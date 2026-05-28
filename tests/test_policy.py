@@ -1,4 +1,4 @@
-from claims_rl_env.agent.policy import Policy
+from evid_rl_env.agent.policy import Policy
 
 
 def test_policy_action():

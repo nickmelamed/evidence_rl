@@ -1,96 +1,101 @@
-# ClaimsRL: Reinforcement Learning for Claim Verification
+# EvidenceRL
 
-## Overview
-
-**ClaimsRL** is a reinforcement learning (RL) framework for training agents to perform **iterative claim verification**. The system models claim evaluation as a sequential decision-making problem, where an agent interacts with an environment to gather evidence, construct arguments, and arrive at a final credibility judgment.
-
-This project extends traditional LLM-based evaluation pipelines by introducing:
-
-* **Action-based reasoning (select/remove/generate/finalize)**
-* **Reward-driven learning (RLHF-style reward modeling)**
-* **Debate-style reasoning (support vs. contradiction)**
-* **Uncertainty-aware evaluation**
-
-The goal is to demonstrate a deep integration of **LLMs + RL + evaluation systems** in a modular, extensible architecture.
-
-For the inspiration behind the claims evaluation, check out this project: https://github.com/nickmelamed/co_claims
+**EvidenceRL** is a reinforcement learning framework that trains agents to verify scientific and factual claims through iterative evidence gathering and debate-style reasoning. The agent operates in a custom Gym-style environment where each episode presents a claim, a pool of evidence, and a structured action space for building arguments — then receives shaped rewards based on the quality of its reasoning process and the accuracy of its final judgment. The core contribution is the RL training loop itself: a principled formulation of claim verification as a sequential decision-making problem, with support for multi-armed bandits, policy gradient, and PPO out of the box.
 
 ---
 
-## Key Features
+## Architecture
 
-### RL Environment for Claim Verification
+### RL Environment (`ClaimEnv`)
 
-* Custom environment (`ClaimEnv`) simulates a claim verification workflow
-* State includes:
+Each episode initializes with a claim and an evidence pool. The agent navigates a five-action space:
 
-  * Claim
-  * Evidence pool
-  * Selected evidence
-  * Generated arguments
-* Action space:
+| Action | Description |
+|---|---|
+| `SELECT` | Pull a piece of evidence into the active context |
+| `REMOVE` | Drop evidence from the active context |
+| `SUPPORT` | Generate an argument in favor of the claim |
+| `CONTRADICT` | Generate a counter-argument against the claim |
+| `FINALIZE` | Commit to a final credibility judgment |
 
-  * `SELECT`: choose evidence
-  * `REMOVE`: discard evidence
-  * `SUPPORT`: generate supporting argument
-  * `CONTRADICT`: generate contradicting argument
-  * `FINALIZE`: produce final decision
+State at each step includes the claim, the full evidence pool, the currently selected evidence, and the full debate history accumulated via `SUPPORT`/`CONTRADICT` actions.
 
----
+### Debate Loop
 
-### Reward Model (RLHF-Inspired)
-
-* Replaces traditional LLM judge with a **reward function**
-* Provides:
-
-  * Step-wise rewards (e.g., good evidence selection)
-  * Final rewards (alignment with ground truth / expected reasoning)
-* Designed to be:
-
-  * Modular
-  * Extensible to learned reward models later
+The `SUPPORT`/`CONTRADICT` cycle is the central reasoning mechanism. Rather than issuing a single judgment from a static context, the agent constructs an explicit argument trace — alternating between building the case for and against the claim — before calling `FINALIZE`. This debate history is passed to the LLM judge at evaluation time, making the agent's reasoning process legible and directly optimizable via reward shaping.
 
 ---
 
-### Multiple RL Strategies
+## Reward Design
 
-Supports flexible experimentation with:
+Rewards are computed at two levels:
 
-* **Multi-Armed Bandits**
-* **Policy Gradient (PG)**
-* **Proximal Policy Optimization (PPO)**
+### Step Rewards
 
-Switchable via a single configuration flag.
+Issued at each action to shape the learning signal mid-episode:
+
+- **Positive:** selecting relevant, non-redundant evidence; generating coherent supporting or contradicting arguments
+- **Negative:** redundant selections, irrelevant evidence, excessive steps without progress
+
+Argument-generating actions (`SUPPORT`, `CONTRADICT`) receive an additional LLM-shaped reward: a lightweight LLM judge scores the accumulated debate history at each step, and a weighted fraction of that score is folded into the step reward. This grounds intermediate shaping in argument quality rather than heuristics alone.
+
+### Final Reward
+
+Issued on `FINALIZE`, based on:
+
+- Alignment with the ground-truth label
+- Logical consistency of the debate trace
+- Evidence utilization quality (coverage, relevance, non-redundancy)
+
+The final reward is the primary training signal; step rewards are shaped to encourage efficient evidence selection and coherent argument construction on the path to it.
 
 ---
 
-### Modular Policy Architecture
+## Evidence Pipeline
 
-* `policy.act(state)` handles action selection
-* Can be:
+Each episode's evidence pool is grounded in real retrieved documents via **Tavily** search — no vector database, no pre-indexed corpus. At episode initialization, EvidenceRL issues a live Tavily query keyed to the claim, retrieves a set of documents, and constructs the evidence pool from those results. This means every episode reflects the current state of the web: the agent never reasons over stale embeddings or cached corpora.
 
-  * Random (baseline)
-  * Learned (PG/PPO)
-  * Hybrid (bandit + policy)
+The pipeline is intentionally lightweight:
+
+1. Claim arrives at episode reset
+2. Tavily query fires; top-k results are fetched and structured as `Evidence` objects
+3. Evidence pool is passed to `ClaimEnv` — no further preprocessing
+4. Agent interacts with live-retrieved evidence for the full episode
+
+This design keeps the evidence pipeline stateless and eliminates retrieval infrastructure entirely. The tradeoff is nondeterminism across runs (web content changes), which is acceptable in a training setting where diversity of evidence is a feature, not a bug.
 
 ---
 
-### Experiment Tracking
+## RL Strategies
 
-* Integrated `ExperimentTracker` for:
+EvidenceRL supports three training strategies, switchable via a single config flag:
 
-  * Logging rewards
-  * Tracking episodes
-  * Saving results to CSV
-* Ensures reproducibility of runs
+### Multi-Armed Bandit
+
+Action selection modeled as a bandit problem. No temporal credit assignment — useful as a baseline to verify that the reward signal is learnable at all.
+
+### Policy Gradient (REINFORCE)
+
+Full episode rollouts with Monte Carlo return estimates. Learns a policy over the action space directly from cumulative episodic reward.
+
+### Proximal Policy Optimization (PPO)
+
+Clipped surrogate objective with value function baseline. Stable under the high-variance reward signal that comes from LLM-in-the-loop shaping. Recommended for serious training runs.
+
+Configure via `config.py`:
+
+```python
+RL_METHOD = "ppo"  # options: "bandit", "pg", "ppo"
+NUM_EPISODES = 100
+```
 
 ---
 
 ## Installation
 
 ```bash
-git clone https://github.com/nickmelamed/claims_rl.git
-cd claims_rl
+git clone https://github.com/nickmelamed/evid_rl.git
+cd evid_rl
 
 python -m venv venv
 source venv/bin/activate
@@ -100,115 +105,60 @@ pip install -r requirements.txt
 
 ---
 
-## Running the Project
+## Usage
 
-### 1. Run a Single Episode
+### Run a Single Episode
 
 ```bash
 python run_episode.py
 ```
 
-Outputs:
+Outputs actions taken, intermediate rewards, and the final decision.
 
-* Actions taken
-* Intermediate rewards
-* Final decision
-
----
-
-### 2. Train the Agent
+### Train the Agent
 
 ```bash
 python train_rl.py
 ```
 
-Configurable via `config.py`:
+Training logs to `logs/experiment_results.csv` automatically, capturing episode rewards, final scores, and action distributions.
 
-```python
-RL_METHOD = "ppo"  # options: "bandit", "pg", "ppo"
-NUM_EPISODES = 100
-```
-
----
-
-### 3. Track Results
-
-Training automatically logs:
-
-* Episode rewards
-* Final scores
-* Action distributions
-
-Saved as:
-
-```
-logs/experiment_results.csv
-```
-
-Plot single experiment results with: 
+### Visualize a Run
 
 ```bash
 python visualize.py --file logs/<experiment_name>.csv
 ```
 
-This will show learning curve, moving average reward, and action distribution trends. 
+Renders learning curve, rolling average reward, and action distribution trends over training.
 
-To compare multiple experiments: 
+### Compare Experiments
 
 ```bash
 python compare_experiments.py \
     --files logs/ppo_run.csv logs/pg_run.csv logs/bandit_run.csv
 ```
 
-You can compare multiple RL methods and  evaluate hyperparameter changes via overlayed reward curves, final performance comparison, and convergence speed analysis. 
+Overlays reward curves across runs for method comparison and hyperparameter analysis, with convergence speed and final performance breakdowns.
 
 ---
 
-## Reward Design
+## Example Episode
 
-The reward function includes:
-
-### Step Rewards
-
-* Positive:
-
-  * Selecting relevant evidence
-  * Generating coherent arguments
-* Negative:
-
-  * Redundant or irrelevant actions
-  * Excessive steps
-
-### Final Reward
-
-* Alignment with:
-
-  * Expected outcome
-  * Logical consistency
-  * Evidence usage quality
+1. Environment initializes with claim: *"Statins reduce cardiovascular mortality in high-risk patients"*
+2. Tavily retrieves live evidence documents; pool is constructed
+3. Agent iterates:
+   - `SELECT` → pulls two high-relevance documents
+   - `SUPPORT` → generates argument citing trial data
+   - `CONTRADICT` → generates counter citing confounding study
+   - `SELECT` → adds a third document addressing the confounder
+   - `SUPPORT` → strengthens argument with updated evidence
+   - `FINALIZE` → commits judgment
+4. Reward model evaluates evidence coverage, debate coherence, and alignment with ground truth
 
 ---
 
-## Example Workflow
+## Future Work
 
-1. Environment initialized with:
-
-   * Claim: *"Company X increased revenue in 2024"*
-   * Evidence set
-
-2. Agent iteratively:
-
-   * Selects evidence
-   * Generates support/contradiction arguments
-
-3. Agent calls `FINALIZE`
-
-4. Reward model evaluates:
-
-   * Evidence quality
-   * Argument coherence
-   * Final decision
-
-
-
-
+- **Learned reward models:** replace the heuristic + LLM-judge reward function with a trained reward model fine-tuned on human preference data over argument quality
+- **Multi-agent debate:** pit two independent agents against each other — one tasked with support, one with contradiction — with a separate arbiter issuing the final reward signal
+- **Domain expansion:** extend beyond scientific claims to regulatory filings, clinical trial reports, and policy documents, with domain-specific evidence retrievers and reward calibration

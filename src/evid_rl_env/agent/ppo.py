@@ -1,5 +1,5 @@
 import numpy as np
-from claims_rl_env.agent.policy import encode_state
+from evid_rl_env.agent.policy import encode_state
 
 
 class PPO:

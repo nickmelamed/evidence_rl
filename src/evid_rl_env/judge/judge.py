@@ -1,4 +1,4 @@
-from claims_rl_env.judge.reward import RewardFunction
+from evid_rl_env.judge.reward import RewardFunction
 
 
 class Judge:

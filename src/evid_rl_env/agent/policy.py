@@ -1,6 +1,6 @@
 import numpy as np
-from claims_rl_env.environment.actions import Actions, ACTIONS
-from claims_rl_env.agent.llm_client import LLMClient
+from evid_rl_env.environment.actions import Actions, ACTIONS
+from evid_rl_env.agent.llm_client import LLMClient
 
 STATE_DIM = 4
 

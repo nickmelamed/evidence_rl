@@ -1,5 +1,5 @@
 [project]
-name = "claims_rl_env"
+name = "evid_rl_env"
 version = "0.1.0"
 description = "RL environment for LLM training for Claims Evaluation"
 authors = [{name = "Nick Melamed"}]
@@ -14,7 +14,7 @@ dependencies = [
 where = ["src"]
 
 [project.scripts]
-train-rl = "claims_rl_env.cli.train:main"
-run-episode = "claims_rl_env.cli.run_episode:main"
-plot-exp = "claims_rl_env.cli.plot:main"
-compare-exp = "claims_rl_env.cli.compare:main"
+train-rl = "evid_rl_env.cli.train:main"
+run-episode = "evid_rl_env.cli.run_episode:main"
+plot-exp = "evid_rl_env.cli.plot:main"
+compare-exp = "evid_rl_env.cli.compare:main"

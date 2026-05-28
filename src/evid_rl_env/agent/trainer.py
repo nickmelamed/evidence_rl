@@ -1,12 +1,12 @@
 import numpy as np
 import json
 
-from claims_rl_env.utils.experiment import ExperimentTracker
-from claims_rl_env.agent.bandit import LinUCBBandit
-from claims_rl_env.agent.policy_gradient import PolicyGradient
-from claims_rl_env.agent.ppo import PPO
-from claims_rl_env.environment.actions import Actions, ACTIONS
-from claims_rl_env.agent.policy import encode_state
+from evid_rl_env.utils.experiment import ExperimentTracker
+from evid_rl_env.agent.bandit import LinUCBBandit
+from evid_rl_env.agent.policy_gradient import PolicyGradient
+from evid_rl_env.agent.ppo import PPO
+from evid_rl_env.environment.actions import Actions, ACTIONS
+from evid_rl_env.agent.policy import encode_state
 
 
 class Trainer:

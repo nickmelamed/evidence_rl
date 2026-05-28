@@ -1,7 +1,7 @@
-from claims_rl_env.environment.environment import ClaimEnv
-from claims_rl_env.data.dataset import load_dataset
-from claims_rl_env.agent.policy import SoftmaxPolicy, ActorCriticPolicy
-from claims_rl_env.environment.actions import ACTIONS
+from evid_rl_env.environment.environment import ClaimEnv
+from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.agent.policy import SoftmaxPolicy, ActorCriticPolicy
+from evid_rl_env.environment.actions import ACTIONS
 
 import argparse
 

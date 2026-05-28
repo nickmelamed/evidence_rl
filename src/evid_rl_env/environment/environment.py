@@ -1,11 +1,11 @@
 import random
 import numpy as np
 
-from claims_rl_env.environment.state import State, Evidence
-from claims_rl_env.environment.actions import Actions
-from claims_rl_env.judge.reward import RewardFunction
-from claims_rl_env.judge.llm_judge import LLMJudge
-from claims_rl_env.agent.llm_client import LLMClient
+from evid_rl_env.environment.state import State, Evidence
+from evid_rl_env.environment.actions import Actions
+from evid_rl_env.judge.reward import RewardFunction
+from evid_rl_env.judge.llm_judge import LLMJudge
+from evid_rl_env.agent.llm_client import LLMClient
 
 
 class ClaimEnv:

@@ -1,4 +1,4 @@
-from claims_rl_env.judge.metrics import (
+from evid_rl_env.judge.metrics import (
     compute_ess,
     compute_ecs,
     compute_adversarial_penalty

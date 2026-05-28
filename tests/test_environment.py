@@ -1,4 +1,4 @@
-from claims_rl_env.environment.environment import Environment
+from evid_rl_env.environment.environment import Environment
 
 
 def test_environment_step():

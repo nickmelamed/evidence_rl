@@ -1,10 +1,10 @@
-from claims_rl_env.environment.environment import ClaimEnv
-from claims_rl_env.environment.curriculum import Curriculum
-from claims_rl_env.agent.policy import SoftmaxPolicy, ActorCriticPolicy
-from claims_rl_env.environment.actions import ACTIONS
-from claims_rl_env.data.dataset import load_dataset
-from claims_rl_env.agent.trainer import Trainer
-from claims_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
+from evid_rl_env.environment.environment import ClaimEnv
+from evid_rl_env.environment.curriculum import Curriculum
+from evid_rl_env.agent.policy import SoftmaxPolicy, ActorCriticPolicy
+from evid_rl_env.environment.actions import ACTIONS
+from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.agent.trainer import Trainer
+from evid_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
 
 import argparse
 

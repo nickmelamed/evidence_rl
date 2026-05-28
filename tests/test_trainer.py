@@ -1,4 +1,4 @@
-from claims_rl_env.config import build_trainer
+from evid_rl_env.config import build_trainer
 
 
 def test_trainer_runs():
