@@ -30,13 +30,14 @@ class LLMJudge:
             f"CLAIM:\n{claim}\n\n"
             f"EVIDENCE:\n{evidence_text}\n\n"
             f"REASONING:\n{reasoning}\n\n"
-            "Score the reasoning on exactly these four dimensions and "
+            "Score the reasoning on exactly these five dimensions and "
             "return ONLY this JSON object with float values between 0 and 1:\n"
-            '{"LCS": 0.0, "ESS": 0.0, "HRS": 0.0, "COMP": 0.0, "confidence": 0.0}\n\n'
+            '{"LCS": 0.0, "ESS": 0.0, "GRS": 0.0, "COMP": 0.0, "BIAS": 0.0, "confidence": 0.0}\n\n'
             "LCS = logical consistency (1=fully coherent)\n"
             "ESS = evidence support (1=correctly uses all evidence)\n"
-            "HRS = hallucination risk (1=highly risky, 0=no hallucination)\n"
+            "GRS = grounding risk (1=reasoning introduces claims not in evidence, 0=fully grounded)\n"
             "COMP = completeness (1=fully addresses the claim)\n"
+            "BIAS = selective citation bias (1=only cites supporting evidence while ignoring contradictions it was given, 0=balanced)\n"
             "confidence = your confidence in these scores (0-1)\n\n"
             "Respond with the JSON object only:"
         )
@@ -58,7 +59,7 @@ class LLMJudge:
 
         # Try extracting individual float values by key
         scores = {}
-        for key in ["LCS", "ESS", "HRS", "COMP", "confidence"]:
+        for key in ["LCS", "ESS", "GRS", "COMP", "BIAS", "confidence"]:
             m = re.search(rf'"{key}"\s*:\s*([0-9.]+)', response)
             if m:
                 try:
@@ -67,16 +68,16 @@ class LLMJudge:
                     pass
 
         if len(scores) >= 3:
-            for key in ["LCS", "ESS", "HRS", "COMP", "confidence"]:
+            for key in ["LCS", "ESS", "GRS", "COMP", "BIAS", "confidence"]:
                 scores.setdefault(key, 0.5)
             return scores
 
         # Hard fallback
-        return {"LCS": 0.5, "ESS": 0.5, "HRS": 0.5, "COMP": 0.5, "confidence": 0.5}
+        return {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.5}
 
     def compute_reward(self, claim, reasoning, evidence):
         if not reasoning.strip():
-            return 0.0, {"LCS": 0.0, "ESS": 0.0, "HRS": 0.5, "COMP": 0.0, "confidence": 0.0}
+            return 0.0, {"LCS": 0.0, "ESS": 0.0, "GRS": 0.5, "COMP": 0.0, "BIAS": 0.5, "confidence": 0.0}
 
         if self.cache_scores:
             key = self._cache_key(claim, reasoning, evidence)
@@ -102,9 +103,19 @@ class LLMJudge:
     def _scores_to_reward(self, scores):
         lcs = float(scores.get("LCS", 0.5))
         ess = float(scores.get("ESS", 0.5))
-        hrs = float(scores.get("HRS", 0.5))
+        grs = float(scores.get("GRS", 0.5))
         comp = float(scores.get("COMP", 0.5))
+        bias = float(scores.get("BIAS", 0.5))
         conf = float(scores.get("confidence", 0.5))
 
-        reward = (0.35 * lcs + 0.35 * ess + 0.2 * comp - 0.3 * hrs) * conf
-        return float(np.clip(reward, -1.0, 1.0))
+        reward = (
+            0.30 * lcs
+            + 0.25 * ess
+            + 0.20 * comp
+            - 0.25 * grs
+            - 0.15 * bias
+        )
+        # blend toward neutral only when judge confidence is very low
+        if conf < 0.4:
+            reward = 0.5 * reward + 0.5 * 0.5
+        return float(np.clip(reward, 0.0, 1.0))

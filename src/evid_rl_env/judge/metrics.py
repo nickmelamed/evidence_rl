@@ -1,13 +1,32 @@
-import numpy as np
+def compute_precision(selected):
+    if not selected:
+        return 0.0
+    return sum(1 for e in selected if e.label == "support") / len(selected)
 
 
-def compute_ess(selected):
-    return np.mean([1 if e.label == "support" else 0 for e in selected]) if selected else 0
+def compute_recall(selected, available):
+    support_available = [e for e in available if e.label == "support"]
+    if not support_available:
+        return 1.0
+    return sum(1 for e in support_available if e in selected) / len(support_available)
 
 
-def compute_ecs(selected):
-    return np.mean([1 if e.label == "contradict" else 0 for e in selected]) if selected else 0
+def compute_f1(selected, available):
+    precision = compute_precision(selected)
+    recall = compute_recall(selected, available)
+    if precision + recall == 0:
+        return 0.0
+    return 2 * precision * recall / (precision + recall)
 
 
-def compute_adversarial_penalty(selected):
-    return np.mean([1 if e.label == "adversarial" else 0 for e in selected]) if selected else 0
+def compute_contradiction_acknowledgment(selected, available):
+    contradict_available = [e for e in available if e.label == "contradict"]
+    if not contradict_available:
+        return 1.0
+    return sum(1 for e in contradict_available if e in selected) / len(contradict_available)
+
+
+def compute_adversarial_contamination(selected):
+    if not selected:
+        return 0.0
+    return sum(1 for e in selected if e.label == "adversarial") / len(selected)
