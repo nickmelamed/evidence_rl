@@ -1,19 +1,16 @@
 import numpy as np
 from evid_rl_env.environment.actions import Actions, ACTIONS
 from evid_rl_env.agent.llm_client import LLMClient
+from evid_rl_env.agent.state_encoder import encode_state_semantic, get_state_dim, SEMANTIC_AVAILABLE
 
-STATE_DIM = 4
+STATE_DIM = get_state_dim()
 
 def encode_state(state):
-    return np.array([
-        len(state.selected_evidence) / 5,
-        len(state.evidence_pool) / 10,
-        len(state.debate_history) / 5,
-        state.steps_taken / state.max_steps
-    ], dtype=float)
+    return encode_state_semantic(state)
 
 class ActorCriticPolicy:
-    def __init__(self, n_actions, state_dim=STATE_DIM):
+    def __init__(self, n_actions, state_dim=None):
+        if state_dim is None: state_dim = get_state_dim()
         self.actions = ACTIONS
         self.n_actions = n_actions
         self.state_dim = state_dim
@@ -82,10 +79,11 @@ Write a concise {action.lower()} argument.
         return np.outer(features, grad)
 
 class SoftmaxPolicy:
-    def __init__(self, n_actions):
+    def __init__(self, n_actions, state_dim=None):
+        if state_dim is None: state_dim = get_state_dim()
         self.actions = ACTIONS
         self.n_actions = n_actions
-        self.params = np.random.randn(STATE_DIM, n_actions)
+        self.params = np.random.randn(state_dim, n_actions)
 
         finalize_idx = self.actions.index(Actions.FINALIZE)
         self.params[finalize_idx] = -2.0
