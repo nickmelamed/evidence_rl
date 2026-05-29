@@ -215,11 +215,15 @@ class ClaimEnv:
                 if concession:
                     s.debate_history.append("CONCEDE: " + concession)
                     partial_reasoning = " ".join(s.debate_history)
-                    llm_reward, llm_scores = self.llm_judge.compute_reward(
-                        claim=s.claim,
-                        reasoning=partial_reasoning,
-                        evidence=s.selected_evidence
-                    )
+                    if s.steps_taken - self._last_judge_step >= 2:
+                        llm_reward, llm_scores = self.llm_judge.compute_reward(
+                            claim=s.claim,
+                            reasoning=partial_reasoning,
+                            evidence=s.selected_evidence
+                        )
+                        self._last_judge_step = s.steps_taken
+                    else:
+                        llm_reward, llm_scores = s.last_llm_score, {}
                     delta = llm_reward - s.last_llm_score
                     s.last_llm_score = llm_reward
                     reward = 0.05 + 0.1 * delta

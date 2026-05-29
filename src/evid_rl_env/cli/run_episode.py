@@ -1,20 +1,17 @@
 from evid_rl_env.environment.environment import ClaimEnv
 from evid_rl_env.data.dataset import load_dataset
-from evid_rl_env.agent.policy import SoftmaxPolicy, ActorCriticPolicy
+from evid_rl_env.agent.policy import ActorCriticPolicy
 from evid_rl_env.environment.actions import ACTIONS
 
 import argparse
 
 
-def run(policy='actor'):
+def run():
     dataset = load_dataset()
 
     env = ClaimEnv(dataset)
 
-    if policy == 'actor':
-        policy = ActorCriticPolicy(len(list(ACTIONS)))
-    elif policy == 'softmax':
-        policy = SoftmaxPolicy(len(list(ACTIONS)))
+    policy = ActorCriticPolicy(len(list(ACTIONS)))
 
     state = env.reset()
     done = False
@@ -25,7 +22,7 @@ def run(policy='actor'):
     print("CLAIM:", state.claim)
 
     while not done:
-        action, payload = policy.act(state)
+        action, payload, _ = policy.act(state)
         state, reward, done, _ = env.step(action, payload)
 
         step += 1
@@ -41,11 +38,7 @@ def run(policy='actor'):
     print("Final Reward:", round(reward, 3))
 
 def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--policy", type=str, default='actor')
-    args = parser.parse_args()
-
-    run(args.policy)
+    run()
 
 if __name__ == "__main__":
     main()

@@ -12,6 +12,7 @@ class PPOConfig(BaseConfig):
         self.entropy_coef = 0.01
         self.value_coef = 0.05
         self.gae_lambda = 0.95
+        self.ppo_epochs = 4
 
 class PGConfig(BaseConfig):
     def __init__(self):
