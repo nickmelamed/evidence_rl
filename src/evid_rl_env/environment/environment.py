@@ -18,6 +18,7 @@ class ClaimEnv:
 
         llm = LLMClient()
         self.llm_judge = LLMJudge(llm, weight=0.5)
+        self._last_judge_step = 0
 
     def _evidence_diversity_bonus(self, new_evidence_id):
         """Returns a small bonus if this evidence id hasn't been selected before."""
@@ -25,6 +26,7 @@ class ClaimEnv:
 
     def reset(self):
         self._prev_phi = 0.0
+        self._last_judge_step = 0
         self.current_sample = random.choice(self.dataset)
         claim = self.current_sample["claim"]
         search_query = self.current_sample.get("search_query", claim)
@@ -74,11 +76,15 @@ class ClaimEnv:
                 s.debate_history.append("SUPPORT: " + str(payload))
 
                 partial_reasoning = " ".join(s.debate_history)
-                llm_reward, llm_scores = self.llm_judge.compute_reward(
-                    claim=s.claim,
-                    reasoning=partial_reasoning,
-                    evidence=s.selected_evidence
-                )
+                if s.steps_taken - self._last_judge_step >= 2:
+                    llm_reward, llm_scores = self.llm_judge.compute_reward(
+                        claim=s.claim,
+                        reasoning=partial_reasoning,
+                        evidence=s.selected_evidence
+                    )
+                    self._last_judge_step = s.steps_taken
+                else:
+                    llm_reward, llm_scores = s.last_llm_score, {}
                 delta = llm_reward - s.last_llm_score
                 s.last_llm_score = llm_reward
                 reward = 0.05 + 0.15 * delta
@@ -89,11 +95,15 @@ class ClaimEnv:
                 s.debate_history.append("CONTRADICT: " + str(payload))
 
                 partial_reasoning = " ".join(s.debate_history)
-                llm_reward, llm_scores = self.llm_judge.compute_reward(
-                    claim=s.claim,
-                    reasoning=partial_reasoning,
-                    evidence=s.selected_evidence
-                )
+                if s.steps_taken - self._last_judge_step >= 2:
+                    llm_reward, llm_scores = self.llm_judge.compute_reward(
+                        claim=s.claim,
+                        reasoning=partial_reasoning,
+                        evidence=s.selected_evidence
+                    )
+                    self._last_judge_step = s.steps_taken
+                else:
+                    llm_reward, llm_scores = s.last_llm_score, {}
                 delta = llm_reward - s.last_llm_score
                 s.last_llm_score = llm_reward
                 reward = 0.05 + 0.15 * delta

@@ -9,7 +9,13 @@ class LLMJudge:
         self.llm = llm
         self.weight = weight
         self.cache_scores = cache_scores
-        self._cache = {}
+        import shelve, os
+        os.makedirs("artifacts/cache", exist_ok=True)
+        self._cache = shelve.open("artifacts/cache/judge_cache", writeback=True)
+
+    def close(self):
+        if hasattr(self._cache, "close"):
+            self._cache.close()
 
     def _cache_key(self, claim, reasoning, evidence):
         raw = claim + reasoning + "".join(e.text for e in evidence)
@@ -94,6 +100,7 @@ Output format (last line only, no markdown):
 
         if self.cache_scores:
             self._cache[key] = scores
+            self._cache.sync()
 
         reward = self._scores_to_reward(scores)
         return reward, scores

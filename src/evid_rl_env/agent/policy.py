@@ -23,6 +23,23 @@ class ActorCriticPolicy:
 
         self.llm = LLMClient()
 
+    def generate_arguments_batch(self, prompts):
+        """Generate multiple arguments in a single batched pipeline call."""
+        if not prompts:
+            return []
+        outputs = self.llm.pipe(
+            prompts,
+            batch_size=min(len(prompts), 4),
+            max_new_tokens=128,
+            do_sample=True,
+            temperature=self.llm.temperature,
+            return_full_text=False
+        )
+        return [(o[0]["generated_text"], len(o[0]["generated_text"].split())) for o in outputs]
+
+    def reset_episode_cache(self):
+        self._arg_cache = {}
+
     def get_logits(self, state):
         features = encode_state(state)
         return features @ self.actor_params
@@ -38,6 +55,9 @@ class ActorCriticPolicy:
         return features @ self.value_params
 
     def act(self, state):
+        if not hasattr(self, "_arg_cache"):
+            self._arg_cache = {}
+
         probs = self.get_probs(state)
 
         entropy = -np.sum(probs * np.log(probs + 1e-8))
@@ -61,14 +81,18 @@ class ActorCriticPolicy:
 
         elif action in [Actions.SUPPORT, Actions.CONTRADICT]:
             texts = [e.text for e in state.selected_evidence]
-
-            argument, tokens = self.llm.generate(
-                f"""
+            cache_key = (str(action), frozenset(e.id for e in state.selected_evidence))
+            if cache_key in self._arg_cache:
+                argument, tokens = self._arg_cache[cache_key]
+            else:
+                argument, tokens = self.llm.generate(
+                    f"""
 Claim: {state.claim}
 Evidence: {texts}
 Write a concise {action.lower()} argument.
 """
-            )
+                )
+                self._arg_cache[cache_key] = (argument, tokens)
 
             return action, {
                 "argument": argument,
@@ -87,15 +111,25 @@ Write a concise {action.lower()} argument.
         elif action == Actions.SUMMARIZE:
             if state.selected_evidence:
                 texts = [e.text for e in state.selected_evidence]
-                summary_prompt = f"Claim: {state.claim}\nEvidence:\n{texts}\nWrite a one-sentence summary of how this evidence relates to the claim."
-                summary_text, tokens = self.llm.generate(summary_prompt)
+                cache_key = (str(action), frozenset(e.id for e in state.selected_evidence))
+                if cache_key in self._arg_cache:
+                    summary_text, tokens = self._arg_cache[cache_key]
+                else:
+                    summary_prompt = f"Claim: {state.claim}\nEvidence:\n{texts}\nWrite a one-sentence summary of how this evidence relates to the claim."
+                    summary_text, tokens = self.llm.generate(summary_prompt)
+                    self._arg_cache[cache_key] = (summary_text, tokens)
                 return action, {"summary": summary_text.strip(), "tokens": tokens}, idx
             return action, {"summary": "", "tokens": 0}, idx
 
         elif action == Actions.CONCEDE:
             texts = [e.text for e in state.selected_evidence]
-            concede_prompt = f"Claim: {state.claim}\nEvidence: {texts}\nWrite a concise acknowledgement of the strongest counterpoint to the claim."
-            argument, tokens = self.llm.generate(concede_prompt)
+            cache_key = (str(action), frozenset(e.id for e in state.selected_evidence))
+            if cache_key in self._arg_cache:
+                argument, tokens = self._arg_cache[cache_key]
+            else:
+                concede_prompt = f"Claim: {state.claim}\nEvidence: {texts}\nWrite a concise acknowledgement of the strongest counterpoint to the claim."
+                argument, tokens = self.llm.generate(concede_prompt)
+                self._arg_cache[cache_key] = (argument, tokens)
             return action, {"argument": argument, "evidence_ids": [e.id for e in state.selected_evidence], "tokens": tokens}, idx
 
         return action, None, idx

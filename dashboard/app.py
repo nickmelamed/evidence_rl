@@ -167,6 +167,29 @@ with tab1:
 
         st.success(f"🏆 Best Episode: {int(best_ep)}")
 
+    st.subheader("Train vs eval reward")
+    eval_rows = df.dropna(subset=["eval/mean_reward"]) if "eval/mean_reward" in df.columns else pd.DataFrame()
+    if not eval_rows.empty:
+        fig_gap = go.Figure()
+        fig_gap.add_trace(go.Scatter(
+            x=df["episode"], y=df["reward_smooth"],
+            mode="lines", name="Train (smoothed)", line=dict(color="#378ADD")
+        ))
+        fig_gap.add_trace(go.Scatter(
+            x=eval_rows["episode"], y=eval_rows["eval/mean_reward"],
+            mode="lines+markers", name="Eval mean",
+            error_y=dict(
+                type="data",
+                array=eval_rows["eval/std_reward"].fillna(0).tolist() if "eval/std_reward" in eval_rows.columns else [],
+                visible=True
+            ),
+            line=dict(color="#D85A30", dash="dash")
+        ))
+        fig_gap.update_layout(title="Train vs eval reward — gap indicates overfitting")
+        st.plotly_chart(fig_gap, use_container_width=True)
+    else:
+        st.info("Eval data not yet available. Set eval_every in Trainer to enable.")
+
     # Policy behavior
     st.subheader("Policy Behavior")
 

@@ -4,11 +4,15 @@ logging.set_verbosity_error() # removing token warning
 
 class LLMClient:
     def __init__(self, model_name="microsoft/phi-2", temperature=0.7):
-        self.pipe = pipeline("text-generation", model=model_name)
+        self._pipe = pipeline("text-generation", model=model_name)
         self.temperature = temperature
 
+    @property
+    def pipe(self):
+        return self._pipe
+
     def generate(self, prompt):
-        out = self.pipe(
+        out = self._pipe(
             prompt,
             max_new_tokens=128,
             do_sample=True,
@@ -21,7 +25,7 @@ class LLMClient:
 
     def generate_structured(self, prompt, temperature=0.1):
         """Lower-temperature generation for structured outputs like JSON scores."""
-        out = self.pipe(
+        out = self._pipe(
             prompt,
             max_new_tokens=200,
             do_sample=True,

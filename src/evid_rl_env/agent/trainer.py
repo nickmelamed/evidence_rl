@@ -49,6 +49,7 @@ class Trainer:
 
             # Policy
             "state_dim": getattr(self.policy, "state_dim", None),
+            "eval_every": self.eval_every,
         }
 
         self.tracker.save_config(wandb_config)
@@ -85,6 +86,10 @@ class Trainer:
             while not done:
 
                 steps += 1
+
+                if steps == 1:
+                    if hasattr(self.policy, "reset_episode_cache"):
+                        self.policy.reset_episode_cache()
 
                 action, payload, action_idx = self.policy.act(state)
 
