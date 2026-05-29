@@ -7,3 +7,5 @@ rl:
   gamma: 0.99
   ppo_epochs: 4
   gae_lambda: 0.95
+  actor_model: "Qwen/Qwen2.5-1.5B-Instruct"
+  judge_model: "Qwen/Qwen2.5-1.5B-Instruct"

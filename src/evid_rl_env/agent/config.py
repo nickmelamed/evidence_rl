@@ -1,6 +1,8 @@
 class BaseConfig:
     def __init__(self):
         self.gamma = 0.99
+        self.actor_model = "Qwen/Qwen2.5-1.5B-Instruct"
+        self.judge_model = "Qwen/Qwen2.5-1.5B-Instruct"
 
 class PPOConfig(BaseConfig):
     def __init__(self):

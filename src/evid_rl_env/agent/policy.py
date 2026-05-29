@@ -9,7 +9,7 @@ def encode_state(state):
     return encode_state_semantic(state)
 
 class ActorCriticPolicy:
-    def __init__(self, n_actions, state_dim=None):
+    def __init__(self, n_actions, state_dim=None, model_name=None):
         if state_dim is None: state_dim = get_state_dim()
         self.actions = ACTIONS
         self.n_actions = n_actions
@@ -21,7 +21,9 @@ class ActorCriticPolicy:
         # Critic (value function)
         self.value_params = np.zeros(state_dim)
 
-        self.llm = LLMClient()
+        from evid_rl_env.agent.llm_client import LLMClient
+        actor_model = model_name or "Qwen/Qwen2.5-1.5B-Instruct"
+        self.llm = LLMClient(model_name=actor_model)
 
     def generate_arguments_batch(self, prompts):
         """Generate multiple arguments in a single batched pipeline call."""

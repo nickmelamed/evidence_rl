@@ -23,29 +23,23 @@ class LLMJudge:
 
     def build_prompt(self, claim, reasoning, evidence):
         evidence_text = "\n".join([f"- {e.text}" for e in evidence])
-        return f"""You are an expert evaluator of reasoning quality.
-
-Evaluate the following:
-
-CLAIM:
-{claim}
-
-EVIDENCE:
-{evidence_text}
-
-REASONING:
-{reasoning}
-
-Score the reasoning on these four dimensions.
-Think step by step, then output ONLY a JSON object on the last line.
-
-1. Logical Consistency (LCS): Is it coherent and non-contradictory? (0-1)
-2. Evidence Support (ESS): Does it correctly use the evidence? (0-1)
-3. Hallucination Risk (HRS): Does it invent unsupported facts? (0=safe, 1=risky)
-4. Completeness (COMP): Does it fully address the claim? (0-1)
-
-Output format (last line only, no markdown):
-{{"LCS": 0.0, "ESS": 0.0, "HRS": 0.0, "COMP": 0.0, "confidence": 0.0}}"""
+        return (
+            "You are an expert evaluator of reasoning quality. "
+            "You must respond with ONLY a JSON object — no explanation, "
+            "no markdown, no preamble.\n\n"
+            f"CLAIM:\n{claim}\n\n"
+            f"EVIDENCE:\n{evidence_text}\n\n"
+            f"REASONING:\n{reasoning}\n\n"
+            "Score the reasoning on exactly these four dimensions and "
+            "return ONLY this JSON object with float values between 0 and 1:\n"
+            '{"LCS": 0.0, "ESS": 0.0, "HRS": 0.0, "COMP": 0.0, "confidence": 0.0}\n\n'
+            "LCS = logical consistency (1=fully coherent)\n"
+            "ESS = evidence support (1=correctly uses all evidence)\n"
+            "HRS = hallucination risk (1=highly risky, 0=no hallucination)\n"
+            "COMP = completeness (1=fully addresses the claim)\n"
+            "confidence = your confidence in these scores (0-1)\n\n"
+            "Respond with the JSON object only:"
+        )
 
     def parse(self, response):
         # Try direct JSON parse first

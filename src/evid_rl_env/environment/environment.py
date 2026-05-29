@@ -5,19 +5,20 @@ from evid_rl_env.environment.state import State, Evidence
 from evid_rl_env.environment.actions import Actions
 from evid_rl_env.judge.reward import RewardFunction
 from evid_rl_env.judge.llm_judge import LLMJudge
-from evid_rl_env.agent.llm_client import LLMClient
+from evid_rl_env.agent.llm_client import LLMClient, JudgeLLMClient
 from evid_rl_env.data.evidence_fetcher import fetch_evidence
 
 
 class ClaimEnv:
-    def __init__(self, dataset):
+    def __init__(self, dataset, judge_model=None):
         self.dataset = dataset
         self.state = None
         self.current_sample = None
         self.reward_fn = RewardFunction()
 
-        llm = LLMClient()
-        self.llm_judge = LLMJudge(llm, weight=0.5)
+        judge_model_name = judge_model or "Qwen/Qwen2.5-1.5B-Instruct"
+        judge_llm = JudgeLLMClient(model_name=judge_model_name)
+        self.llm_judge = LLMJudge(judge_llm, weight=0.5)
         self._last_judge_step = 0
 
     def _evidence_diversity_bonus(self, new_evidence_id):
