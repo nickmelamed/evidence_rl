@@ -75,3 +75,4 @@ typing_extensions==4.15.0
 urllib3==2.6.3
 watchdog==6.0.0
 sentence-transformers>=2.2.0
+wandb>=0.16.0

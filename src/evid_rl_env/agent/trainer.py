@@ -1,7 +1,14 @@
 import numpy as np
 import json
 
+try:
+    import wandb
+    WANDB_AVAILABLE = True
+except ImportError:
+    WANDB_AVAILABLE = False
+
 from evid_rl_env.utils.experiment import ExperimentTracker
+from evid_rl_env.agent.evaluator import Evaluator
 from evid_rl_env.utils.running_stats import RunningMeanStd
 from evid_rl_env.agent.bandit import LinUCBBandit
 from evid_rl_env.agent.policy_gradient import PolicyGradient
@@ -11,9 +18,11 @@ from evid_rl_env.agent.policy import encode_state
 
 
 class Trainer:
-    def __init__(self, env, policy, config, episodes=50, algo="ppo", exp_name="exp", seed=42):
+    def __init__(self, env, policy, config, episodes=50, algo="ppo", exp_name="exp", seed=42, use_wandb=False, eval_dataset=None, eval_every=10):
         import random, numpy as np
         random.seed(seed); np.random.seed(seed)
+        self.use_wandb = use_wandb and WANDB_AVAILABLE
+        self.eval_every = eval_every
         self.reward_rms = RunningMeanStd()
         self.token_penalty = 0.0001  # penalty per token used
         self.max_tokens_per_episode = 2000
@@ -25,7 +34,7 @@ class Trainer:
         self.seed = seed
         self.tracker = ExperimentTracker(exp_name)
 
-        self.tracker.save_config({
+        wandb_config = {
             "algo": self.algo,
             "policy_type": self.policy.__class__.__name__,
             "episodes": self.episodes,
@@ -45,7 +54,13 @@ class Trainer:
 
             # Policy
             "state_dim": getattr(self.policy, "state_dim", None),
-        })
+        }
+
+        self.tracker.save_config(wandb_config)
+        self.evaluator = Evaluator(env, policy) if eval_dataset is not None else None
+
+        if self.use_wandb:
+            wandb.init(project="evid-rl", name=exp_name, config=wandb_config)
 
         # RL selection
         if algo == "ppo":
@@ -201,7 +216,27 @@ class Trainer:
                 "tokens": total_tokens 
             }
 
+            action_dist = {}
+            for t in viz:
+                a = t["action"]
+                action_dist[a] = action_dist.get(a, 0) + 1
+
+            metrics["action_dist"] = {k: v / max(steps, 1) for k, v in action_dist.items()}
+            metrics["entropy"] = self.policy.last_entropy
+
+            if self.use_wandb:
+                wandb.log(metrics, step=ep)
+
             self.tracker.log_episode(metrics)
             self.tracker.save_trajectory(ep, viz)
 
             print(f"Ep {ep} | Reward {total_reward:.3f}")
+
+            if self.evaluator is not None and (ep + 1) % self.eval_every == 0:
+                eval_metrics = self.evaluator.evaluate()
+                print(f"  Eval | reward {eval_metrics['eval/mean_reward']:.3f} ± {eval_metrics['eval/std_reward']:.3f}")
+                if self.use_wandb:
+                    wandb.log(eval_metrics, step=ep)
+
+        if self.use_wandb:
+            wandb.finish()
