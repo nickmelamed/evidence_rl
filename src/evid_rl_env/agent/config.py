@@ -9,6 +9,7 @@ class PPOConfig(BaseConfig):
         self.clip = 0.2
         self.entropy_coef = 0.01
         self.value_coef = 0.05
+        self.gae_lambda = 0.95
 
 class PGConfig(BaseConfig):
     def __init__(self):

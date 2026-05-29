@@ -2,6 +2,7 @@ import numpy as np
 import json
 
 from evid_rl_env.utils.experiment import ExperimentTracker
+from evid_rl_env.utils.running_stats import RunningMeanStd
 from evid_rl_env.agent.bandit import LinUCBBandit
 from evid_rl_env.agent.policy_gradient import PolicyGradient
 from evid_rl_env.agent.ppo import PPO
@@ -13,6 +14,9 @@ class Trainer:
     def __init__(self, env, policy, config, episodes=50, algo="ppo", exp_name="exp", seed=42):
         import random, numpy as np
         random.seed(seed); np.random.seed(seed)
+        self.reward_rms = RunningMeanStd()
+        self.token_penalty = 0.0001  # penalty per token used
+        self.max_tokens_per_episode = 2000
         self.env = env
         self.policy = policy
         self.config = config
@@ -104,9 +108,15 @@ class Trainer:
                 llm_reward = info.get("llm_reward", 0)
 
                 if isinstance(payload, dict):
-                    total_tokens += payload.get("tokens", 0)
+                    ep_tokens = payload.get("tokens", 0)
+                    total_tokens += ep_tokens
+                    token_fraction = min(1.0, total_tokens / self.max_tokens_per_episode)
+                    reward -= self.token_penalty * ep_tokens
 
-                # store unified trajectory 
+                self.reward_rms.update([reward])
+                reward = float(self.reward_rms.normalize(reward))
+
+                # store unified trajectory
                 trajectory.append({
                     "state": state,
                     "action_idx": action_idx,

@@ -12,27 +12,32 @@ class PPO:
         self.value_coef = config.value_coef
         self.K = getattr(config, "ppo_epochs", 4)
         self.max_grad_norm = getattr(config, "max_grad_norm", 0.5)
+        self.gae_lambda = getattr(config, "gae_lambda", 0.95)
 
-    def compute_advantages(self, rewards, values):
-        returns = []
+    def compute_advantages(self, rewards, values, next_value=0.0):
+        """
+        Generalised Advantage Estimation (GAE-lambda).
+        next_value: bootstrap value for the state after the last step (0 if terminal).
+        """
+        gae_lambda = getattr(self, "gae_lambda", 0.95)
+        advantages = []
+        gae = 0.0
+        values_extended = list(values) + [next_value]
 
-        G = 0
-        for r in reversed(rewards):
-            G = r + self.gamma * G
-            returns.insert(0, G)
+        for t in reversed(range(len(rewards))):
+            delta = rewards[t] + self.gamma * values_extended[t + 1] - values_extended[t]
+            gae = delta + self.gamma * gae_lambda * gae
+            advantages.insert(0, gae)
 
-        returns = np.array(returns)
-        values = np.array(values)
-
-        advantages = returns - values
+        advantages = np.array(advantages, dtype=np.float32)
+        returns = advantages + np.array(values, dtype=np.float32)
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
         return returns, advantages
 
     def update(self, trajectories):
         states, actions, old_probs, rewards, values = zip(*trajectories)
 
-        returns, advantages = self.compute_advantages(rewards, values)
+        returns, advantages = self.compute_advantages(list(rewards), list(values))
 
         for _ in range(self.K):
             for state, action_idx, old_prob, ret, adv in zip(
