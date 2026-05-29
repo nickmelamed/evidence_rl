@@ -16,6 +16,9 @@ class State:
     max_steps: int = 10
     last_llm_score: float = 0.0
     selected_evidence_ids: set = field(default_factory=set)
+    query_count: int = 0
+    max_queries: int = 2
+    summary: str = ""
 
     def is_done(self):
         return self.steps_taken >= self.max_steps

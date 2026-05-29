@@ -42,6 +42,14 @@ class ActorCriticPolicy:
 
         entropy = -np.sum(probs * np.log(probs + 1e-8))
         self.last_entropy = entropy
+
+        # mask QUERY when budget exhausted
+        if state.query_count >= state.max_queries:
+            probs = probs.copy()
+            query_idx = self.actions.index(Actions.QUERY)
+            probs[query_idx] = 0
+            probs = probs / np.sum(probs)
+
         self.last_probs = probs.copy()
 
         idx = np.random.choice(self.n_actions, p=probs)
@@ -67,6 +75,28 @@ Write a concise {action.lower()} argument.
                 "evidence_ids": [e.id for e in state.selected_evidence],
                 "tokens": tokens
             }, idx
+
+        elif action == Actions.QUERY:
+            query_prompt = f"Given claim: {state.claim}\nWrite a short search query to find more relevant evidence."
+            query_text, tokens = self.llm.generate(query_prompt)
+            return action, query_text.strip(), idx
+
+        elif action == Actions.RERANK:
+            return action, None, idx
+
+        elif action == Actions.SUMMARIZE:
+            if state.selected_evidence:
+                texts = [e.text for e in state.selected_evidence]
+                summary_prompt = f"Claim: {state.claim}\nEvidence:\n{texts}\nWrite a one-sentence summary of how this evidence relates to the claim."
+                summary_text, tokens = self.llm.generate(summary_prompt)
+                return action, {"summary": summary_text.strip(), "tokens": tokens}, idx
+            return action, {"summary": "", "tokens": 0}, idx
+
+        elif action == Actions.CONCEDE:
+            texts = [e.text for e in state.selected_evidence]
+            concede_prompt = f"Claim: {state.claim}\nEvidence: {texts}\nWrite a concise acknowledgement of the strongest counterpoint to the claim."
+            argument, tokens = self.llm.generate(concede_prompt)
+            return action, {"argument": argument, "evidence_ids": [e.id for e in state.selected_evidence], "tokens": tokens}, idx
 
         return action, None, idx
 
@@ -149,6 +179,28 @@ class SoftmaxPolicy:
                 "argument": argument,
                 "evidence_ids": [e.id for e in state.selected_evidence]
             }
+
+        elif action == Actions.QUERY:
+            query_prompt = f"Given claim: {state.claim}\nWrite a short search query to find more relevant evidence."
+            query_text, tokens = self.llm.generate(query_prompt)
+            return action, query_text.strip()
+
+        elif action == Actions.RERANK:
+            return action, None
+
+        elif action == Actions.SUMMARIZE:
+            if state.selected_evidence:
+                texts = [e.text for e in state.selected_evidence]
+                summary_prompt = f"Claim: {state.claim}\nEvidence:\n{texts}\nWrite a one-sentence summary of how this evidence relates to the claim."
+                summary_text, tokens = self.llm.generate(summary_prompt)
+                return action, {"summary": summary_text.strip(), "tokens": tokens}
+            return action, {"summary": "", "tokens": 0}
+
+        elif action == Actions.CONCEDE:
+            texts = [e.text for e in state.selected_evidence]
+            concede_prompt = f"Claim: {state.claim}\nEvidence: {texts}\nWrite a concise acknowledgement of the strongest counterpoint to the claim."
+            argument, tokens = self.llm.generate(concede_prompt)
+            return action, {"argument": argument, "evidence_ids": [e.id for e in state.selected_evidence], "tokens": tokens}
 
         return action, None
 

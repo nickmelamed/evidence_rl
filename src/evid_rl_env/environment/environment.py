@@ -157,6 +157,62 @@ class ClaimEnv:
 
             return s, reward, True, {"llm_scores": llm_scores, "llm_reward": llm_reward}
 
+        elif action == Actions.QUERY:
+            if s.query_count >= s.max_queries:
+                reward = -0.1  # penalise exceeding query budget
+            else:
+                s.query_count += 1
+                if payload and isinstance(payload, str):
+                    try:
+                        from evid_rl_env.data.evidence_fetcher import fetch_evidence
+                        raw = fetch_evidence(s.claim, payload)
+                        new_evidence = [
+                            Evidence(
+                                id=len(s.evidence_pool) + i,
+                                text=e["content"],
+                                label=e.get("label", "neutral")
+                            )
+                            for i, e in enumerate(raw)
+                        ]
+                        s.evidence_pool.extend(new_evidence)
+                        reward = 0.05 * len(new_evidence)
+                    except Exception:
+                        reward = 0.0
+
+        elif action == Actions.RERANK:
+            # Reorder selected_evidence by descending text length as a simple
+            # relevance heuristic; swap for embedding similarity once encoder is wired in
+            if s.selected_evidence:
+                s.selected_evidence.sort(key=lambda e: len(e.text), reverse=True)
+            reward = 0.02
+
+        elif action == Actions.SUMMARIZE:
+            if s.selected_evidence and payload and isinstance(payload, dict):
+                summary_text = payload.get("summary", "")
+                if summary_text:
+                    s.summary = summary_text
+                    s.debate_history.append("SUMMARY: " + summary_text)
+                    reward = 0.05
+                else:
+                    reward = 0.0
+            else:
+                reward = 0.0
+
+        elif action == Actions.CONCEDE:
+            if payload and isinstance(payload, dict):
+                concession = payload.get("argument", "")
+                if concession:
+                    s.debate_history.append("CONCEDE: " + concession)
+                    partial_reasoning = " ".join(s.debate_history)
+                    llm_reward, llm_scores = self.llm_judge.compute_reward(
+                        claim=s.claim,
+                        reasoning=partial_reasoning,
+                        evidence=s.selected_evidence
+                    )
+                    delta = llm_reward - s.last_llm_score
+                    s.last_llm_score = llm_reward
+                    reward = 0.05 + 0.1 * delta
+
         # step limit termination
         if s.is_done():
             # penalize not finalizing
