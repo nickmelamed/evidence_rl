@@ -10,18 +10,22 @@ from evid_rl_env.agent.policy import encode_state
 
 
 class Trainer:
-    def __init__(self, env, policy, config, episodes=50, algo="ppo", exp_name="exp"):
+    def __init__(self, env, policy, config, episodes=50, algo="ppo", exp_name="exp", seed=42):
+        import random, numpy as np
+        random.seed(seed); np.random.seed(seed)
         self.env = env
         self.policy = policy
         self.config = config
         self.episodes = episodes
         self.algo = algo
+        self.seed = seed
         self.tracker = ExperimentTracker(exp_name)
 
         self.tracker.save_config({
             "algo": self.algo,
             "policy_type": self.policy.__class__.__name__,
             "episodes": self.episodes,
+            "seed": seed,
 
             # RL config
             "lr": getattr(self.config, "lr", None),
@@ -46,7 +50,7 @@ class Trainer:
 
         elif algo == "pg":
             assert hasattr(config, "lr"), "PGConfig required"
-            self.rl = PolicyGradient(policy, lr=config.lr)
+            self.rl = PolicyGradient(policy, config)
 
         elif algo == "bandit":
             self.rl = LinUCBBandit(

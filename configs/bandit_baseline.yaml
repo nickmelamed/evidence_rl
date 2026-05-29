@@ -1,0 +1,3 @@
+algo: bandit
+rl:
+  alpha: 1.0

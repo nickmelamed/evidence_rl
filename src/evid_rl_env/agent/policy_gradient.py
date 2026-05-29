@@ -5,6 +5,7 @@ class PolicyGradient:
     def __init__(self, policy, config):
         self.policy = policy
         self.lr = config.lr
+        self.max_grad_norm = getattr(config, "max_grad_norm", 0.5)
 
     def update(self, trajectories):
         rewards = [r for (_, _, r) in trajectories]
@@ -17,5 +18,9 @@ class PolicyGradient:
             norm_r = (reward - mean) / std
 
             grad = self.policy.grad_log_prob(state, action_idx)
+
+            grad_norm = np.linalg.norm(grad)
+            if grad_norm > self.max_grad_norm:
+                grad = grad * (self.max_grad_norm / (grad_norm + 1e-8))
 
             self.policy.actor_params += self.lr * norm_r * grad

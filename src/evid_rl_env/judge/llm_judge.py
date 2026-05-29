@@ -60,7 +60,7 @@ Return ONLY JSON:
 
     def compute_reward(self, claim, reasoning, evidence):
         prompt = self.build_prompt(claim, reasoning, evidence)
-        response = self.llm.generate(prompt)
+        response, _ = self.llm.generate(prompt)
 
         scores = self.parse(response)
 

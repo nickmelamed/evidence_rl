@@ -154,8 +154,8 @@ class SoftmaxPolicy:
 
         return action, None
 
-    def grad_log_prob(self, action_idx):
-        probs = self.get_probs()
+    def grad_log_prob(self, state, action_idx):
+        probs = self.get_probs(state)
         grad = -probs
         grad[action_idx] += 1
         return grad

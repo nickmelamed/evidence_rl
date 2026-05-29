@@ -1,0 +1,4 @@
+algo: pg
+rl:
+  lr: 0.01
+  gamma: 0.99

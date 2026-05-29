@@ -27,12 +27,18 @@ class ClaimEnv:
         try:
             raw_evidence = fetch_evidence(claim, search_query)
             evidence_pool = [
-                Evidence(id=i, text=e["content"], label="neutral")
+                Evidence(id=i, text=e["content"], label=e.get("label", "neutral"))
                 for i, e in enumerate(raw_evidence)
             ]
         except Exception as exc:
             print(f"[WARNING] Tavily fetch failed, falling back to seed_claims.json data: {exc}")
             evidence_pool = []
+
+        if not evidence_pool and "evidence" in self.current_sample:
+            evidence_pool = [
+                Evidence(id=i, text=e["text"], label=e.get("label", "neutral"))
+                for i, e in enumerate(self.current_sample["evidence"])
+            ]
 
         self.state = State(claim=claim, evidence_pool=evidence_pool)
         return self.state

@@ -1,0 +1,8 @@
+algo: ppo
+rl:
+  lr: 0.001
+  clip: 0.2
+  entropy_coef: 0.01
+  value_coef: 0.05
+  gamma: 0.99
+  ppo_epochs: 4
