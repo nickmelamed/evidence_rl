@@ -1,4 +1,6 @@
 altair==6.0.0
+python-dotenv==1.2.2
+tavily-python==0.7.24
 annotated-doc==0.0.4
 anyio==4.13.0
 attrs==26.1.0

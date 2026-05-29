@@ -6,6 +6,7 @@ from evid_rl_env.environment.actions import Actions
 from evid_rl_env.judge.reward import RewardFunction
 from evid_rl_env.judge.llm_judge import LLMJudge
 from evid_rl_env.agent.llm_client import LLMClient
+from evid_rl_env.data.evidence_fetcher import fetch_evidence
 
 
 class ClaimEnv:
@@ -20,12 +21,20 @@ class ClaimEnv:
 
     def reset(self):
         self.current_sample = random.choice(self.dataset)
+        claim = self.current_sample["claim"]
+        search_query = self.current_sample.get("search_query", claim)
 
-        self.state = State(
-            claim=self.current_sample["claim"],
-            evidence_pool=[Evidence(**e) for e in self.current_sample["evidence"]]
-        )
+        try:
+            raw_evidence = fetch_evidence(claim, search_query)
+            evidence_pool = [
+                Evidence(id=i, text=e["content"], label="neutral")
+                for i, e in enumerate(raw_evidence)
+            ]
+        except Exception as exc:
+            print(f"[WARNING] Tavily fetch failed, falling back to seed_claims.json data: {exc}")
+            evidence_pool = []
 
+        self.state = State(claim=claim, evidence_pool=evidence_pool)
         return self.state
 
     def step(self, action, payload):

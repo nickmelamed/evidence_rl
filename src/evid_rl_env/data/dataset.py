@@ -1,15 +1,8 @@
-import random
+import json
+import os
+
 
 def load_dataset():
-    return [
-        {
-            "claim": "AI models improve productivity.",
-            "evidence": [
-                {"id": 1, "text": "Study shows 20% increase", "label": "support"},
-                {"id": 2, "text": "Some tasks degrade", "label": "contradict"},
-                {"id": 3, "text": "Irrelevant blog", "label": "neutral"},
-                {"id": 4, "text": "Misleading stat", "label": "adversarial"},
-            ],
-            "difficulty": "medium"
-        }
-    ]
+    path = os.path.join(os.path.dirname(__file__), "seed_claims.json")
+    with open(path) as f:
+        return json.load(f)

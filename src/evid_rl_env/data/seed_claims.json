@@ -1,0 +1,66 @@
+[
+  {
+    "id": "aspirin_primary_prevention",
+    "claim": "Low-dose aspirin (75–100mg daily) reduces major cardiovascular events in adults without prior cardiovascular disease.",
+    "domain": "Cardiology / Preventive Medicine",
+    "search_query": "low-dose aspirin primary prevention cardiovascular events randomized controlled trial benefit bleeding risk",
+    "notes": "Recent large RCTs (ASPREE, ARRIVE, ASCEND) found that bleeding risks offset vascular benefits in primary prevention populations, reversing decades of guideline recommendations.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "adult_hippocampal_neurogenesis",
+    "claim": "New neurons are continuously generated in the adult human hippocampus throughout adulthood.",
+    "domain": "Neuroscience",
+    "search_query": "adult hippocampal neurogenesis human evidence Sorrells Boldrini postmortem controversy methods",
+    "notes": "A 2018 Nature study found no evidence of adult neurogenesis in postmortem human hippocampal tissue, directly contradicting multiple studies using different methods that support its existence.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "time_restricted_eating_metabolic",
+    "claim": "Time-restricted eating produces metabolic improvements beyond those explained by caloric restriction alone.",
+    "domain": "Nutrition / Metabolism",
+    "search_query": "time-restricted eating intermittent fasting metabolic benefits independent of caloric restriction controlled RCT",
+    "notes": "Controlled studies that match calorie intake between groups yield conflicting results on whether meal timing provides independent metabolic benefits over and above reducing total energy intake.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "saturated_fat_cvd",
+    "claim": "Dietary saturated fat intake is causally associated with increased risk of cardiovascular disease independent of other dietary factors.",
+    "domain": "Nutrition / Cardiovascular Epidemiology",
+    "search_query": "saturated fat cardiovascular disease causal evidence meta-analysis Mendelian randomization PURE cohort",
+    "notes": "The PURE cohort and several meta-analyses have challenged the classical diet-heart hypothesis, and Mendelian randomization studies yield conflicting causal estimates depending on methodology.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "blue_light_sleep_disruption",
+    "claim": "Evening blue light exposure from screens significantly delays melatonin onset and degrades sleep quality in adults.",
+    "domain": "Sleep Science / Chronobiology",
+    "search_query": "blue light screen exposure melatonin suppression sleep quality adults effect size naturalistic study",
+    "notes": "While blue light suppresses melatonin in controlled laboratory settings, recent naturalistic studies and meta-analyses question whether the real-world effect size is clinically meaningful.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "psilocybin_treatment_resistant_depression",
+    "claim": "Psilocybin therapy produces durable antidepressant effects lasting at least six months in treatment-resistant depression.",
+    "domain": "Psychiatry / Psychopharmacology",
+    "search_query": "psilocybin treatment-resistant depression clinical trial durability six-month follow-up relapse remission",
+    "notes": "Phase 2 trials show promising short-term efficacy, but longer-term follow-up data is limited and relapse rates vary substantially across studies.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "gut_microbiome_mental_health",
+    "claim": "Gut microbiome composition causally influences depression and anxiety symptoms in humans via the gut-brain axis.",
+    "domain": "Microbiome Science / Psychiatry",
+    "search_query": "gut microbiome depression anxiety causal gut-brain axis human Mendelian randomization probiotic RCT",
+    "notes": "While animal studies and some human observational data support the gut-brain axis, Mendelian randomization analyses and probiotic RCTs in humans show inconsistent results on causality.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "moderate_alcohol_mortality",
+    "claim": "Moderate alcohol consumption (one to two drinks per day) is associated with lower all-cause mortality compared to complete abstinence.",
+    "domain": "Epidemiology / Public Health",
+    "search_query": "moderate alcohol consumption mortality J-curve sick quitter bias Mendelian randomization all-cause mortality",
+    "notes": "The apparent protective J-curve may be an artifact of sick-quitter bias in observational studies, while Mendelian randomization analyses generally find no safe level of alcohol consumption for mortality.",
+    "difficulty": "medium"
+  }
+]
