@@ -355,7 +355,9 @@ with tab4:
         st.write(cfg.get("policy_type"))
 
         st.subheader("Hyperparameters")
-        st.table(pd.DataFrame(cfg.items(), columns=["param", "value"]))
+        df_cfg = pd.DataFrame(cfg.items(), columns=["param", "value"])
+        df_cfg["value"] = df_cfg["value"].astype(str)
+        st.table(df_cfg)
 
 # live refresh
 if auto_refresh:

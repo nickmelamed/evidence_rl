@@ -52,7 +52,7 @@ class Trainer:
             self.rl = LinUCBBandit(
                 n_actions=len(policy.actions),
                 d=policy.state_dim,
-                alpha=config.epsilon
+                alpha=config.alpha
             )
 
         else:

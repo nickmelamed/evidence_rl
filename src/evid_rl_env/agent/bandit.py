@@ -12,7 +12,7 @@ class LinUCBBandit:
             A_inv = np.linalg.inv(self.A[a])
             theta = A_inv @ self.b[a]
             p.append(theta @ x + self.alpha * np.sqrt(x @ A_inv @ x))
-        return np.argmax(p)
+        return int(np.argmax(p))
 
     def update(self, action, x, reward):
         self.A[action] += np.outer(x, x)
