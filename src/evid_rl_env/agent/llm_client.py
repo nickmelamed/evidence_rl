@@ -18,3 +18,15 @@ class LLMClient:
 
         tokens = len(out.split())  # simple approximation
         return out, tokens
+
+    def generate_structured(self, prompt, temperature=0.1):
+        """Lower-temperature generation for structured outputs like JSON scores."""
+        out = self.pipe(
+            prompt,
+            max_new_tokens=200,
+            do_sample=True,
+            temperature=temperature,
+            return_full_text=False
+        )[0]["generated_text"]
+        tokens = len(out.split())
+        return out, tokens
