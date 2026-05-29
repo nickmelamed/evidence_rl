@@ -12,6 +12,7 @@ from evid_rl_env.agent.evaluator import Evaluator
 from evid_rl_env.utils.running_stats import RunningMeanStd
 from evid_rl_env.agent.policy_gradient import PolicyGradient
 from evid_rl_env.agent.ppo import PPO
+from evid_rl_env.environment.actions import ACTIONS
 
 
 class Trainer:
@@ -141,6 +142,10 @@ class Trainer:
                 # TOKEN USAGE
                 "tokens": payload.get("tokens", 0) if isinstance(payload, dict) else 0,
 
+                "action_names": ACTIONS,
+                "argument": payload.get("argument", "") if isinstance(payload, dict) else "",
+                "action_payload": payload if isinstance(payload, dict) else {},
+
                 "selected_ids": [e.id for e in next_state.selected_evidence],
                 "claim": state.claim,
                 "evidence_pool": [
@@ -179,6 +184,8 @@ class Trainer:
             metrics = {
                 "episode": ep,
                 "reward": total_reward,
+                "reward_raw": total_reward,
+                "curriculum_level": getattr(self, "curriculum_level", None),
                 "num_steps": steps,
                 "entropy": self.policy.last_entropy,
                 "tokens": total_tokens
@@ -190,6 +197,10 @@ class Trainer:
                 action_dist[a] = action_dist.get(a, 0) + 1
 
             metrics["action_dist"] = {k: v / max(steps, 1) for k, v in action_dist.items()}
+            for action_name, frac in metrics.get("action_dist", {}).items():
+                safe_key = "action_dist." + action_name.replace(" ", "_")
+                metrics[safe_key] = frac
+            metrics.pop("action_dist", None)
             metrics["entropy"] = self.policy.last_entropy
 
             if self.use_wandb:
