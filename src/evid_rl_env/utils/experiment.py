@@ -17,7 +17,16 @@ FIXED_FIELDS = [
     "entropy",
     "tokens",
     "policy_type",
-    "algo"
+    "algo",
+    "action_dist.select_evidence",
+    "action_dist.remove_evidence",
+    "action_dist.generate_support_argument",
+    "action_dist.generate_contradict_argument",
+    "action_dist.finalize",
+    "action_dist.query_evidence",
+    "action_dist.rerank_evidence",
+    "action_dist.summarize_evidence",
+    "action_dist.concede_point",
 ]
 
 

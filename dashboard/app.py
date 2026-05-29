@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import os
 import json
 import time
@@ -7,7 +8,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
-st.title("Claims RL Dashboard")
+st.title("EvidenceRL Dashboard")
 
 BASE_DIR = "artifacts/experiments"
 
@@ -69,7 +70,10 @@ for exp in selected:
         dfs.append(df)
         configs[os.path.basename(exp)] = load_config(exp)
 
-data = pd.concat(dfs)
+if not dfs:
+    st.warning("No experiment data found. Check that your experiments have a metrics.csv file.")
+    st.stop()
+data = pd.concat(dfs, ignore_index=True)
 
 # tabs
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -126,20 +130,20 @@ with tab1:
         traj_df["HRS"] = traj_df["llm_scores"].apply(lambda x: x.get("HRS", 0) if isinstance(x, dict) else 0)
 
         fig = px.line(traj_df, x="step", y=["LCS", "ESS", "HRS"], title="LLM Scores Over Time")
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, width="stretch")
 
     # value estimate for actor critic
     if "value_estimate" in traj_df:
         fig = px.line(traj_df, x="step", y="value_estimate", title="Value Estimates")
-        st.plotly_chart(fig)
+        st.plotly_chart(fig, width="stretch")
 
     if "advantage" in traj_df:
         fig = px.line(traj_df, x="step", y="advantage", title="Advantage Signal")
-        st.plotly_chart(fig)
+        st.plotly_chart(fig, width="stretch")
 
     # token usage
     fig = px.line(df, x="episode", y="tokens", title="Token Usage")
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
     # BEST EPISODE
     if "reward" not in df.columns or df["reward"].dropna().empty:
@@ -155,11 +159,11 @@ with tab1:
 
         with colA:
             fig = px.line(df, x="episode", y="reward", title="Reward")
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, width="stretch")
 
         with colB:
             fig = px.line(df, x="episode", y="reward_smooth", title="Smoothed")
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, width="stretch")
 
         st.success(f"🏆 Best Episode: {int(best_ep)}")
 
@@ -167,30 +171,30 @@ with tab1:
     st.subheader("Policy Behavior")
 
     fig = px.line(df, x="episode", y="entropy", title="Entropy (Exploration)")
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, width="stretch")
 
     if "num_steps" in df.columns:
         fig = px.line(df, x="episode", y="num_steps", title="Steps per episode")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if "llm_reward" in traj_df.columns:
         traj_df["base_reward"] = traj_df["reward"] - traj_df.get("llm_reward", 0)
         fig = px.line(traj_df, x="step", y=["reward", "llm_reward"], title="Base vs LLM reward per step")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if "curriculum_level" in df.columns:
         fig = px.line(df, x="episode", y="curriculum_level", title="Curriculum level")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if "reward_raw" in df.columns and "reward" in df.columns:
         fig = px.line(df, x="episode", y=["reward", "reward_raw"], title="Normalised vs raw reward")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # Action mix
     action_dist_cols = [c for c in df.columns if c.startswith("action_dist.")]
     if action_dist_cols:
         fig = px.area(df, x="episode", y=action_dist_cols, title="Action distribution over time")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info("Action distribution data not yet available (requires commit 5 trainer changes)")
 
@@ -202,17 +206,26 @@ with tab2:
 
     for exp in selected:
         name = os.path.basename(exp)
-        df = data[data["experiment"] == name]
-        df["reward_smooth"] = df["reward"].rolling(10).mean()
+        df = data[data["experiment"] == name].copy()
+        df["reward_smooth"] = df["reward"].rolling(10, min_periods=1).mean()
+
+        if df.empty or "reward" not in df.columns or df["reward"].dropna().empty:
+            continue
+
+        algo_label = configs.get(name, {}).get("algo", "unknown")
+        trace_label = f"{name} ({algo_label})"
 
         fig.add_trace(go.Scatter(
             x=df["episode"],
             y=df["reward_smooth"],
             mode='lines',
-            name=f"{name} ({configs[name].get('algo', 'unknown')})"
+            name=trace_label
         ))
 
-    st.plotly_chart(fig, width='stretch')
+    if not fig.data:
+        st.warning("No reward data available for the selected experiments yet.")
+    else:
+        st.plotly_chart(fig, width="stretch")
 
     eval_cols = [c for c in data.columns if c.startswith("eval/")]
     if eval_cols:
@@ -228,7 +241,33 @@ with tab2:
                     mode="lines", name=f"{name} eval",
                     error_y=dict(type="data", array=df_e.get("eval/std_reward", pd.Series()).fillna(0).tolist(), visible=True)
                 ))
-        st.plotly_chart(fig_eval, use_container_width=True)
+        st.plotly_chart(fig_eval, width="stretch")
+
+    st.subheader("LLM judge scores by experiment")
+    fig_llm = go.Figure()
+    for exp in selected:
+        name = os.path.basename(exp)
+        df = data[data["experiment"] == name].copy()
+        lcs_per_ep = []
+        for ep in df["episode"].dropna().unique():
+            traj = load_trajectory(exp, int(ep))
+            if not traj:
+                continue
+            scores = [
+                s.get("llm_scores", {}).get("LCS", None)
+                for s in traj
+                if isinstance(s.get("llm_scores"), dict)
+            ]
+            scores = [s for s in scores if s is not None]
+            lcs_per_ep.append({"episode": ep, "mean_LCS": float(np.mean(scores)) if scores else None})
+        if lcs_per_ep:
+            lcs_df = pd.DataFrame(lcs_per_ep).dropna()
+            fig_llm.add_trace(go.Scatter(
+                x=lcs_df["episode"], y=lcs_df["mean_LCS"],
+                mode="lines", name=f"{name} LCS"
+            ))
+    if fig_llm.data:
+        st.plotly_chart(fig_llm, width="stretch")
 
 # drilldown + claim
 with tab3:
@@ -313,7 +352,7 @@ with tab3:
                                      color_discrete_map={"HRS": "#E24B4A", "LCS": "#378ADD",
                                                          "ESS": "#1D9E75", "COMP": "#7F77DD",
                                                          "confidence": "#888780"})
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
 
                 st.metric("Tokens Used", step.get("tokens", 0))
 
@@ -367,7 +406,7 @@ with tab3:
                         title='Action Probabilities'
                     )
 
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, width="stretch")
 
                     if chosen_idx is not None:
                         st.success(f"Chosen Action: {names[chosen_idx]}")
@@ -378,12 +417,12 @@ with tab3:
 
                 if "entropy" in traj_df:
                     fig = px.line(traj_df, x='step', y='entropy', title='Entropy Over Steps')
-                    st.plotly_chart(fig, width='stretch')
+                    st.plotly_chart(fig, width="stretch")
 
                 # Highlight selected
                 st.subheader("Selected Evidence")
 
-                selected_ids = step.get("selected_ids", [])
+                selected_ids = step.get("selected_ids") or step.get("evidence_used", [])
 
                 for e in evidence:
                     if e["id"] in selected_ids:

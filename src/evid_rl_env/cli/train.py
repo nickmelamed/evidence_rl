@@ -4,6 +4,7 @@ from evid_rl_env.agent.policy import SoftmaxPolicy, ActorCriticPolicy
 from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.data.dataset import load_dataset
 from evid_rl_env.agent.trainer import Trainer
+from evid_rl_env.agent.bandit_trainer import BanditTrainer
 from evid_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
 
 import argparse
@@ -28,14 +29,23 @@ def train(episodes, method="ppo", policy='actor'):
     elif method == 'bandit':
         config = BanditConfig()
 
-    trainer = Trainer(
-        env=env,
-        policy=policy,
-        config=config,
-        episodes=episodes,
-        algo=method,
-        exp_name=f"{method}_run"
-    )
+    if method == 'bandit':
+        trainer = BanditTrainer(
+            env=env,
+            policy=policy,
+            config=config,
+            episodes=episodes,
+            exp_name=f"{method}_run"
+        )
+    else:
+        trainer = Trainer(
+            env=env,
+            policy=policy,
+            config=config,
+            episodes=episodes,
+            algo=method,
+            exp_name=f"{method}_run"
+        )
 
     trainer.train()
 
