@@ -2,5 +2,5 @@ algo: pg
 rl:
   lr: 0.01
   gamma: 0.99
-  actor_model: "Qwen/Qwen2.5-1.5B-Instruct"
+  actor_model: "google/gemma-2-2b-it"
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"

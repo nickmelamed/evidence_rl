@@ -1,5 +1,5 @@
 algo: bandit
 rl:
   alpha: 1.0
-  actor_model: "Qwen/Qwen2.5-1.5B-Instruct"
+  actor_model: "google/gemma-2-2b-it"
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
