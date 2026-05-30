@@ -1,6 +1,12 @@
+import logging as _logging
+import re
+import random
+
 from transformers import pipeline, logging
 
 logging.set_verbosity_error()
+
+_logger = _logging.getLogger(__name__)
 
 
 def _extract_text(output):
@@ -20,7 +26,7 @@ class LLMClient:
     Default: google/gemma-2-2b-it
     """
 
-    def __init__(self, model_name="Qwen/Qwen2.5-1.5B-Instruct", temperature=0.7):
+    def __init__(self, model_name="google/gemma-2-2b-it", temperature=0.7):
         self.model_name = model_name
         self.temperature = temperature
         self._pipe = pipeline(
@@ -101,3 +107,55 @@ class JudgeLLMClient:
     # alias so LLMJudge works with either client
     def generate_structured(self, prompt, temperature=None):
         return self.generate(prompt)
+
+
+class AnnotatorClient:
+    """
+    Strong LLM annotator for labeling trajectories via the Anthropic Messages API.
+
+    Default: claude-opus-4-5
+    Requires ANTHROPIC_API_KEY in the environment (loaded via python-dotenv).
+    """
+
+    def __init__(self, model: str = "claude-opus-4-5"):
+        try:
+            import anthropic
+        except ImportError as exc:
+            raise ImportError(
+                "anthropic package required for AnnotatorClient. "
+                "Install with: pip install anthropic"
+            ) from exc
+
+        from dotenv import load_dotenv
+        load_dotenv()
+
+        self.model = model
+        self._client = anthropic.Anthropic()
+
+    def select_action(self, observation: str, action_descriptions: list) -> int:
+        """
+        Ask the model to choose the best action index for the given observation.
+        Falls back to a random valid index on parse failure.
+        """
+        desc = "\n".join(
+            f"{i}: {a}" for i, a in enumerate(action_descriptions)
+        )
+        prompt = (
+            "You are selecting the best next action for an evidence retrieval task.\n"
+            f"Observation: {observation}\n"
+            f"Available actions:\n{desc}\n"
+            "Respond with only the index number of the best action. No explanation."
+        )
+        try:
+            msg = self._client.messages.create(
+                model=self.model,
+                max_tokens=16,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = msg.content[0].text.strip()
+            match = re.search(r"\d+", text)
+            if match:
+                return int(max(0, min(int(match.group()), len(action_descriptions) - 1)))
+        except Exception as exc:
+            _logger.warning("AnnotatorClient: LLM call failed (%s), returning random.", exc)
+        return random.randint(0, len(action_descriptions) - 1)

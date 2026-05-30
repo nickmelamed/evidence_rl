@@ -5,13 +5,17 @@ from evid_rl_env.environment.actions import ACTIONS
 class Evaluator:
     """Runs a fixed held-out eval split with no policy updates."""
 
-    def __init__(self, env, policy, n_eval_episodes=20):
+    def __init__(self, env, policy, n_eval_episodes=20, reward_normalizer=None):
         self.env = env
         self.policy = policy
         self.n_eval_episodes = n_eval_episodes
+        # RunningMeanStd instance or None. Used read-only — stats are never
+        # updated here so training normalization stays uncontaminated.
+        self.reward_normalizer = reward_normalizer
 
     def evaluate(self):
-        rewards = []
+        print("[Eval] greedy mode active — running evaluation...")
+        rewards_raw = []
         steps_list = []
         action_counts = {a: 0 for a in ACTIONS}
         llm_score_totals = {"LCS": [], "ESS": [], "HRS": [], "COMP": []}
@@ -23,7 +27,7 @@ class Evaluator:
             ep_steps = 0
 
             while not done:
-                action, payload, action_idx = self.policy.act(state)
+                action, payload, action_idx = self.policy.act(state, greedy=True)
                 next_state, reward, done, info = self.env.step(action, payload)
                 ep_reward += reward
                 ep_steps += 1
@@ -36,13 +40,25 @@ class Evaluator:
 
                 state = next_state
 
-            rewards.append(ep_reward)
+            rewards_raw.append(ep_reward)
             steps_list.append(ep_steps)
+
+        # Optionally normalize using training stats (read-only — no .update() calls)
+        if self.reward_normalizer is not None:
+            rewards_norm = [
+                float(self.reward_normalizer.normalize(r)) for r in rewards_raw
+            ]
+        else:
+            rewards_norm = rewards_raw
 
         total_actions = max(sum(action_counts.values()), 1)
         return {
-            "eval/mean_reward": float(np.mean(rewards)),
-            "eval/std_reward": float(np.std(rewards)),
+            # Normalized (or raw if no normalizer) — primary signal for tracking
+            "eval/mean_reward": float(np.mean(rewards_norm)),
+            "eval/std_reward": float(np.std(rewards_norm)),
+            # Raw always present so baselines and RL can be compared on the same scale
+            "eval/mean_reward_raw": float(np.mean(rewards_raw)),
+            "eval/std_reward_raw": float(np.std(rewards_raw)),
             "eval/mean_steps": float(np.mean(steps_list)),
             "eval/action_dist": {k: v / total_actions for k, v in action_counts.items()},
             "eval/llm_LCS": float(np.mean(llm_score_totals["LCS"])) if llm_score_totals["LCS"] else 0.0,

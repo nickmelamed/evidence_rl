@@ -56,7 +56,7 @@ class ActorCriticPolicy:
         features = encode_state(state)
         return features @ self.value_params
 
-    def act(self, state):
+    def act(self, state, greedy: bool = False):
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
@@ -74,7 +74,7 @@ class ActorCriticPolicy:
 
         self.last_probs = probs.copy()
 
-        idx = np.random.choice(self.n_actions, p=probs)
+        idx = int(np.argmax(probs)) if greedy else np.random.choice(self.n_actions, p=probs)
         action = self.actions[idx]
 
         if action == Actions.SELECT:
@@ -143,4 +143,37 @@ Write a concise {action.lower()} argument.
 
         features = encode_state(state)
         return np.outer(features, grad)
+
+    def save(self, path: str) -> None:
+        """Persist learnable parameters to a .npz checkpoint.
+
+        Saves actor_params, value_params, and enough metadata to reconstruct
+        the policy without the original config.  The LLM pipeline is not
+        serialised — it is re-instantiated from model_name on load.
+        """
+        np.savez_compressed(
+            path,
+            actor_params=self.actor_params,
+            value_params=self.value_params,
+            n_actions=np.array([self.n_actions]),
+            state_dim=np.array([self.state_dim]),
+            model_name=np.array([self.llm.model_name], dtype="U256"),
+        )
+
+    @classmethod
+    def load(cls, path: str) -> "ActorCriticPolicy":
+        """Reconstruct a policy from a .npz checkpoint produced by save().
+
+        The LLM pipeline is re-initialised from the stored model_name, so the
+        first call may trigger a model download if not already cached.
+        """
+        data = np.load(path, allow_pickle=False)
+        n_actions  = int(data["n_actions"][0])
+        state_dim  = int(data["state_dim"][0])
+        model_name = str(data["model_name"][0])
+
+        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name)
+        policy.actor_params = data["actor_params"]
+        policy.value_params = data["value_params"]
+        return policy
 
