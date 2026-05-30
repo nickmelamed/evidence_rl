@@ -1,6 +1,11 @@
 import logging as _logging
+import os
 import re
 import random
+
+# Disable the fast tokenizer's Rust-backed parallel worker pool. Without this,
+# the pool's semaphores leak at interpreter shutdown and cause a segfault.
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 from transformers import pipeline, logging, set_seed as _transformers_set_seed
 
@@ -36,6 +41,7 @@ class LLMClient:
         self._pipe = pipeline(
             "text-generation",
             model=model_name,
+            torch_dtype="auto",
         )
 
     @property
@@ -99,6 +105,7 @@ class JudgeLLMClient:
         self._pipe = pipeline(
             "text-generation",
             model=model_name,
+            torch_dtype="auto",
         )
 
     def _chat(self, prompt):

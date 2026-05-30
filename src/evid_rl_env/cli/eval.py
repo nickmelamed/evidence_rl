@@ -37,7 +37,8 @@ def _find_latest_checkpoint(base: str = "artifacts/experiments") -> str | None:
     latest = max(candidates, key=lambda p: p.stat().st_mtime)
     return str(latest / "policy.npz")
 from evid_rl_env.environment.environment import ClaimEnv
-from evid_rl_env.agent.policy import ActorCriticPolicy
+from evid_rl_env.agent.policy import ActorCriticPolicy, BanditPolicyWrapper
+from evid_rl_env.agent.bandit import LinUCBBandit
 from evid_rl_env.agent.evaluator import Evaluator
 from evid_rl_env.agent.baseline import (
     RandomBaseline,
@@ -257,17 +258,32 @@ def main() -> None:
     )
 
     # ------------------------------------------------------------------
-    # Load policy
+    # Load policy (actor-critic or bandit)
     # ------------------------------------------------------------------
-    policy = ActorCriticPolicy.load(checkpoint)
+    import numpy as _np
+    _peek = _np.load(checkpoint, allow_pickle=False)
+    _ckpt_type = str(_peek.get("type", ["actor_critic"])[0])
+
+    if _ckpt_type == "bandit":
+        bandit, model_name = LinUCBBandit.load(checkpoint)
+        inner = ActorCriticPolicy(
+            n_actions=int(_peek["n_actions"][0]),
+            state_dim=int(_peek["d"][0]),
+            model_name=model_name,
+            seed=seed,
+        )
+        policy = BanditPolicyWrapper(bandit, inner)
+    else:
+        policy = ActorCriticPolicy.load(checkpoint)
+
     # AUDIT FIX: set the LLM seed on the loaded policy so transformers.set_seed is
     # called with the --seed value before every generation, making eval reproducible
-    if hasattr(policy, "llm"):
+    if hasattr(policy, "llm") and policy.llm is not None:
         policy.llm.seed = seed
     print(
         f"Loaded checkpoint: {checkpoint} "
         f"(state_dim={policy.state_dim}, n_actions={policy.n_actions}, "
-        f"greedy={args.greedy})"
+        f"type={_ckpt_type}, greedy={args.greedy})"
     )
     print(f"LLM seed: {seed}")
     llm_client = getattr(policy, "llm", None)

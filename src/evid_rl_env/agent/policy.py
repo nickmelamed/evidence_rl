@@ -22,7 +22,7 @@ class ActorCriticPolicy:
         self.value_params = np.zeros(state_dim)
 
         from evid_rl_env.agent.llm_client import LLMClient
-        actor_model = model_name or "Qwen/Qwen2.5-1.5B-Instruct"
+        actor_model = model_name or "google/gemma-2-2b-it"
         # AUDIT FIX: propagate seed to LLMClient so transformers.set_seed is called
         # with the top-level --seed value before every pipeline generation
         self.llm = LLMClient(model_name=actor_model, seed=seed)
@@ -185,3 +185,33 @@ Write a concise {action.lower()} argument.
         policy.value_params = data["value_params"]
         return policy
 
+
+class BanditPolicyWrapper:
+    """Adapts a LinUCBBandit for use with Evaluator.
+
+    Mirrors the training loop: bandit selects the action, the inner
+    ActorCriticPolicy generates the payload (LLM arguments, queries, etc.).
+    """
+
+    def __init__(self, bandit, inner_policy: ActorCriticPolicy):
+        self.bandit = bandit
+        self._inner = inner_policy
+        self.actions = inner_policy.actions
+        self.n_actions = inner_policy.n_actions
+        self.state_dim = inner_policy.state_dim
+        self.llm = getattr(inner_policy, "llm", None)
+        self.last_entropy = 0.0
+        self.last_probs = np.zeros(inner_policy.n_actions)
+
+    def act(self, state, greedy: bool = True):
+        x = encode_state(state)
+        action_idx = self.bandit.select_action(x)
+        action = self.actions[action_idx]
+        # Payload generation mirrors bandit_trainer: inner policy generates payload
+        _, payload, _ = self._inner.act(state, greedy=greedy)
+        self.last_entropy = self._inner.last_entropy
+        self.last_probs = self._inner.last_probs
+        return action, payload, action_idx
+
+    def reset_episode_cache(self):
+        self._inner.reset_episode_cache()

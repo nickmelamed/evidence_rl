@@ -31,7 +31,7 @@ class RewardFunction:
             return 0.0
 
         selected = state.selected_evidence
-        available = state.available_evidence
+        available = state.evidence_pool
 
         f1 = compute_f1(selected, available)
         ca = compute_contradiction_acknowledgment(selected, available)

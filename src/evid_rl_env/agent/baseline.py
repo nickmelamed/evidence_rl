@@ -166,7 +166,7 @@ class MajorityBaseline(BaseEvaluator):
 
     def __init__(self, eval_dataset: list):
         self.eval_dataset = eval_dataset
-        self._majority_idx = self._find_majority()
+        self._majority_idx: int | None = None  # computed lazily on first run()
 
     def _find_majority(self) -> int:
         env = ClaimEnv(self.eval_dataset)
@@ -187,6 +187,8 @@ class MajorityBaseline(BaseEvaluator):
         return majority
 
     def run(self, n_episodes: int) -> dict:
+        if self._majority_idx is None:
+            self._majority_idx = self._find_majority()
         env = ClaimEnv(self.eval_dataset)
         majority = self._majority_idx
         rewards = []
@@ -289,16 +291,9 @@ class FewShotLLMBaseline(BaseEvaluator):
         self.k = k
         self.selection_mode = selection_mode
 
-        self._examples = self._build_examples()
-
-        # AUDIT FIX: initialise model cache slot before _embed() is called so the
-        # SentenceTransformer instance is created once and reused across all calls
+        self._examples: list | None = None  # built lazily on first use
         self._st_model = None
         self._train_embeddings = None
-        if selection_mode == "similarity":
-            self._train_embeddings = self._embed(
-                [ex["observation"] for ex in self._examples]
-            )
 
     def _build_examples(self) -> list:
         """One random-action pass over train_dataset to collect (observation, action) pairs."""
@@ -334,7 +329,17 @@ class FewShotLLMBaseline(BaseEvaluator):
             )
             return None
 
+    def _ensure_examples(self) -> None:
+        if self._examples is not None:
+            return
+        self._examples = self._build_examples()
+        if self.selection_mode == "similarity":
+            self._train_embeddings = self._embed(
+                [ex["observation"] for ex in self._examples]
+            )
+
     def _select_examples(self, state, k: int) -> list:
+        self._ensure_examples()
         if self.selection_mode == "similarity" and self._train_embeddings is not None:
             query_emb = self._embed([_state_summary(state)])
             if query_emb is not None:

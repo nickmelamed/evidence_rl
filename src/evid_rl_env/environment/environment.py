@@ -5,8 +5,21 @@ from evid_rl_env.environment.state import State, Evidence
 from evid_rl_env.environment.actions import Actions
 from evid_rl_env.judge.reward import RewardFunction
 from evid_rl_env.judge.llm_judge import LLMJudge
-from evid_rl_env.agent.llm_client import LLMClient, JudgeLLMClient
 from evid_rl_env.data.evidence_fetcher import fetch_evidence
+
+# One JudgeLLMClient per model name, shared across all ClaimEnv instances.
+# Loading Qwen per-env would otherwise exhaust memory when multiple envs
+# (training, eval, baselines) are alive at the same time.
+_judge_cache: dict = {}
+
+
+def _get_judge(model_name: str, seed: int):
+    from evid_rl_env.agent.llm_client import JudgeLLMClient
+    if model_name not in _judge_cache:
+        _judge_cache[model_name] = JudgeLLMClient(model_name=model_name, seed=seed)
+    else:
+        _judge_cache[model_name].seed = seed
+    return _judge_cache[model_name]
 
 
 class ClaimEnv:
@@ -17,9 +30,7 @@ class ClaimEnv:
         self.reward_fn = RewardFunction()
 
         judge_model_name = judge_model or "Qwen/Qwen2.5-1.5B-Instruct"
-        # AUDIT FIX: propagate seed to JudgeLLMClient so transformers.set_seed is called
-        # with the top-level --seed value before every judge pipeline call
-        judge_llm = JudgeLLMClient(model_name=judge_model_name, seed=seed)
+        judge_llm = _get_judge(judge_model_name, seed)
         self.llm_judge = LLMJudge(judge_llm, weight=0.5)
         self._last_judge_step = 0
 

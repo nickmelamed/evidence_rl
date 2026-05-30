@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 try:
@@ -170,6 +171,11 @@ class BanditTrainer:
                 print(f"  Eval | reward {eval_metrics['eval/mean_reward']:.3f} ± {eval_metrics['eval/std_reward']:.3f}")
                 if self.use_wandb:
                     wandb.log(eval_metrics, step=ep)
+
+        checkpoint_path = os.path.join(self.tracker.base_dir, "policy")
+        model_name = getattr(getattr(self.policy, "llm", None), "model_name", "google/gemma-2-2b-it")
+        self.rl.save(checkpoint_path, model_name=model_name)
+        print(f"Checkpoint saved: {checkpoint_path}.npz")
 
         if self.use_wandb:
             wandb.finish()
