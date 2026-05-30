@@ -1,7 +1,10 @@
 import json
+import logging
 import re
 import hashlib
 import numpy as np
+
+_logger = logging.getLogger(__name__)
 
 
 class LLMJudge:
@@ -87,10 +90,26 @@ class LLMJudge:
                 return reward, scores
 
         prompt = self.build_prompt(claim, reasoning, evidence)
-        if hasattr(self.llm, "generate_structured"):
-            response, _ = self.llm.generate_structured(prompt)
-        else:
-            response, _ = self.llm.generate(prompt)
+        # AUDIT FIX: wrap generation in try/except so a crashed judge call falls back
+        # gracefully instead of propagating an exception that kills the episode
+        try:
+            if hasattr(self.llm, "generate_structured"):
+                response, _ = self.llm.generate_structured(prompt)
+            else:
+                response, _ = self.llm.generate(prompt)
+        except Exception as exc:
+            _logger.warning(
+                "LLMJudge: generation failed (%s) | model=%s | claim='%.80s' — "
+                "returning neutral fallback scores.",
+                exc,
+                getattr(self.llm, "model_name", "unknown"),
+                claim,
+            )
+            scores = {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.0}
+            if self.cache_scores:
+                self._cache[key] = scores
+                self._cache.sync()
+            return self._scores_to_reward(scores), scores
         scores = self.parse(response)
 
         if self.cache_scores:

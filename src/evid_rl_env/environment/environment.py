@@ -10,14 +10,16 @@ from evid_rl_env.data.evidence_fetcher import fetch_evidence
 
 
 class ClaimEnv:
-    def __init__(self, dataset, judge_model=None):
+    def __init__(self, dataset, judge_model=None, seed: int = 42):
         self.dataset = dataset
         self.state = None
         self.current_sample = None
         self.reward_fn = RewardFunction()
 
         judge_model_name = judge_model or "Qwen/Qwen2.5-1.5B-Instruct"
-        judge_llm = JudgeLLMClient(model_name=judge_model_name)
+        # AUDIT FIX: propagate seed to JudgeLLMClient so transformers.set_seed is called
+        # with the top-level --seed value before every judge pipeline call
+        judge_llm = JudgeLLMClient(model_name=judge_model_name, seed=seed)
         self.llm_judge = LLMJudge(judge_llm, weight=0.5)
         self._last_judge_step = 0
 

@@ -8,8 +8,18 @@ class RunningMeanStd:
         self.mean = 0.0
         self.var = 1.0
         self.count = epsilon
+        # AUDIT FIX: lock flag prevents accidental updates inside eval/baseline loops;
+        # set via lock()/unlock() context helpers in Evaluator
+        self._locked = False
 
     def update(self, x):
+        # AUDIT FIX: raise immediately if update() is called while locked so that
+        # eval or baseline code paths never silently corrupt training normalizer state
+        assert not self._locked, (
+            "RunningMeanStd.update() called while locked — normalizer must not be "
+            "updated inside an eval loop, baseline run, or trajectory collection. "
+            "Only call update() from the training step."
+        )
         x = np.asarray(x, dtype=np.float64).flatten()
         batch_mean = x.mean()
         batch_var = x.var()

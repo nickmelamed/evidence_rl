@@ -9,7 +9,7 @@ def encode_state(state):
     return encode_state_semantic(state)
 
 class ActorCriticPolicy:
-    def __init__(self, n_actions, state_dim=None, model_name=None):
+    def __init__(self, n_actions, state_dim=None, model_name=None, seed: int = 42):
         if state_dim is None: state_dim = get_state_dim()
         self.actions = ACTIONS
         self.n_actions = n_actions
@@ -23,12 +23,18 @@ class ActorCriticPolicy:
 
         from evid_rl_env.agent.llm_client import LLMClient
         actor_model = model_name or "Qwen/Qwen2.5-1.5B-Instruct"
-        self.llm = LLMClient(model_name=actor_model)
+        # AUDIT FIX: propagate seed to LLMClient so transformers.set_seed is called
+        # with the top-level --seed value before every pipeline generation
+        self.llm = LLMClient(model_name=actor_model, seed=seed)
 
     def generate_arguments_batch(self, prompts):
         """Generate multiple arguments in a single batched pipeline call."""
         if not prompts:
             return []
+        # AUDIT FIX: this method calls self.llm.pipe directly (bypassing generate()),
+        # so set_seed must be called here explicitly to cover this code path
+        from transformers import set_seed as _set_seed
+        _set_seed(self.llm.seed)
         outputs = self.llm.pipe(
             prompts,
             batch_size=min(len(prompts), 4),
@@ -172,7 +178,9 @@ Write a concise {action.lower()} argument.
         state_dim  = int(data["state_dim"][0])
         model_name = str(data["model_name"][0])
 
-        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name)
+        # AUDIT FIX: load() defaults seed to 42; callers (e.g. eval.py) can pass their
+        # --seed value here so the reloaded policy's LLM uses the same seed as training
+        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name, seed=42)
         policy.actor_params = data["actor_params"]
         policy.value_params = data["value_params"]
         return policy

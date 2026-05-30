@@ -39,7 +39,21 @@ class BanditTrainer:
         }
 
         self.tracker.save_config(wandb_config)
-        self.evaluator = Evaluator(env, policy) if eval_dataset is not None else None
+
+        # AUDIT FIX: construct a separate ClaimEnv from eval_dataset rather than
+        # reusing the training env; the training env's internal episode state (reset()
+        # cursor, reward normalizer exposure) must never bleed into eval measurements
+        if eval_dataset is not None:
+            from evid_rl_env.environment.environment import ClaimEnv
+            eval_env = ClaimEnv(eval_dataset)
+            assert eval_env.dataset is not self.env.dataset, (
+                "BanditTrainer: eval_env.dataset and env.dataset must be different "
+                "objects — passing the same dataset to both leaks eval data into training."
+            )
+            print("BanditTrainer: eval env isolated from training env")
+            self.evaluator = Evaluator(eval_env, policy)
+        else:
+            self.evaluator = None
 
         if self.use_wandb:
             wandb.init(project="evid-rl", name=exp_name, config=wandb_config)

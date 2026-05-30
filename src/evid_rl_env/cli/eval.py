@@ -44,12 +44,16 @@ _AVAILABLE = frozenset(_TABLE_ORDER)
 
 def _deterministic_split(dataset: list) -> tuple[list, list]:
     """Apply the same seed-42 80/20 split used during training."""
+    # AUDIT FIX: save/restore global random state so seeding to 42 for the split
+    # does not permanently alter the RNG sequence seen by downstream baseline runs
+    _saved = random.getstate()
     random.seed(42)
     indices = list(range(len(dataset)))
     random.shuffle(indices)
     cut = int(0.8 * len(dataset))
     train = [dataset[i] for i in indices[:cut]]
     eval_ = [dataset[i] for i in indices[cut:]]
+    random.setstate(_saved)
     return train, eval_
 
 
@@ -178,6 +182,28 @@ def main() -> None:
         default=True,
         help="Use greedy (argmax) action selection for the RL policy (default: True).",
     )
+    # AUDIT FIX: expose --seed so baseline eval results are reproducible; does not
+    # affect the train/eval split (always seed-42 to match train.py)
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for baseline evaluation runs (default: 0). "
+             "The train/eval split always uses seed 42 regardless of this value.",
+    )
+    # AUDIT FIX (issue 3): surface --annotator-model so evid-eval's interface is
+    # consistent with evid-collect; argument is accepted but not wired to any logic yet —
+    # it is reserved for future post-hoc re-annotation workflows
+    parser.add_argument(
+        "--annotator-model",
+        default="claude-opus-4-5",
+        help=(
+            "Anthropic model string for post-hoc re-annotation workflows (default: claude-opus-4-5). "
+            "Currently only relevant when 'imitation' is included in --baselines and "
+            "re-annotation is being performed. Does not affect the loaded checkpoint or "
+            "any other baseline."
+        ),
+    )
     args = parser.parse_args()
 
     requested = [b.strip() for b in args.baselines.split(",") if b.strip()]
@@ -199,11 +225,17 @@ def main() -> None:
     # Load policy
     # ------------------------------------------------------------------
     policy = ActorCriticPolicy.load(args.checkpoint)
+    # AUDIT FIX: set the LLM seed on the loaded policy so transformers.set_seed is
+    # called with the --seed value before every generation, making eval reproducible
+    if hasattr(policy, "llm"):
+        policy.llm.seed = args.seed
     print(
         f"Loaded checkpoint: {args.checkpoint} "
         f"(state_dim={policy.state_dim}, n_actions={policy.n_actions}, "
         f"greedy={args.greedy})"
     )
+    # AUDIT FIX: log LLM seed here so eval invocations are auditable from terminal output
+    print(f"LLM seed: {args.seed}")
     llm_client = getattr(policy, "llm", None)
 
     # ------------------------------------------------------------------
@@ -211,7 +243,9 @@ def main() -> None:
     # comparison with baselines which also report raw)
     # ------------------------------------------------------------------
     print("\nRunning RL policy evaluation...")
-    eval_env = ClaimEnv(eval_dataset)
+    # AUDIT FIX: pass seed so ClaimEnv threads it to JudgeLLMClient for reproducible
+    # judge outputs during eval
+    eval_env = ClaimEnv(eval_dataset, seed=args.seed)
 
     if args.greedy:
         # Wrap act to force greedy selection without modifying the policy object
@@ -227,11 +261,26 @@ def main() -> None:
     rl_raw = rl_metrics["eval/mean_reward_raw"]
     rl_std = rl_metrics["eval/std_reward_raw"]
 
+    # AUDIT FIX (issue 3): log the annotator-model note whenever imitation is requested
+    # so the interface intent is visible in logs even before re-annotation logic is wired in
+    if "imitation" in requested:
+        print(
+            f"[info] --annotator-model='{args.annotator_model}' is set. "
+            "Note: annotator model arg is only used for post-hoc re-annotation workflows "
+            "— it does not affect the loaded checkpoint or other baselines."
+        )
+
     # ------------------------------------------------------------------
     # Baselines
     # ------------------------------------------------------------------
     print("\nInstantiating and running baselines...")
     baselines = _build_baselines(requested, eval_dataset, train_dataset, llm_client, args.trajectories)
+
+    # AUDIT FIX: seed global RNG before running baselines so results are reproducible
+    # across repeated evid-eval invocations with the same --seed value
+    random.seed(args.seed)
+    import numpy as np
+    np.random.seed(args.seed)
 
     baseline_results = {}
     for name, bl in baselines.items():

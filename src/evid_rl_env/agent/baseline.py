@@ -218,7 +218,12 @@ def _parse_action_idx(response: str, caller: str) -> int:
     match = re.search(r"\d+", response.strip())
     if match:
         return int(np.clip(int(match.group()), 0, N_ACTIONS - 1))
-    warnings.warn(f"[{caller}] LLM response could not be parsed, falling back to random.")
+    # AUDIT FIX: use logger.warning (not warnings.warn) and include the raw response
+    # so parse failures are visible in structured logs with enough context to debug
+    logger.warning(
+        "[%s] LLM response could not be parsed (response=%r) — falling back to random.",
+        caller, response[:120],
+    )
     return random.randint(0, N_ACTIONS - 1)
 
 
@@ -239,7 +244,15 @@ class GreedyLLMBaseline(BaseEvaluator):
             response, _ = self.llm.generate_structured(prompt)
             return _parse_action_idx(response, "GreedyLLMBaseline")
         except Exception as exc:
-            warnings.warn(f"[GreedyLLMBaseline] LLM call failed ({exc}), falling back to random.")
+            # AUDIT FIX: include model name and observation snippet so LLM failures
+            # are debuggable from logs without having to reproduce the episode
+            logger.warning(
+                "[GreedyLLMBaseline] LLM call failed: %s | model=%s | obs='%.80s' "
+                "— falling back to random.",
+                exc,
+                getattr(self.llm, "model_name", "unknown"),
+                _state_summary(state),
+            )
             return random.randint(0, N_ACTIONS - 1)
 
     def run(self, n_episodes: int) -> dict:
@@ -278,6 +291,9 @@ class FewShotLLMBaseline(BaseEvaluator):
 
         self._examples = self._build_examples()
 
+        # AUDIT FIX: initialise model cache slot before _embed() is called so the
+        # SentenceTransformer instance is created once and reused across all calls
+        self._st_model = None
         self._train_embeddings = None
         if selection_mode == "similarity":
             self._train_embeddings = self._embed(
@@ -307,8 +323,11 @@ class FewShotLLMBaseline(BaseEvaluator):
     def _embed(self, texts: list):
         try:
             from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer("all-MiniLM-L6-v2")
-            return model.encode(texts, normalize_embeddings=True)
+            # AUDIT FIX: reuse the cached SentenceTransformer instance instead of
+            # re-instantiating it on every _select_examples() call (one per step per episode)
+            if self._st_model is None:
+                self._st_model = SentenceTransformer("all-MiniLM-L6-v2")
+            return self._st_model.encode(texts, normalize_embeddings=True)
         except ImportError:
             logger.warning(
                 "sentence-transformers not available; similarity selection falls back to random."
@@ -342,7 +361,15 @@ class FewShotLLMBaseline(BaseEvaluator):
             response, _ = self.llm.generate_structured(prompt)
             return _parse_action_idx(response, "FewShotLLMBaseline")
         except Exception as exc:
-            warnings.warn(f"[FewShotLLMBaseline] LLM call failed ({exc}), falling back to random.")
+            # AUDIT FIX: include model name and observation snippet so LLM failures
+            # are debuggable from logs without having to reproduce the episode
+            logger.warning(
+                "[FewShotLLMBaseline] LLM call failed: %s | model=%s | obs='%.80s' "
+                "— falling back to random.",
+                exc,
+                getattr(self.llm, "model_name", "unknown"),
+                _state_summary(state),
+            )
             return random.randint(0, N_ACTIONS - 1)
 
     def run(self, n_episodes: int, k: int = None) -> dict:
@@ -468,6 +495,12 @@ class ImitationBaseline(BaseEvaluator):
 
     def _load(self, path: str) -> None:
         n_trajectories = 0
+        # AUDIT FIX: track provenance fields so callers can audit which models/modes
+        # contributed to the lookup table; warn on records missing these fields
+        annotator_models_seen: set = set()
+        modes_seen: set = set()
+        missing_provenance = 0
+
         with open(path) as f:
             for line in f:
                 line = line.strip()
@@ -489,11 +522,32 @@ class ImitationBaseline(BaseEvaluator):
                 self._lookup[claim].extend(entries)
                 n_trajectories += 1
 
+                # AUDIT FIX: collect provenance from each record
+                ann = rec.get("annotator_model")
+                mode = rec.get("mode")
+                if ann:
+                    annotator_models_seen.add(ann)
+                if mode:
+                    modes_seen.add(mode)
+                if not ann or not mode:
+                    missing_provenance += 1
+
+        if missing_provenance:
+            logger.warning(
+                "ImitationBaseline: %d/%d trajectory records are missing provenance "
+                "fields (annotator_model and/or mode) — these are old records that "
+                "pre-date the collected_at/annotator_model schema.",
+                missing_provenance, n_trajectories,
+            )
+
         n_claims = len(self._lookup)
         logger.info(
-            "Imitation baseline loaded %d trajectories covering %d unique claims",
+            "ImitationBaseline loaded %d trajectories covering %d unique claims "
+            "| annotator_models=%s | modes=%s",
             n_trajectories,
             n_claims,
+            sorted(annotator_models_seen) or ["unknown"],
+            sorted(modes_seen) or ["unknown"],
         )
 
     # ------------------------------------------------------------------

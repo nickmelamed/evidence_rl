@@ -15,33 +15,50 @@ class Evaluator:
 
     def evaluate(self):
         print("[Eval] greedy mode active — running evaluation...")
+        # AUDIT FIX: log the LLM seed so every eval run is auditable from logs;
+        # the seed is stored on policy.llm.seed if the policy uses an LLMClient
+        _llm_seed = getattr(getattr(self.policy, "llm", None), "seed", None)
+        if _llm_seed is not None:
+            print(f"[Eval] LLM seed: {_llm_seed}")
+        # AUDIT FIX: lock the reward normalizer for the duration of this eval pass so
+        # any accidental .update() call inside the loop raises immediately rather than
+        # silently corrupting the training normalizer state
+        if self.reward_normalizer is not None:
+            self.reward_normalizer._locked = True
+
         rewards_raw = []
         steps_list = []
         action_counts = {a: 0 for a in ACTIONS}
         llm_score_totals = {"LCS": [], "ESS": [], "HRS": [], "COMP": []}
 
-        for _ in range(self.n_eval_episodes):
-            state = self.env.reset()
-            done = False
-            ep_reward = 0.0
-            ep_steps = 0
+        try:
+            for _ in range(self.n_eval_episodes):
+                state = self.env.reset()
+                done = False
+                ep_reward = 0.0
+                ep_steps = 0
 
-            while not done:
-                action, payload, action_idx = self.policy.act(state, greedy=True)
-                next_state, reward, done, info = self.env.step(action, payload)
-                ep_reward += reward
-                ep_steps += 1
-                action_counts[action] = action_counts.get(action, 0) + 1
+                while not done:
+                    action, payload, action_idx = self.policy.act(state, greedy=True)
+                    next_state, reward, done, info = self.env.step(action, payload)
+                    ep_reward += reward
+                    ep_steps += 1
+                    action_counts[action] = action_counts.get(action, 0) + 1
 
-                for k in llm_score_totals:
-                    v = info.get("llm_scores", {}).get(k)
-                    if v is not None:
-                        llm_score_totals[k].append(v)
+                    for k in llm_score_totals:
+                        v = info.get("llm_scores", {}).get(k)
+                        if v is not None:
+                            llm_score_totals[k].append(v)
 
-                state = next_state
+                    state = next_state
 
-            rewards_raw.append(ep_reward)
-            steps_list.append(ep_steps)
+                rewards_raw.append(ep_reward)
+                steps_list.append(ep_steps)
+        finally:
+            # AUDIT FIX: always unlock so the normalizer can be updated by training
+            # even if an exception occurs mid-eval
+            if self.reward_normalizer is not None:
+                self.reward_normalizer._locked = False
 
         # Optionally normalize using training stats (read-only — no .update() calls)
         if self.reward_normalizer is not None:

@@ -18,6 +18,7 @@ import json
 import logging
 import os
 import random
+from datetime import datetime, timezone
 
 import numpy as np
 
@@ -33,6 +34,10 @@ logging.basicConfig(
 )
 
 N_ACTIONS = len(ACTIONS)
+
+# AUDIT FIX: define the set of modes that originate from training-only collection;
+# best_rollouts uses this to filter out any stray non-training records
+_TRAIN_COLLECTION_MODES = frozenset({"llm_annotator", "reward_filtered", "best_rollouts"})
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +96,9 @@ def _collect_episode(env: ClaimEnv, action_fn, annotator_model: str, mode: str) 
         "claim": claim,
         "annotator_model": annotator_model,
         "mode": mode,
+        # AUDIT FIX: add ISO timestamp so ImitationBaseline and best_rollouts can
+        # verify trajectory provenance and detect stale/mixed-run records
+        "collected_at": datetime.now(timezone.utc).isoformat(),
         "total_reward": float(total_reward),
         "steps": steps,
     }
@@ -151,6 +159,7 @@ def collect_best_rollouts(min_reward: float, logs_dir: str = "logs") -> list:
         return []
 
     selected = []
+    skipped_mode = 0
     for path in jsonl_files:
         with open(path) as f:
             for line in f:
@@ -161,10 +170,29 @@ def collect_best_rollouts(min_reward: float, logs_dir: str = "logs") -> list:
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
+                # AUDIT FIX: only include records whose mode is a recognized training
+                # collection mode; records without a mode field or with an unknown mode
+                # are skipped with a warning to prevent eval-episode data leaking into
+                # the imitation learning dataset
+                traj_mode = rec.get("mode")
+                if traj_mode not in _TRAIN_COLLECTION_MODES:
+                    logger.warning(
+                        "best_rollouts: skipping record with mode=%r (not a recognized "
+                        "training-collection mode) in file %s",
+                        traj_mode, path,
+                    )
+                    skipped_mode += 1
+                    continue
                 if rec.get("total_reward", float("-inf")) >= min_reward:
                     # Stamp mode for provenance; preserve original annotator_model
                     rec["mode"] = "best_rollouts"
                     selected.append(rec)
+
+    if skipped_mode:
+        logger.warning(
+            "best_rollouts: skipped %d records with unrecognized modes across %d files",
+            skipped_mode, len(jsonl_files),
+        )
 
     logger.info(
         "best_rollouts: %d trajectories with total_reward >= %.3f from %d files",
@@ -239,7 +267,20 @@ def main():
         default="data/trajectories.jsonl",
         help="Output JSONL path.",
     )
+    # AUDIT FIX: expose --seed so reward_filtered and llm_annotator episode ordering
+    # is reproducible; consistent with --seed in evid-train and evid-eval
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for episode collection (default: 0). "
+             "Does not affect the train/eval split (always seed 42).",
+    )
     args = parser.parse_args()
+
+    # AUDIT FIX: seed before any collection so episode ordering is reproducible
+    random.seed(args.seed)
+    np.random.seed(args.seed)
 
     train_dataset = _load_train_split(args.dataset)
     logger.info("Dataset: %d samples", len(train_dataset))

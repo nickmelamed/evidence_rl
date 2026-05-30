@@ -1,6 +1,7 @@
 # For bandit training use BanditTrainer in bandit_trainer.py
 import csv
 import os
+import random
 from pathlib import Path
 
 import numpy as np
@@ -149,6 +150,21 @@ class Trainer:
     # ------------------------------------------------------------------
 
     def _run_eval_round(self, ep: int) -> None:
+        # AUDIT FIX: save and restore global RNG state so that baseline evaluations
+        # (RandomBaseline, MajorityBaseline, etc.) don't consume training RNG entropy
+        # and cause training to produce different results depending on eval frequency.
+        # Also seed eval deterministically so eval results are reproducible across runs.
+        _rng_state = random.getstate()
+        _np_rng_state = np.random.get_state()
+        random.seed(self.seed ^ (ep + 1))
+        np.random.seed(self.seed ^ (ep + 1))
+        try:
+            self.__run_eval_round_inner(ep)
+        finally:
+            random.setstate(_rng_state)
+            np.random.set_state(_np_rng_state)
+
+    def __run_eval_round_inner(self, ep: int) -> None:
         # --- RL evaluator (normalized rewards via self.reward_rms) ---
         rl_metrics = self.evaluator.evaluate()
         rl_raw = rl_metrics["eval/mean_reward_raw"]
