@@ -33,6 +33,32 @@ $(PYTHON) scripts/run_episode.py
 test:
 pytest
 
+# evaluation
+
+eval:
+	evid-eval --checkpoint $(checkpoint) --baselines random,greedy_llm,fewshot_k3,best_of_5
+
+eval-quick:
+	evid-eval --checkpoint $(checkpoint) --baselines random,greedy_llm --n-episodes 20
+
+eval-full:
+	evid-eval --checkpoint $(checkpoint) --baselines random,majority,greedy_llm,fewshot_k3,fewshot_k5,best_of_5 --n-episodes 100
+
+eval-ci:
+	evid-eval --checkpoint $(checkpoint) --baselines greedy_llm --n-episodes 50
+
+collect:
+	evid-collect
+
+collect-n:
+	evid-collect --n-episodes $(n)
+
+eval-imitation:
+	evid-eval --checkpoint $(checkpoint) --trajectories $(trajectories) --baselines random,greedy_llm,fewshot_k3,best_of_5,imitation
+
+migrate:
+	evid-migrate
+
 # experiments
 
 train-ppo:
@@ -44,9 +70,6 @@ train-pg:
 train-bandit:
 	train-rl --method bandit --episodes 100
 
-compare:
-	compare-exp --paths artifacts/experiments/*
-
 dashboard:
 	streamlit run dashboard/app.py
 
@@ -54,10 +77,10 @@ train-exp:
 $(PYTHON) scripts/train.py --exp_name=default
 
 plot:
-	python scripts/plot.py --path=$(path)
+	plot-exp --path=$(path)
 
 compare:
-	python scripts/compare.py --paths $(paths)
+	compare-exp --paths $(paths)
 
 # full reset
 
@@ -75,3 +98,18 @@ help:
 @echo "  make test           Run tests"
 @echo "  make clean          Remove cache files"
 @echo "  make reset          Full cleanup"
+@echo ""
+@echo "Evaluation (requires checkpoint=<path>):"
+@echo "  make eval           Eval vs random,greedy,fewshot_k3,best_of_5"
+@echo "  make eval-quick     Fast eval (random,greedy, 20 episodes)"
+@echo "  make eval-full      Full eval all baselines, 100 episodes"
+@echo "  make eval-ci        CI gate — exits 1 if RL doesn't beat greedy"
+@echo "  make eval-imitation checkpoint=<path> trajectories=<path>"
+@echo "                      Eval including imitation baseline"
+@echo "  make collect        Collect trajectories via evid-collect"
+@echo "  make collect-n n=<int>  Collect N episodes of trajectories"
+@echo "  make migrate        Migrate trajectory files via evid-migrate"
+@echo ""
+@echo "Analysis:"
+@echo "  make plot path=<path>         Plot a single experiment"
+@echo "  make compare paths=<paths>    Compare multiple experiments"
