@@ -1,7 +1,7 @@
 [
   {
     "id": "aspirin_primary_prevention",
-    "claim": "Low-dose aspirin (75–100mg daily) reduces major cardiovascular events in adults without prior cardiovascular disease.",
+    "claim": "Low-dose aspirin (75\u2013100mg daily) reduces major cardiovascular events in adults without prior cardiovascular disease.",
     "domain": "Cardiology / Preventive Medicine",
     "search_query": "low-dose aspirin primary prevention cardiovascular events randomized controlled trial benefit bleeding risk",
     "notes": "Recent large RCTs (ASPREE, ARRIVE, ASCEND) found that bleeding risks offset vascular benefits in primary prevention populations, reversing decades of guideline recommendations.",
@@ -62,5 +62,581 @@
     "search_query": "moderate alcohol consumption mortality J-curve sick quitter bias Mendelian randomization all-cause mortality",
     "notes": "The apparent protective J-curve may be an artifact of sick-quitter bias in observational studies, while Mendelian randomization analyses generally find no safe level of alcohol consumption for mortality.",
     "difficulty": "medium"
+  },
+  {
+    "id": "sugar_addiction_neurobiological",
+    "claim": "Sugar induces neurobiological addiction in humans through the same dopaminergic mechanisms as drugs of abuse such as opioids and stimulants.",
+    "domain": "Neuroscience / Nutritional Psychology",
+    "search_query": "sugar addiction dopamine humans neuroimaging craving withdrawal evidence clinical criteria DSM",
+    "notes": "Animal studies show opioid-like and dopaminergic sensitization from intermittent sugar access, but human neuroimaging and behavioral studies do not consistently demonstrate the bingeing, tolerance, and withdrawal cycle required for a substance addiction diagnosis.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "organic_nutritional_superiority",
+    "claim": "Organic produce contains meaningfully higher levels of vitamins, minerals, and antioxidants than conventionally grown produce.",
+    "domain": "Nutrition / Agricultural Science",
+    "search_query": "organic vs conventional produce nutritional content meta-analysis vitamins minerals antioxidants Stanford",
+    "notes": "A large Stanford meta-analysis (Annals of Internal Medicine, 2012) and subsequent systematic reviews find minimal nutritional differences between organic and conventional produce; the primary measurable differences are in pesticide residue levels, not nutrient content.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "dietary_cholesterol_ldl_response",
+    "claim": "Dietary cholesterol intake raises serum LDL cholesterol and cardiovascular risk in most healthy adults.",
+    "domain": "Nutrition / Cardiovascular Medicine",
+    "search_query": "dietary cholesterol eggs LDL cardiovascular risk hypo-responder meta-analysis population variation",
+    "notes": "Approximately 70\u201375% of people are dietary cholesterol hypo-responders whose LDL is minimally affected by intake; large meta-analyses and prospective cohorts find no consistent association between egg consumption and CVD risk in most populations.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "ultra_processed_food_harm_independent",
+    "claim": "Ultra-processed foods cause harm to metabolic health beyond what is explained by their macronutrient composition, caloric density, and sodium content.",
+    "domain": "Nutrition / Epidemiology",
+    "search_query": "ultra-processed food NOVA classification health outcomes independent macronutrients RCT Hall 2019",
+    "notes": "NOVA-based prospective studies (EPIC, NutriNet-Sant\u00e9) consistently associate ultra-processing with adverse outcomes, but the Hall et al. (2019) inpatient crossover RCT\u2014the only controlled trial isolating processing from nutrition\u2014found higher caloric intake but did not cleanly disentangle processing from nutritional composition differences.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "stretching_injury_prevention",
+    "claim": "Static stretching before exercise prevents sports injuries and reduces delayed-onset muscle soreness.",
+    "domain": "Exercise Science / Sports Medicine",
+    "search_query": "static stretching pre-exercise injury prevention DOMS systematic review Cochrane RCT",
+    "notes": "Cochrane reviews and multiple RCTs find no significant reduction in injury rates or DOMS from pre-exercise static stretching; static stretching may transiently reduce force output and does not address the primary mechanisms of overuse injury.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "exercise_primary_weight_loss",
+    "claim": "Regular aerobic exercise, without dietary modification, is an effective primary strategy for clinically meaningful long-term weight loss.",
+    "domain": "Exercise Science / Obesity Medicine",
+    "search_query": "exercise alone weight loss compensatory appetite energy intake meta-analysis without diet restriction",
+    "notes": "Meta-analyses of exercise-only interventions consistently show modest weight loss (~1\u20132 kg) attributable to compensatory increases in appetite and reductions in non-exercise activity thermogenesis; dietary restriction produces substantially larger and more sustained reductions.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "hiit_vo2max_superiority",
+    "claim": "High-intensity interval training produces greater absolute improvements in VO2max than moderate-intensity continuous exercise when total training volume is equated.",
+    "domain": "Exercise Science / Cardiology",
+    "search_query": "HIIT vs moderate intensity continuous training VO2max absolute improvement volume-matched meta-analysis",
+    "notes": "When total work and time are equated, meta-analyses find similar absolute VO2max gains between HIIT and MICT; HIIT's documented advantage is time efficiency\u2014equivalent cardiovascular adaptation in less total exercise time\u2014not superior physiological gain per session.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "eccentric_exercise_strength_superiority",
+    "claim": "Eccentric (muscle-lengthening) contractions produce greater strength and hypertrophy gains per unit of metabolic effort than concentric contractions.",
+    "domain": "Exercise Science / Sports Medicine",
+    "search_query": "eccentric vs concentric exercise strength hypertrophy mechanical efficiency meta-analysis",
+    "notes": "Meta-analyses consistently show eccentric protocols produce superior strength gains and hypertrophy relative to perceived exertion and oxygen consumption; the advantage is robust across trained and untrained populations, driven by higher mechanical load tolerance during lengthening.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "multitasking_skill_development",
+    "claim": "Skilled individuals can develop the ability to genuinely parallel-process two cognitively demanding tasks through extensive practice.",
+    "domain": "Cognitive Psychology",
+    "search_query": "multitasking dual-task interference supertaskers parallel processing practice attentional limits",
+    "notes": "Cognitive psychology demonstrates that humans serially switch attention rather than truly parallel-process; even high-performing self-described multitaskers show dual-task decrements; Watson and Strayer's (2010) 'supertasker' study found only 2.5% of participants showed negligible dual-task cost, and replication is sparse.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "video_game_attention_transfer",
+    "claim": "Action video game training produces durable improvements in attentional abilities that transfer broadly to untrained real-world perceptual tasks.",
+    "domain": "Cognitive Psychology / Neuroscience",
+    "search_query": "action video game attention transfer effect replication pre-registered meta-analysis Boot Bavelier",
+    "notes": "Initial findings by Green and Bavelier generated enthusiasm, but subsequent pre-registered replications and meta-analyses (Boot et al., van Ravenzwaaij et al.) find limited evidence of reliable far transfer; concerns include expectation effects from unblinded designs and inadequate active control conditions.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "working_memory_training_fluid_intelligence",
+    "claim": "Adaptive working memory training programs (such as dual n-back) improve fluid intelligence and produce broad cognitive gains beyond the trained task.",
+    "domain": "Cognitive Psychology",
+    "search_query": "n-back working memory training fluid intelligence far transfer replication meta-analysis Jaeggi",
+    "notes": "The Jaeggi et al. (2008) Science paper on n-back training improving fluid intelligence failed to replicate in multiple pre-registered studies; large-scale meta-analyses find near-transfer (improved performance on trained task variants) but no reliable far transfer to untrained cognitive domains.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "subliminal_advertising_commercial_effectiveness",
+    "claim": "Subliminal advertising\u2014presenting commercial messages below the threshold of conscious perception\u2014effectively influences consumer purchasing decisions.",
+    "domain": "Consumer Psychology / Marketing Science",
+    "search_query": "subliminal advertising effectiveness commercial purchasing behavior evidence real world lab priming",
+    "notes": "Laboratory priming studies demonstrate subtle, short-lived behavioral effects of subliminal stimuli under highly controlled conditions; the original James Vicary subliminal cinema experiment was fabricated; no peer-reviewed evidence demonstrates real-world commercial effectiveness at scale.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "learning_styles_meshing_hypothesis",
+    "claim": "Matching instructional delivery modality to a student's preferred learning style (visual, auditory, or kinesthetic) improves learning outcomes relative to mismatched instruction.",
+    "domain": "Education / Learning Science",
+    "search_query": "learning styles meshing hypothesis evidence visual auditory kinesthetic VARK Pashler Willingham",
+    "notes": "The 'meshing hypothesis' has been tested in controlled experiments without supportive evidence; Pashler et al.'s (2008) comprehensive review concluded optimal learning modality is determined by content type, not learner preference, and the construct lacks both predictive and psychometric validity.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "retrieval_practice_retention_advantage",
+    "claim": "Retrieval practice (taking practice tests) improves long-term retention more than an equivalent period of restudying material.",
+    "domain": "Education / Cognitive Psychology",
+    "search_query": "testing effect retrieval practice vs restudying retention long-term meta-analysis Roediger Karpicke",
+    "notes": "The testing effect is among the most robust findings in cognitive science; meta-analyses across age groups, content domains, and retention intervals consistently show large retrieval practice advantages over passive restudying, even when practice tests are ungraded and feedback is not provided.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "early_formal_reading_instruction_outcomes",
+    "claim": "Children who begin formal reading instruction before age five achieve measurably better reading outcomes by age ten compared to children who begin at ages six or seven.",
+    "domain": "Developmental Psychology / Education",
+    "search_query": "school start age reading outcomes early formal instruction Scandinavian England Cambridge Primary Review longitudinal",
+    "notes": "Comparative studies across England (compulsory start at 4\u20135) and Scandinavian countries (start at 6\u20137) find that any early-instruction advantage disappears by age 10\u201311; the Cambridge Primary Review and EPPE study found no lasting reading advantage from earlier formal academic instruction.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "ego_depletion_self_control_resource",
+    "claim": "Self-control draws on a limited glucose-dependent resource that becomes depleted with use, impairing subsequent self-regulatory performance in unrelated domains.",
+    "domain": "Social Psychology",
+    "search_query": "ego depletion replication self-control resource model glucose Carter Hagger multi-lab",
+    "notes": "Baumeister's ego depletion model was highly influential, but a large pre-registered multi-lab replication (Hagger et al. 2016; 23 labs) found near-zero average effects; the glucose mechanism is especially poorly supported, with studies failing to replicate and methodological critiques of the original paradigm.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "power_poses_hormonal_performance",
+    "claim": "Adopting expansive body postures for two minutes significantly increases testosterone and decreases cortisol, improving performance in subsequent evaluations.",
+    "domain": "Social Psychology / Endocrinology",
+    "search_query": "power poses testosterone cortisol replication Carney Cuddy meta-analysis failed",
+    "notes": "Carney, Cuddy, and Yap's (2010) hormonal findings failed to replicate in multiple independent studies; co-author Carney publicly distanced herself from the original results; meta-analyses find null hormonal effects, though weak subjective confidence effects in some paradigms remain debated.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "implicit_bias_iat_behavior_prediction",
+    "claim": "An individual's Implicit Association Test score reliably predicts their discriminatory behavior toward the targeted group in real-world situations.",
+    "domain": "Social Psychology",
+    "search_query": "IAT implicit bias predictive validity discriminatory behavior meta-analysis Oswald within-person reliability",
+    "notes": "Oswald et al.'s (2013) meta-analysis found IAT scores explain only 1\u20135% of variance in individual discriminatory behavior; Forscher et al.'s (2019) meta-analysis of 426 studies found that changing IAT scores does not change behavior; within-person test-retest reliability is also problematic for its use as a stable individual-difference measure.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "social_network_health_contagion",
+    "claim": "Chronic health conditions such as obesity and depression spread through social networks via genuine social contagion, independent of shared environments and lifestyle homophily.",
+    "domain": "Social Epidemiology / Network Science",
+    "search_query": "Christakis Fowler social contagion obesity depression Framingham methodological critique homophily confounding",
+    "notes": "Christakis and Fowler's influential Framingham Heart Study analyses claimed social contagion of obesity, depression, and loneliness; methodological critics (Cohen-Cole and Fletcher; Lyons) demonstrated that adequate controls for shared environmental exposure and friendship selection largely eliminate apparent contagion effects.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "minimum_wage_significant_job_loss",
+    "claim": "Moderate increases in the minimum wage (below 60% of local median wage) cause significant net employment losses in low-wage labor markets.",
+    "domain": "Labor Economics",
+    "search_query": "minimum wage employment effect Card Krueger natural experiment quasi-experimental Dube meta-analysis",
+    "notes": "Card and Krueger's 1994 natural experiment and subsequent quasi-experimental research using border discontinuity designs (Dube, Lester, Reich) consistently find small to negligible employment effects at moderate minimum wage levels; the prior consensus of significant job loss has substantially shifted among labor economists.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "cash_transfers_temptation_goods",
+    "claim": "Unconditional cash transfers to people living in poverty are disproportionately spent on alcohol, tobacco, and other temptation goods rather than necessities.",
+    "domain": "Development Economics / Public Health",
+    "search_query": "unconditional cash transfer temptation goods alcohol tobacco spending World Bank GiveDirectly RCT Africa",
+    "notes": "A World Bank meta-analysis of 19 studies and multiple GiveDirectly RCTs find no consistent increase in temptation goods spending; food security, productive assets, and education expenditure reliably increase; the assumption reflects a paternalistic prior that is not borne out by experimental evidence.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "financial_incentives_intrinsic_motivation",
+    "claim": "Offering monetary rewards for activities people already find intrinsically interesting reliably reduces their intrinsic motivation for those activities.",
+    "domain": "Behavioral Economics / Motivational Psychology",
+    "search_query": "overjustification effect intrinsic motivation financial incentives meta-analysis Deci Cameron contradictory findings",
+    "notes": "Deci, Koestner, and Ryan's (1999) meta-analysis supported the undermining effect for tangible expected rewards; Cameron and Pierce's competing meta-analysis found undermining limited to verbal rewards and found monetary rewards often enhance motivation; the effect is highly contingent on reward type, task, and expectedness.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "cancer_screening_all_cause_mortality",
+    "claim": "Population-level cancer screening programs (mammography, PSA testing, CT lung screening) reduce overall all-cause mortality in screened populations.",
+    "domain": "Oncology / Preventive Medicine",
+    "search_query": "cancer screening all-cause mortality RCT mammography PSA overdiagnosis net benefit Cochrane",
+    "notes": "While several screening programs reduce cancer-specific mortality, large adequately powered RCTs for mammography, PSA, and colorectal screening generally show no statistically significant reduction in all-cause mortality; overdiagnosis, treatment harms, and anxiety are significant costs rarely incorporated into benefit calculations.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "antioxidant_supplements_cancer_prevention",
+    "claim": "High-dose antioxidant supplementation reduces cancer risk by neutralizing free radicals that damage DNA.",
+    "domain": "Oncology / Nutritional Pharmacology",
+    "search_query": "antioxidant supplement cancer risk beta-carotene CARET selenium vitamin E SELECT trial increased risk",
+    "notes": "The CARET trial found significantly increased lung cancer incidence in smokers taking beta-carotene plus retinol; the SELECT trial found elevated prostate cancer risk with vitamin E supplementation; antioxidants appear to protect cancer cells as well as normal cells, potentially accelerating tumor growth in pro-oxidant treatment contexts.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "cancer_random_mutations_primary_cause",
+    "claim": "The majority of human cancer cases are primarily attributable to random mutations arising during normal stem cell division rather than to preventable environmental or lifestyle exposures.",
+    "domain": "Cancer Biology / Epidemiology",
+    "search_query": "Tomasetti Vogelstein bad luck cancer stem cell division replication errors attributable fraction lifestyle environment",
+    "notes": "Tomasetti and Vogelstein's 2015 and 2017 Science papers argued that R-squared correlations between stem cell divisions and cancer rates imply most driver mutations are replicative errors; Sch\u00f6ttker, Blot, and others countered that this analysis conflates mutation rate with cancer incidence probability and that population attributable fraction analyses consistently show preventable factors dominate for the most common cancers.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "natural_immunity_universally_superior",
+    "claim": "Immunity acquired through natural infection is always more durable and broader than immunity conferred by vaccines targeting the same pathogen.",
+    "domain": "Immunology / Vaccinology",
+    "search_query": "natural infection vs vaccine immunity durability breadth HPV COVID mRNA hepatitis B comparison",
+    "notes": "For HPV, hepatitis B, and COVID-19 (mRNA vaccines vs. mild infection), vaccine-induced immunity is more durable and/or broader than that from mild natural infection; the relationship is pathogen- and vaccine-specific; severe natural infection may produce stronger immunity but at unacceptable morbidity cost.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "mrna_vaccine_dna_integration",
+    "claim": "mRNA vaccines can reverse-transcribe into DNA and integrate into the human genome, permanently altering recipients' genetic material.",
+    "domain": "Molecular Biology / Vaccinology",
+    "search_query": "mRNA vaccine reverse transcription genome integration LINE-1 Zhang 2021 in vivo evidence",
+    "notes": "mRNA lacks the enzymatic machinery (reverse transcriptase, integrase) for genomic integration; a 2021 Zhang et al. in vitro study showed integration in LINE-1-overexpressing HEK293T cancer cells under artificial conditions; there is no evidence this occurs in normal human somatic cells in vivo, and mRNA degrades within days.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "influenza_vaccine_cross_reactive_protection",
+    "claim": "Annual influenza vaccines provide meaningful cross-reactive protection against antigenically drifted strains not included in the current formulation.",
+    "domain": "Infectious Disease / Vaccinology",
+    "search_query": "influenza vaccine effectiveness mismatched strains cross-reactive T-cell immunity drift season",
+    "notes": "Influenza vaccine effectiveness against antigenically mismatched strains is typically 10\u201330% and often not statistically significant in surveillance data; cross-reactive T-cell immunity exists but does not reliably prevent infection or severe illness from drifted strains, which is precisely why annual reformulation is required.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "gwas_missing_heritability_resolved",
+    "claim": "Genome-wide association studies have now identified genetic variants that account for the majority of inherited variation in complex traits such as height and general cognitive ability.",
+    "domain": "Genetics / Genomics",
+    "search_query": "missing heritability GWAS height IQ common variants SNP heritability explained structural rare variants",
+    "notes": "Despite GWAS with millions of participants identifying thousands of loci, identified common variants explain roughly 40\u201360% of SNP-heritability for height and less for most other complex traits; the 'missing heritability' problem persists, with rare variants, structural variants, gene-gene interactions, and gene-environment interactions likely responsible for substantial unexplained variance.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "transgenerational_epigenetic_inheritance_mammals",
+    "claim": "Stress, trauma, or nutritional deprivation in one mammalian generation causes heritable epigenetic changes that alter gene expression in subsequent generations through non-genetic mechanisms.",
+    "domain": "Epigenetics / Evolutionary Biology",
+    "search_query": "transgenerational epigenetic inheritance mammals stress trauma Dutch Hunger Winter germline reprogramming confounding",
+    "notes": "Robust transgenerational epigenetic inheritance is well-documented in plants and some invertebrates; in mammals, epigenetic marks are largely reprogrammed during gametogenesis and early embryogenesis; studies like the Dutch Hunger Winter cohort are consistent with but do not demonstrate epigenetic transmission vs. shared environment or direct genetic confounding.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "crispr_embryo_clinical_precision",
+    "claim": "Current CRISPR-Cas9 technology is precise enough for safe therapeutic use in human embryos, with acceptable rates of unintended genomic alterations.",
+    "domain": "Genetics / Reproductive Medicine",
+    "search_query": "CRISPR human embryo off-target editing mosaicism chromosomal deletion Zuccaro Alanis-Lobato 2020 2021",
+    "notes": "Studies of CRISPR editing in human embryos (Zuccaro et al. 2020; Alanis-Lobato et al. 2021) found unexpectedly high rates of large chromosomal deletions, inversions, loss of heterozygosity, and mosaicism at target sites; international regulatory and scientific bodies do not consider the technology sufficiently precise for clinical heritable human genome editing.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "mask_rct_community_transmission",
+    "claim": "Wearing surgical or cloth masks significantly reduces community transmission of respiratory viruses in real-world settings.",
+    "domain": "Infectious Disease / Public Health",
+    "search_query": "mask RCT community transmission influenza COVID Cochrane 2023 Jefferson physical interventions",
+    "notes": "The 2023 Cochrane systematic review of 78 RCTs (Jefferson et al.) found little to no evidence that medical or cloth masks reduce influenza-like illness or confirmed COVID-19 in community settings; mechanistic and observational evidence supports masking, but the RCT evidence remains consistently weak across multiple updates of the review.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "antibiotic_resistance_clinical_primary_driver",
+    "claim": "Antibiotic use in human clinical settings is the primary driver of the antibiotic-resistant bacteria responsible for human infections.",
+    "domain": "Infectious Disease / One Health",
+    "search_query": "antibiotic resistance agriculture sub-therapeutic livestock contribution human pathogens WHO One Health relative risk",
+    "notes": "Agricultural antibiotic use\u2014often at sub-therapeutic growth-promoting doses\u2014selects for resistant organisms in food animals and environments that enter human populations via food, water, and direct contact; WHO and FAO recognize agricultural use as a major and potentially comparable contributor to clinically relevant resistance alongside human clinical use.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "measles_herd_immunity_95_percent",
+    "claim": "Preventing measles outbreaks in a community requires population immunity of at least 95% due to the virus's exceptionally high transmissibility.",
+    "domain": "Infectious Disease / Epidemiology",
+    "search_query": "measles herd immunity threshold R0 basic reproduction number 95 percent vaccination coverage outbreak data",
+    "notes": "Measles has one of the highest basic reproduction numbers (R0 = 12\u201318) of any known pathogen, which mathematically requires approximately 92\u201395% population immunity for herd protection; this threshold is strongly validated by outbreak data and is a firm scientific consensus figure, frequently misapplied in public discourse to pathogens with very different transmission dynamics.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "eight_hour_sleep_universal_requirement",
+    "claim": "All healthy adults require exactly eight hours of sleep per night to function at their cognitive and physiological optimum.",
+    "domain": "Sleep Science",
+    "search_query": "sleep duration individual variation optimal 7 to 9 hours natural short sleeper FNBP1L gene",
+    "notes": "Major sleep societies recommend 7\u20139 hours as a range reflecting genuine inter-individual variation; rare individuals with FNBP1L (DEC2) or ADRB1 gene variants function optimally on 4\u20136 hours; the 'exactly 8 hours' framing overstates the evidence for a universal fixed requirement.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "weekend_sleep_extension_full_recovery",
+    "claim": "Sleeping longer on weekends fully compensates for chronic weekday sleep restriction and restores normal cognitive and metabolic function.",
+    "domain": "Sleep Science / Metabolism",
+    "search_query": "weekend sleep recovery debt chronic restriction metabolic insulin cognitive Depner Current Biology 2019",
+    "notes": "A 2019 Current Biology study (Depner et al.) found that weekend recovery sleep reduced but did not eliminate metabolic dysregulation; insulin sensitivity and daytime sleepiness did not fully normalize; cognitive performance deficits from chronic restriction also persist through and after weekend recovery periods.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "individual_carbon_footprint_primary_lever",
+    "claim": "Individual behavior change\u2014reducing personal air travel, adopting plant-based diets, and recycling\u2014is the most effective lever for reducing global greenhouse gas emissions.",
+    "domain": "Environmental Science / Climate Policy",
+    "search_query": "individual carbon footprint systemic change policy leverage emissions reduction BP 2004 campaign responsibility",
+    "notes": "Systems analyses consistently show energy infrastructure decarbonization, industrial process change, and policy mechanisms have orders-of-magnitude greater leverage than aggregate individual consumption choices; the 'personal carbon footprint' concept was popularized by a BP advertising campaign beginning in 2004 to shift public discourse toward individual rather than corporate and regulatory responsibility.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "nuclear_plant_radiation_greater_than_coal",
+    "claim": "Nuclear power plants expose nearby populations to greater radiation doses than coal-fired power plants operating under normal conditions.",
+    "domain": "Environmental Health / Energy Policy",
+    "search_query": "coal plant radiation fly ash radionuclides uranium thorium nuclear comparison normal operation ORNL",
+    "notes": "Coal combustion releases naturally occurring radionuclides (uranium, thorium, radium-226) concentrated in fly ash; a 1978 ORNL study estimated coal plants release approximately 100 times more radioactivity per unit energy than nuclear plants under normal operation; the primary public health impacts of coal are from particulate matter and carbon dioxide, not radiation.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "plastic_recycling_ocean_waste_effectiveness",
+    "claim": "Consumer plastic recycling programs substantially reduce the volume of plastic entering oceans and landfills.",
+    "domain": "Environmental Science / Waste Management",
+    "search_query": "plastic recycling rates global effectiveness ocean waste Geyer 2017 China National Sword downcycling",
+    "notes": "Global plastic recycling rates are approximately 9% (Geyer et al. 2017); after China's 2018 National Sword policy, most developed-world plastic 'recycling' was exported and often landfilled or incinerated abroad; flexible packaging and most mixed plastics are economically unrecyclable without commodity subsidies, and mechanical recycling downgrades polymer quality with each cycle.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "invasive_species_universal_harm",
+    "claim": "Non-native species introduced into new ecosystems are almost always ecologically harmful and reliably reduce native biodiversity.",
+    "domain": "Ecology / Conservation Biology",
+    "search_query": "invasive species ecological impact meta-analysis neutral positive biodiversity Davis 2011 proportion harmful",
+    "notes": "Davis et al.'s (2011) Nature commentary and subsequent meta-analyses find that many introduced species have neutral or negligible ecological impacts; an estimated 10\u201315% of established non-native species cause significant harm; some introduced species become mutualistic partners with native species; the universalist framing may misdirect conservation resources.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "coral_bleaching_always_fatal",
+    "claim": "Coral bleaching events inevitably cause the death of bleached coral tissue unless water temperatures return to normal within days.",
+    "domain": "Marine Biology / Conservation",
+    "search_query": "coral bleaching recovery survival thermal acclimatization adaptation weeks mortality nonlinear",
+    "notes": "Corals can survive bleaching events lasting several weeks if cumulative thermal stress (degree-heating weeks) does not exceed critical thresholds; documented cases of acclimatization to elevated temperatures exist in some reef populations; the bleaching\u2013mortality relationship is nonlinear, population-specific, and depends on symbiont type.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "wolf_yellowstone_trophic_cascade",
+    "claim": "Wolf reintroduction to Yellowstone triggered a comprehensive trophic cascade that transformed vegetation, river morphology, and biodiversity throughout the park.",
+    "domain": "Ecology / Conservation Biology",
+    "search_query": "wolf reintroduction Yellowstone trophic cascade vegetation rivers ecology of fear Kauffman Winnie heterogeneous",
+    "notes": "Kauffman et al. (2010) and subsequent fieldwork show wolf effects on elk distribution and riparian vegetation are spatially heterogeneous and weaker than the popular 'rivers of change' narrative (Monbiot, 2013) suggests; direct causal links to altered river morphology lack empirical support; multiple confounding factors including drought, beaver activity, and human management complicate attribution.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "caloric_restriction_primate_lifespan_extension",
+    "claim": "Caloric restriction (20\u201340% below ad libitum intake) extends maximum lifespan in non-human primates as robustly as it does in rodents.",
+    "domain": "Aging / Gerontology",
+    "search_query": "caloric restriction rhesus monkey lifespan NIA Wisconsin conflicting results control diet composition",
+    "notes": "The University of Wisconsin study found reduced age-related mortality in calorie-restricted rhesus monkeys; the NIA study found no survival benefit; key differences in control diet sucrose content, nutrient composition, and monkey source make cross-study interpretation difficult; primate CR effects appear substantially weaker and more condition-dependent than the dramatic lifespan extensions observed in rodents.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "centenarian_healthy_lifestyle_primary",
+    "claim": "Individuals who live to 100 or beyond typically owe their extreme longevity to exceptionally healthy lifestyle habits maintained throughout adulthood.",
+    "domain": "Aging / Gerontology",
+    "search_query": "centenarians lifestyle genetics smoking alcohol APOE FOXO3 supercentenarian habits longitudinal",
+    "notes": "Cohort studies of centenarians and supercentenarians document many with histories of smoking, moderate alcohol consumption, and unremarkable diets; genetic variants (APOE \u03b52, FOXO3, CETP) are strongly over-represented in extreme longevity cohorts; sibling concordance for longevity suggests genetics dominates over lifestyle at the tails of the survival distribution.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "ssri_efficacy_mild_moderate_depression",
+    "claim": "SSRI antidepressants provide clinically meaningful benefit over placebo for mild to moderate depression, not only for severe depression.",
+    "domain": "Psychiatry / Psychopharmacology",
+    "search_query": "SSRI antidepressant efficacy mild moderate depression placebo drug difference Kirsch FDA Cipriani Lancet",
+    "notes": "Kirsch et al.'s (2008) FDA trial data re-analysis found the drug\u2013placebo difference fell below NICE's clinical significance threshold for all but severe depression; Cipriani et al.'s (2018) Lancet mega-analysis of 522 trials found statistically significant but small average effect sizes across severity levels; the debate centers on whether statistical significance translates to individual clinical meaningfulness.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "dose_response_monotonic_toxicology",
+    "claim": "The dose-response relationship for toxic substances is always monotonic: lower doses of a toxin invariably produce proportionally smaller adverse effects than higher doses.",
+    "domain": "Toxicology / Endocrinology",
+    "search_query": "non-monotonic dose response hormesis endocrine disruptors BPA low dose effect regulatory risk assessment",
+    "notes": "Hormesis (beneficial or neutral effects at low doses of otherwise toxic agents) is well-documented; endocrine-disrupting compounds including BPA, BPS, and certain pesticides exhibit non-monotonic dose-response curves where low doses sometimes produce larger effects than intermediate doses, directly undermining standard regulatory risk models that assume monotonicity.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "opioid_acute_prescription_low_addiction_risk",
+    "claim": "Opioid-naive patients prescribed opioids for acute post-surgical pain have a negligible risk of developing opioid use disorder.",
+    "domain": "Pharmacology / Addiction Medicine",
+    "search_query": "opioid prescription acute pain chronic use transition risk opioid use disorder administrative database post-surgical",
+    "notes": "Large administrative database studies find that 5\u201312% of post-surgical patients become long-term opioid users within a year; among those prescribed for acute musculoskeletal pain, chronic use transition rates are higher still; risk varies substantially by opioid type, daily dose, supply duration, and patient comorbidities.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "aces_permanent_irreversible_brain_damage",
+    "claim": "Adverse childhood experiences cause permanent, irreversible structural brain damage that cannot be meaningfully remediated by subsequent intervention.",
+    "domain": "Developmental Neuroscience / Psychiatry",
+    "search_query": "adverse childhood experiences ACEs brain structure neuroplasticity recovery intervention adoption enriched environment longitudinal",
+    "notes": "While ACEs are associated with altered HPA axis function and prefrontal-amygdala connectivity, neuroplasticity allows substantial recovery, particularly with early high-quality intervention; longitudinal studies of children adopted out of Romanian institutions show significant neurological and psychological improvement, particularly when adopted before 6 months of age.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "first_three_years_closed_critical_period",
+    "claim": "The brain's critical developmental window closes at age three, making early childhood the decisive and essentially final period for shaping cognitive and emotional development.",
+    "domain": "Developmental Psychology / Neuroscience",
+    "search_query": "critical period brain development first three years sensitive period adolescence neuroplasticity exaggeration",
+    "notes": "While sensitive periods exist for specific systems (binocular vision, first-language phonology), significant neuroplasticity and developmentally sensitive periods for social cognition, executive function, and emotional regulation persist through adolescence; the 'zero to three' framing overgeneralizes a few specific critical periods into a blanket developmental claim.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "parenting_style_causal_child_outcomes",
+    "claim": "Authoritative parenting style causally produces better child cognitive and socioemotional outcomes independent of the genetic relationship between parent and child.",
+    "domain": "Developmental Psychology / Behavioral Genetics",
+    "search_query": "parenting style outcomes behavioral genetics adoption twin study gene environment correlation causal effect",
+    "notes": "Adoption studies and twin designs reveal that correlations between parenting style and child outcomes are substantially mediated by passive gene-environment correlation (shared genes drive both parenting behavior and child outcomes); the causal effect of parenting style, independent of shared genetics, appears substantially smaller than correlational studies imply.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "ldl_cholesterol_cvd_causality",
+    "claim": "Elevated LDL cholesterol is causally responsible for atherosclerotic cardiovascular disease.",
+    "domain": "Cardiology / Lipidology",
+    "search_query": "LDL cholesterol causal cardiovascular disease statin Mendelian randomization PCSK9 familial hypercholesterolemia convergent evidence",
+    "notes": "Converging causal evidence from statin RCTs, PCSK9 inhibitor trials, familial hypercholesterolemia natural experiments, and Mendelian randomization studies all support LDL causality; 'cholesterol skepticism' persists in popular media but lacks support from high-quality epidemiological and experimental evidence.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "beta_blockers_first_line_hypertension",
+    "claim": "Beta-blockers are effective and appropriate first-line antihypertensive agents for patients with uncomplicated primary hypertension.",
+    "domain": "Cardiology / Pharmacology",
+    "search_query": "beta blocker hypertension first line meta-analysis stroke mortality ACE inhibitor ARB calcium channel blocker comparison",
+    "notes": "Multiple meta-analyses (Lindholm et al. 2005; Bradley et al.) and updated guidelines (JNC 8; ESC/ESH 2018) downgraded beta-blockers for uncomplicated hypertension due to inferior stroke and all-cause mortality outcomes compared to ACE inhibitors, ARBs, and calcium channel blockers in head-to-head trials; they remain first-line for specific indications such as heart failure and recent MI.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "statin_therapy_cognitive_impairment",
+    "claim": "Statin therapy causes clinically meaningful cognitive impairment and accelerates memory decline, particularly at higher doses.",
+    "domain": "Cardiology / Neurology",
+    "search_query": "statin cognitive impairment memory decline FDA warning RCT observational evidence meta-analysis neuroprotective",
+    "notes": "Despite the FDA's 2012 label addition regarding cognitive side effects (driven by spontaneous adverse event reports), multiple large RCTs (HPS, JUPITER, PROSPER), prospective cohort studies, and meta-analyses find no evidence of statin-induced cognitive decline; several studies suggest statins may be neuroprotective against dementia.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "dissociative_identity_disorder_trauma_etiology",
+    "claim": "Dissociative Identity Disorder is reliably caused by severe childhood trauma and its prevalence is not substantially shaped by cultural context or therapeutic suggestion.",
+    "domain": "Psychiatry / Clinical Psychology",
+    "search_query": "dissociative identity disorder trauma model sociocognitive model iatrogenic Spanos Lilienfeld prevalence media cultural",
+    "notes": "The trauma model (Kluft, Putnam) posits DID arises from childhood abuse-driven dissociation; the sociocognitive model (Spanos; Lilienfeld et al.) documents that DID prevalence rose dramatically alongside media coverage, particularly in North America and not in other countries, and that iatrogenic creation through suggestive therapy is a documented pathway.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "ssri_pregnancy_teratogenicity",
+    "claim": "SSRI use during pregnancy significantly increases the risk of congenital heart defects and should be avoided in most pregnant women.",
+    "domain": "Reproductive Psychiatry / Pharmacology",
+    "search_query": "SSRI antidepressant pregnancy congenital heart defects paroxetine confounding by indication risk-benefit depression",
+    "notes": "Earlier pharmacoepidemiological studies found small absolute risk increases for cardiac defects, especially with paroxetine, but larger studies controlling for confounding by indication and disease severity find no clinically significant increases; untreated maternal depression poses documented risks to fetal development and maternal outcomes; clinical guidelines generally support SSRIs when clinically indicated.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "obesity_willpower_primary_cause",
+    "claim": "Obesity is primarily caused by inadequate willpower and voluntary sedentary behavior rather than genetic predisposition and obesogenic environments.",
+    "domain": "Endocrinology / Obesity Medicine",
+    "search_query": "obesity heritability BMI twin adoption genetic neuroendocrine leptin GLP-1 environment food system willpower",
+    "notes": "BMI heritability is estimated at 40\u201370% in twin studies; population-level obesity rates track food environment changes (caloric density, ultra-processing, portion sizes) across populations with stable genotypes; leptin resistance, GLP-1, and hypothalamic regulatory mechanisms create physiological barriers to weight loss that operate largely independently of conscious willpower.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "cell_phone_radiation_brain_tumors",
+    "claim": "Long-term mobile phone use (10+ years) significantly increases the risk of brain tumors, particularly glioma.",
+    "domain": "Epidemiology / Environmental Health",
+    "search_query": "mobile phone radiation brain tumor glioma INTERPHONE Danish cohort Million Women Study incidence trends IARC 2B",
+    "notes": "The INTERPHONE study, Danish cohort (700,000 subscribers over 30 years), and Million Women Study find no consistent increased glioma or acoustic neuroma risk; glioma incidence rates have not risen in populations with widespread mobile phone use for 20+ years; IARC's Group 2B classification ('possibly carcinogenic') reflects limited evidence equating the hazard level of pickled vegetables.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "vitamin_d_supplementation_fracture_prevention",
+    "claim": "Vitamin D supplementation reduces fracture risk and improves bone health in community-dwelling adults, including those without severe deficiency.",
+    "domain": "Endocrinology / Bone Medicine",
+    "search_query": "vitamin D supplementation fracture risk RCT VITAL ViDA D-HEALTH community-dwelling USPSTF null result",
+    "notes": "Large, adequately powered RCTs (VITAL, ViDA, D-HEALTH) and USPSTF systematic reviews in community-dwelling adults with typical baseline vitamin D levels find no reduction in fracture rates; benefits appear limited to institutionalized elderly or severely deficient individuals; prior smaller positive studies likely enrolled deficient populations.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "evolution_progressive_complexity",
+    "claim": "Evolution is a progressive process that drives organisms toward greater complexity and higher adaptive fitness over geological time.",
+    "domain": "Evolutionary Biology",
+    "search_query": "evolution directionality complexity natural selection simplification parasites cave fish drift Gould drunkard walk",
+    "notes": "Natural selection optimizes fitness in local environments without any inherent directionality; parasites, cave-dwelling organisms, and endosymbionts routinely evolve structural simplification; Gould's 'drunkard's walk' model explains apparent average complexity increases as a statistical artifact of expansion from a minimally complex common ancestor, not directional selection.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "heterozygote_advantage_explains_genetic_disease",
+    "claim": "Most genetic diseases that are prevalent in specific populations persist because heterozygous carriers have a selective advantage against local pathogens or environmental stressors.",
+    "domain": "Population Genetics / Evolutionary Medicine",
+    "search_query": "heterozygote advantage balancing selection genetic disease prevalence founder effect mutation selection balance",
+    "notes": "Heterozygote advantage is well-established for sickle cell disease/malaria and a handful of other conditions; however, most common recessive diseases are maintained by mutation-selection balance rather than balancing selection; population prevalence is often better explained by founder effects and genetic drift than by heterozygous benefit.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "human_evolution_stopped_modern_medicine",
+    "claim": "Human evolution has effectively stopped because modern medicine and technology have removed natural selection by allowing nearly all individuals to survive to reproductive age.",
+    "domain": "Evolutionary Biology / Anthropology",
+    "search_query": "human evolution ongoing selection modern populations genomics fertility age first reproduction polygenic score",
+    "notes": "Genomic analyses of contemporary human populations detect ongoing positive selection for variants affecting fertility timing, disease resistance, and complex trait polygenic scores; GWAS-based selection analyses document differential reproductive success associated with genetic variants for educational attainment and BMI in historical European cohorts; selection has changed character, not ceased.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "global_temperature_monotonic_increase",
+    "claim": "Global mean surface temperatures have risen monotonically every decade since industrialization, with no genuine periods of reduced warming rate.",
+    "domain": "Climate Science",
+    "search_query": "global warming hiatus pause 1998 2012 Pacific Decadal Oscillation ENSO natural variability trend monotonic",
+    "notes": "Within the unambiguous long-term anthropogenic warming trend, natural variability\u2014driven by ENSO, volcanic forcing, and the Pacific Decadal Oscillation\u2014creates genuine multi-year periods of reduced warming rate; the 1998\u20132012 'hiatus' in surface temperature trend was real and required scientific explanation, though it did not contradict the underlying forced trend.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "lactic_acid_exercise_soreness",
+    "claim": "Lactic acid buildup in muscle tissue causes the burning sensation during intense exercise and the muscle soreness felt 24\u201348 hours afterward.",
+    "domain": "Exercise Physiology",
+    "search_query": "lactic acid DOMS delayed onset muscle soreness lactate hydrogen ions micro-tears inflammation cause",
+    "notes": "Lactate is a fuel source cleared within 30\u201360 minutes of exercise cessation; the burning sensation during intense exercise is caused by hydrogen ion accumulation (acidosis) and other metabolites, not lactate itself; DOMS is caused by micro-tears in muscle fibers, subsequent inflammatory response, and prostaglandin release\u2014none of which involves residual lactic acid.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "creatine_supplementation_safety_efficacy",
+    "claim": "Creatine monohydrate supplementation safely and meaningfully improves performance in high-intensity, short-duration exercise and promotes skeletal muscle hypertrophy.",
+    "domain": "Exercise Science / Sports Pharmacology",
+    "search_query": "creatine monohydrate safety efficacy high intensity strength hypertrophy meta-analysis kidney long-term",
+    "notes": "Creatine monohydrate is among the most extensively studied ergogenic aids; meta-analyses consistently demonstrate 1\u20132% improvements in short-duration high-intensity performance and augmented hypertrophy responses to resistance training; long-term safety data from trials up to five years find no evidence of renal harm in healthy individuals at standard doses (3\u20135g/day).",
+    "difficulty": "easy"
+  },
+  {
+    "id": "hubble_tension_systematic_error_resolution",
+    "claim": "The Hubble tension\u2014the ~9% discrepancy between CMB-derived and distance-ladder measurements of the Hubble constant\u2014will be resolved by unidentified systematic errors rather than requiring new physics.",
+    "domain": "Cosmology / Astrophysics",
+    "search_query": "Hubble tension H0 CMB Planck Cepheid Type Ia supernova TRGB systematic error new physics concordance",
+    "notes": "After two decades of methodological cross-checks, the tension persists across independent CMB analyses (Planck, ACT, SPT) and multiple independent distance ladder rungs (Cepheids+SNIa, TRGB+SNIa, gravitational wave sirens, strong lensing time delays); the convergence of independent probes makes pure systematic error increasingly unlikely, though not yet ruled out; new physics explanations (early dark energy, interacting dark matter) have their own tensions.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "bpa_free_plastics_safety",
+    "claim": "Products labeled 'BPA-free' are meaningfully safer for human health than BPA-containing plastics because they eliminate exposure to endocrine-disrupting bisphenol compounds.",
+    "domain": "Toxicology / Environmental Health",
+    "search_query": "BPA-free BPS BPF endocrine activity estrogen receptor binding regrettable substitution biomonitoring",
+    "notes": "BPA replacements used in BPA-free products (bisphenol S, bisphenol F) exhibit similar estrogen receptor binding affinity and comparable in vitro endocrine-disrupting activity to BPA; human biomonitoring data shows BPS exposure increasing as BPA exposure declines; regulatory scrutiny of BPA substitutes lags substantially behind BPA itself.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "glyphosate_cancer_human_risk",
+    "claim": "Glyphosate herbicide exposure at real-world agricultural levels causes cancer in humans.",
+    "domain": "Toxicology / Epidemiology",
+    "search_query": "glyphosate cancer IARC 2A Group EPA EFSA regulatory classification agricultural workers lymphoma evidence",
+    "notes": "IARC classified glyphosate as Group 2A ('probably carcinogenic') in 2015 based primarily on lymphoma data in heavily exposed agricultural workers; EPA, EFSA, and most national regulatory agencies conclude it is 'unlikely carcinogenic' at typical exposure levels; the discrepancy stems from different weighting of mechanistic versus epidemiological evidence and differing exposure-level assumptions.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "probiotic_gut_colonization",
+    "claim": "Commercial probiotic supplements reliably colonize the gut and produce lasting changes in microbiome composition in healthy adults.",
+    "domain": "Microbiome Science / Gastroenterology",
+    "search_query": "probiotic colonization healthy gut microbiome resistance Zmora Suez 2018 metagenomic analysis cessation revert",
+    "notes": "Controlled trials with metagenomic analysis (Zmora et al. 2018; Suez et al. 2018) found probiotic strains failed to detectably colonize the gut in a majority of healthy participants with intact existing microbiomes; microbial composition reverted to baseline within weeks of cessation; individuals with post-antibiotic dysbiosis showed greater colonization.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "mozart_effect_spatial_reasoning",
+    "claim": "Listening to Mozart or other classical music temporarily enhances spatial reasoning performance beyond an individual's baseline cognitive ability.",
+    "domain": "Cognitive Psychology / Music Cognition",
+    "search_query": "Mozart effect spatial reasoning meta-analysis Rauscher arousal mood specificity music replication",
+    "notes": "The original Rauscher, Shaw, and Ky (1993) finding was 10-minute spatial reasoning improvement in 36 college students; subsequent meta-analyses show the effect is not specific to Mozart or classical music but reflects a general arousal and positive affect boost replicable with any enjoyable stimulus; the extrapolation to lasting infant intelligence gains is unsupported.",
+    "difficulty": "easy"
+  },
+  {
+    "id": "mirror_neurons_human_empathy",
+    "claim": "A human mirror neuron system directly mediates empathy, social cognition, and language comprehension through neural mirroring of others' actions and internal states.",
+    "domain": "Cognitive Neuroscience",
+    "search_query": "mirror neurons human empathy fMRI evidence premotor cortex lesion TMS autism broken mirror Hickok critique",
+    "notes": "Human mirror neurons are inferred from fMRI premotor activation rather than direct single-unit recording; lesion and TMS studies do not show predicted social cognition deficits from disrupting putative mirror regions; the 'broken mirror' theory of autism is contradicted by intact imitation in ASD; Hickok (2009) and Heyes (2010) provide systematic critiques of the broader theory.",
+    "difficulty": "hard"
+  },
+  {
+    "id": "single_concussion_no_lasting_effects",
+    "claim": "A single concussion without loss of consciousness causes no lasting neurological or cognitive effects in otherwise healthy adults.",
+    "domain": "Sports Medicine / Neurology",
+    "search_query": "single concussion long-term cognitive effects white matter DTI sleep CTE neurodegenerative risk longitudinal",
+    "notes": "Longitudinal studies using diffusion tensor imaging find subtle white matter changes persisting months to years after a single concussion; some studies link even one concussion to elevated long-term risk of depression and sleep disturbance; CTE pathology has been identified in individuals with limited documented concussion histories, though causality and prevalence remain uncertain.",
+    "difficulty": "medium"
+  },
+  {
+    "id": "ten_percent_brain_utilization_myth",
+    "claim": "Humans use only about 10% of their brain capacity, leaving vast neural resources dormant and available for enhancement.",
+    "domain": "Neuroscience",
+    "search_query": "10 percent brain myth neuroimaging PET fMRI all regions active lesion studies metabolic cost evidence",
+    "notes": "Metabolic imaging shows virtually all brain regions are active during waking life and serve identifiable functions; lesion studies demonstrate that damage to any cortical or subcortical region produces measurable deficits; the brain consumes ~20% of resting metabolic energy at 2% of body mass, an evolutionary cost inconsistent with 90% dormancy.",
+    "difficulty": "easy"
   }
 ]
