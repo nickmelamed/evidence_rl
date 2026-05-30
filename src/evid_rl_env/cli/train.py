@@ -6,7 +6,7 @@ from evid_rl_env.data.dataset import load_dataset
 from evid_rl_env.agent.trainer import Trainer
 from evid_rl_env.agent.bandit_trainer import BanditTrainer
 from evid_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
-from evid_rl_env.agent.config_loader import load_config
+from evid_rl_env.agent.config_loader import load_config, load_base_config
 
 import argparse
 import random
@@ -37,6 +37,7 @@ def train(episodes, method="ppo", config_path=None, seed=42):
 
     if config_path:
         method, config = load_config(config_path)
+        config.seed = seed  # align config.seed with the resolved seed
     elif method == 'ppo':
         config = PPOConfig()
     elif method == 'pg':
@@ -80,13 +81,19 @@ def main():
     parser.add_argument(
         "--seed",
         type=int,
-        default=42,
-        help="Random seed for weight initialisation and action sampling (default: 42). "
+        default=None,
+        help="Random seed for weight initialisation and action sampling. "
+             "Defaults to the value in configs/base.yaml (currently 42). "
              "The train/eval split always uses seed 42 regardless of this value.",
     )
     args = parser.parse_args()
 
-    train(args.episodes, args.method, args.config, seed=args.seed)
+    if args.seed is not None:
+        seed = args.seed
+    else:
+        seed = load_base_config().get("seed", 42)
+
+    train(args.episodes, args.method, args.config, seed=seed)
 
 
 if __name__ == "__main__":

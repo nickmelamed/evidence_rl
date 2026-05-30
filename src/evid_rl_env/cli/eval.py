@@ -14,10 +14,28 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import sys
+from pathlib import Path
 
 from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.agent.config_loader import load_base_config
+
+
+def _find_latest_checkpoint(base: str = "artifacts/experiments") -> str | None:
+    """Return the policy.npz path from the most recently modified experiment dir."""
+    base_path = Path(base)
+    if not base_path.exists():
+        return None
+    candidates = [
+        p for p in base_path.iterdir()
+        if p.is_dir() and (p / "policy.npz").exists()
+    ]
+    if not candidates:
+        return None
+    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    return str(latest / "policy.npz")
 from evid_rl_env.environment.environment import ClaimEnv
 from evid_rl_env.agent.policy import ActorCriticPolicy
 from evid_rl_env.agent.evaluator import Evaluator
@@ -157,8 +175,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--checkpoint",
-        required=True,
-        help="Path to a .npz checkpoint saved by the trainer (e.g. artifacts/experiments/ppo_run_*/policy.npz).",
+        default=None,
+        help="Path to a .npz checkpoint. Defaults to the most recently modified experiment under artifacts/experiments/.",
     )
     parser.add_argument(
         "--eval-data",
@@ -187,8 +205,9 @@ def main() -> None:
     parser.add_argument(
         "--seed",
         type=int,
-        default=0,
-        help="Random seed for baseline evaluation runs (default: 0). "
+        default=None,
+        help="Random seed for baseline evaluation runs. "
+             "Defaults to the value in configs/base.yaml. "
              "The train/eval split always uses seed 42 regardless of this value.",
     )
     # AUDIT FIX (issue 3): surface --annotator-model so evid-eval's interface is
@@ -205,6 +224,22 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+
+    base_cfg = load_base_config()
+
+    if args.seed is not None:
+        seed = args.seed
+    else:
+        seed = base_cfg.get("seed", 42)
+
+    if args.checkpoint is not None:
+        checkpoint = args.checkpoint
+    else:
+        checkpoint = _find_latest_checkpoint()
+        if checkpoint is None:
+            print("No checkpoint found under artifacts/experiments/. Run train-rl first or pass --checkpoint.")
+            sys.exit(1)
+        print(f"Using latest checkpoint: {checkpoint}")
 
     requested = [b.strip() for b in args.baselines.split(",") if b.strip()]
     unknown = set(requested) - _AVAILABLE
@@ -224,18 +259,17 @@ def main() -> None:
     # ------------------------------------------------------------------
     # Load policy
     # ------------------------------------------------------------------
-    policy = ActorCriticPolicy.load(args.checkpoint)
+    policy = ActorCriticPolicy.load(checkpoint)
     # AUDIT FIX: set the LLM seed on the loaded policy so transformers.set_seed is
     # called with the --seed value before every generation, making eval reproducible
     if hasattr(policy, "llm"):
-        policy.llm.seed = args.seed
+        policy.llm.seed = seed
     print(
-        f"Loaded checkpoint: {args.checkpoint} "
+        f"Loaded checkpoint: {checkpoint} "
         f"(state_dim={policy.state_dim}, n_actions={policy.n_actions}, "
         f"greedy={args.greedy})"
     )
-    # AUDIT FIX: log LLM seed here so eval invocations are auditable from terminal output
-    print(f"LLM seed: {args.seed}")
+    print(f"LLM seed: {seed}")
     llm_client = getattr(policy, "llm", None)
 
     # ------------------------------------------------------------------
@@ -245,7 +279,7 @@ def main() -> None:
     print("\nRunning RL policy evaluation...")
     # AUDIT FIX: pass seed so ClaimEnv threads it to JudgeLLMClient for reproducible
     # judge outputs during eval
-    eval_env = ClaimEnv(eval_dataset, seed=args.seed)
+    eval_env = ClaimEnv(eval_dataset, seed=seed)
 
     if args.greedy:
         # Wrap act to force greedy selection without modifying the policy object
@@ -278,9 +312,9 @@ def main() -> None:
 
     # AUDIT FIX: seed global RNG before running baselines so results are reproducible
     # across repeated evid-eval invocations with the same --seed value
-    random.seed(args.seed)
+    random.seed(seed)
     import numpy as np
-    np.random.seed(args.seed)
+    np.random.seed(seed)
 
     baseline_results = {}
     for name, bl in baselines.items():
@@ -291,7 +325,7 @@ def main() -> None:
     # Table + CI gate
     # ------------------------------------------------------------------
     ref = _print_table(
-        f"Eval — {args.n_episodes} episodes | checkpoint: {args.checkpoint}",
+        f"Eval — {args.n_episodes} episodes | checkpoint: {checkpoint}",
         baseline_results,
         rl_raw,
         rl_std,

@@ -6,6 +6,14 @@ from evid_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
 logger = logging.getLogger(__name__)
 
 
+def load_base_config(config_dir: str = "configs") -> dict:
+    """Load base.yaml and return the raw dict. Returns {} if the file is absent."""
+    path = Path(config_dir) / "base.yaml"
+    if not path.exists():
+        return {}
+    with open(path) as f:
+        return yaml.safe_load(f) or {}
+
 def _deep_merge(base: dict, override: dict) -> dict:
     result = dict(base)
     for k, v in override.items():
