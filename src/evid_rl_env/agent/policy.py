@@ -62,7 +62,7 @@ class ActorCriticPolicy:
         features = encode_state(state)
         return features @ self.value_params
 
-    def act(self, state, greedy: bool = False):
+    def act(self, state, greedy: bool = False, force_action_idx: int = None):
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
@@ -80,7 +80,10 @@ class ActorCriticPolicy:
 
         self.last_probs = probs.copy()
 
-        idx = int(np.argmax(probs)) if greedy else np.random.choice(self.n_actions, p=probs)
+        if force_action_idx is not None:
+            idx = force_action_idx
+        else:
+            idx = int(np.argmax(probs)) if greedy else np.random.choice(self.n_actions, p=probs)
         action = self.actions[idx]
 
         if action == Actions.SELECT:
@@ -207,8 +210,7 @@ class BanditPolicyWrapper:
         x = encode_state(state)
         action_idx = self.bandit.select_action(x)
         action = self.actions[action_idx]
-        # Payload generation mirrors bandit_trainer: inner policy generates payload
-        _, payload, _ = self._inner.act(state, greedy=greedy)
+        _, payload, _ = self._inner.act(state, greedy=greedy, force_action_idx=action_idx)
         self.last_entropy = self._inner.last_entropy
         self.last_probs = self._inner.last_probs
         return action, payload, action_idx

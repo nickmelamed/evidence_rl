@@ -85,8 +85,7 @@ class BanditTrainer:
                 action_idx = self.rl.select_action(x)
                 action = self.policy.actions[action_idx]
 
-                # policy used only for payload generation
-                _, payload, _ = self.policy.act(state)
+                _, payload, _ = self.policy.act(state, force_action_idx=action_idx)
 
                 next_state, reward, done, info = self.env.step(action, payload)
 
@@ -169,6 +168,7 @@ class BanditTrainer:
             if self.evaluator is not None and (ep + 1) % self.eval_every == 0:
                 eval_metrics = self.evaluator.evaluate()
                 print(f"  Eval | reward {eval_metrics['eval/mean_reward']:.3f} ± {eval_metrics['eval/std_reward']:.3f}")
+                self.tracker.log_eval(ep + 1, eval_metrics["eval/mean_reward"], eval_metrics["eval/std_reward"])
                 if self.use_wandb:
                     wandb.log(eval_metrics, step=ep)
 

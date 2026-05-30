@@ -200,6 +200,7 @@ class Trainer:
 
         # --- CSV ---
         self._append_eval_csv(ep, rl_raw, rl_raw_std, baseline_results, ref, rl_metrics)
+        self.tracker.log_eval(ep + 1, rl_norm, rl_norm_std)
 
         # --- Wandb ---
         if self.use_wandb:

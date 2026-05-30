@@ -27,6 +27,8 @@ FIXED_FIELDS = [
     "action_dist.rerank_evidence",
     "action_dist.summarize_evidence",
     "action_dist.concede_point",
+    "eval/mean_reward",
+    "eval/std_reward",
 ]
 
 
@@ -58,6 +60,16 @@ class ExperimentTracker:
     def log_episode(self, metrics: dict):
         # enforce schema
         row = {k: metrics.get(k, None) for k in FIXED_FIELDS}
+
+        with open(self.csv_path, "a", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=FIXED_FIELDS)
+            writer.writerow(row)
+
+    def log_eval(self, episode: int, mean_reward: float, std_reward: float):
+        row = {k: None for k in FIXED_FIELDS}
+        row["episode"] = episode
+        row["eval/mean_reward"] = mean_reward
+        row["eval/std_reward"] = std_reward
 
         with open(self.csv_path, "a", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=FIXED_FIELDS)
