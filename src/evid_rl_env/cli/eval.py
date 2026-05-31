@@ -212,19 +212,6 @@ def main() -> None:
              "Defaults to the value in configs/base.yaml. "
              "The train/eval split always uses seed 42 regardless of this value.",
     )
-    # AUDIT FIX (issue 3): surface --annotator-model so evid-eval's interface is
-    # consistent with evid-collect; argument is accepted but not wired to any logic yet —
-    # it is reserved for future post-hoc re-annotation workflows
-    parser.add_argument(
-        "--annotator-model",
-        default="claude-opus-4-5",
-        help=(
-            "Anthropic model string for post-hoc re-annotation workflows (default: claude-opus-4-5). "
-            "Currently only relevant when 'imitation' is included in --baselines and "
-            "re-annotation is being performed. Does not affect the loaded checkpoint or "
-            "any other baseline."
-        ),
-    )
     args = parser.parse_args()
 
     base_cfg = load_base_config()
@@ -275,12 +262,8 @@ def main() -> None:
         )
         policy = BanditPolicyWrapper(bandit, inner)
     else:
-        policy = ActorCriticPolicy.load(checkpoint)
+        policy = ActorCriticPolicy.load(checkpoint, seed=seed)
 
-    # AUDIT FIX: set the LLM seed on the loaded policy so transformers.set_seed is
-    # called with the --seed value before every generation, making eval reproducible
-    if hasattr(policy, "llm") and policy.llm is not None:
-        policy.llm.seed = seed
     print(
         f"Loaded checkpoint: {checkpoint} "
         f"(state_dim={policy.state_dim}, n_actions={policy.n_actions}, "
@@ -311,15 +294,6 @@ def main() -> None:
 
     rl_raw = rl_metrics["eval/mean_reward_raw"]
     rl_std = rl_metrics["eval/std_reward_raw"]
-
-    # AUDIT FIX (issue 3): log the annotator-model note whenever imitation is requested
-    # so the interface intent is visible in logs even before re-annotation logic is wired in
-    if "imitation" in requested:
-        print(
-            f"[info] --annotator-model='{args.annotator_model}' is set. "
-            "Note: annotator model arg is only used for post-hoc re-annotation workflows "
-            "— it does not affect the loaded checkpoint or other baselines."
-        )
 
     # ------------------------------------------------------------------
     # Write eval_results.json incrementally so a crash mid-baseline

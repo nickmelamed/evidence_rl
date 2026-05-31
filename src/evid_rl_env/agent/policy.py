@@ -26,20 +26,6 @@ class ActorCriticPolicy:
         # Propagate seed so LLMClient calls transformers.set_seed once at init.
         self.llm = LLMClient(model_name=actor_model, seed=seed)
 
-    def generate_arguments_batch(self, prompts):
-        """Generate multiple arguments in a single batched pipeline call."""
-        if not prompts:
-            return []
-        outputs = self.llm.pipe(
-            prompts,
-            batch_size=min(len(prompts), 4),
-            max_new_tokens=128,
-            do_sample=True,
-            temperature=self.llm.temperature,
-            return_full_text=False
-        )
-        return [(o[0]["generated_text"], len(o[0]["generated_text"].split())) for o in outputs]
-
     def reset_episode_cache(self):
         self._arg_cache = {}
 
@@ -184,7 +170,7 @@ Write a concise {action.lower()} argument.
         )
 
     @classmethod
-    def load(cls, path: str) -> "ActorCriticPolicy":
+    def load(cls, path: str, seed: int = 42) -> "ActorCriticPolicy":
         """Reconstruct a policy from a .npz checkpoint produced by save().
 
         The LLM pipeline is re-initialised from the stored model_name, so the
@@ -194,10 +180,7 @@ Write a concise {action.lower()} argument.
         n_actions  = int(data["n_actions"][0])
         state_dim  = int(data["state_dim"][0])
         model_name = str(data["model_name"][0])
-
-        # AUDIT FIX: load() defaults seed to 42; callers (e.g. eval.py) can pass their
-        # --seed value here so the reloaded policy's LLM uses the same seed as training
-        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name, seed=42)
+        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name, seed=seed)
         policy.actor_params = data["actor_params"]
         policy.value_params = data["value_params"]
         return policy
