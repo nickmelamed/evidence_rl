@@ -38,6 +38,15 @@ class ClaimEnv:
         """Returns a small bonus if this evidence id hasn't been selected before."""
         return 0.05 if new_evidence_id not in self.state.selected_evidence_ids else 0.0
 
+    @staticmethod
+    def _claim_similarity(claim: str, text: str) -> float:
+        """Word-overlap proxy: fraction of >3-char claim words that appear in text."""
+        claim_words = {w.lower().strip(".,!?;:\"'()[]") for w in claim.split() if len(w) > 3}
+        if not claim_words:
+            return 0.0
+        text_lower = text.lower()
+        return sum(1 for w in claim_words if w in text_lower) / len(claim_words)
+
     def reset(self):
         self._prev_phi = 0.0
         self._last_judge_step = 0
@@ -78,7 +87,11 @@ class ClaimEnv:
                 s.selected_evidence.append(doc)
                 diversity = self._evidence_diversity_bonus(payload)
                 s.selected_evidence_ids.add(payload)
-                reward = 0.1 + diversity
+                sim = self._claim_similarity(s.claim, doc.text)
+                reward = 0.1 + diversity + 0.1 * sim
+            elif doc is not None:
+                # doc is in the pool but already selected — penalise redundancy
+                reward = -0.1
 
         elif action == Actions.REMOVE:
             s.selected_evidence = [

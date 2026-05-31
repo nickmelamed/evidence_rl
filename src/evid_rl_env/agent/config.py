@@ -21,6 +21,8 @@ class PGConfig(BaseConfig):
     def __init__(self):
         super().__init__()
         self.lr = 0.01
+        self.lr_decay_episodes = 200   # span over which LR decays linearly
+        self.lr_min_fraction = 0.2     # floor: LR never drops below 20% of initial
 
 class BanditConfig(BaseConfig):
     def __init__(self):

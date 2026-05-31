@@ -385,6 +385,9 @@ class Trainer:
                 "tokens": total_tokens
             }
 
+            if self.algo == "pg":
+                metrics["pg_lr"] = self.rl.current_lr
+
             action_dist = {}
             for t in viz:
                 a = t["action"]
