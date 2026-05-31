@@ -10,11 +10,34 @@ except ImportError:
     EMBEDDING_DIM = 0
     SEMANTIC_AVAILABLE = False
 
+# Text-level embedding cache. The same claim and evidence texts are encoded
+# repeatedly within an episode (multiple policy calls per step) and across
+# episodes (same eval samples reused). Caching at the text level eliminates
+# redundant SentenceTransformer inference for any text already seen.
+_embed_cache: dict = {}
+
+
+def _encode_texts(texts: list) -> np.ndarray:
+    """Batch-encode texts, using cache for any already seen."""
+    missing_idxs = [i for i, t in enumerate(texts) if t not in _embed_cache]
+    if missing_idxs:
+        missing_texts = [texts[i] for i in missing_idxs]
+        embs = _MODEL.encode(missing_texts, normalize_embeddings=True)
+        for t, emb in zip(missing_texts, embs):
+            _embed_cache[t] = emb
+    return np.stack([_embed_cache[t] for t in texts])
+
+
+def _encode_text(text: str) -> np.ndarray:
+    if text not in _embed_cache:
+        _embed_cache[text] = _MODEL.encode(text, normalize_embeddings=True)
+    return _embed_cache[text]
+
 
 def encode_state_semantic(state):
     """
     Returns a flat numpy float32 vector combining:
-      - 4 structural features (same as original encode_state)
+      - 4 structural features
       - claim embedding (384-dim)
       - mean of selected evidence embeddings (384-dim), zeros if none selected
       - mean of evidence pool embeddings (384-dim)
@@ -34,13 +57,10 @@ def encode_state_semantic(state):
     if not SEMANTIC_AVAILABLE or _MODEL is None:
         return structural
 
-    claim_emb = _MODEL.encode(state.claim, normalize_embeddings=True)
+    claim_emb = _encode_text(state.claim)
 
     if state.selected_evidence:
-        sel_embs = _MODEL.encode(
-            [e.text for e in state.selected_evidence],
-            normalize_embeddings=True
-        )
+        sel_embs = _encode_texts([e.text for e in state.selected_evidence])
         sel_mean = sel_embs.mean(axis=0)
         sel_sim = float(np.dot(claim_emb, sel_mean))
     else:
@@ -48,10 +68,7 @@ def encode_state_semantic(state):
         sel_sim = 0.0
 
     if state.evidence_pool:
-        pool_embs = _MODEL.encode(
-            [e.text for e in state.evidence_pool],
-            normalize_embeddings=True
-        )
+        pool_embs = _encode_texts([e.text for e in state.evidence_pool])
         pool_mean = pool_embs.mean(axis=0)
         pool_sim = float(np.dot(claim_emb, pool_mean))
     else:
@@ -68,7 +85,6 @@ def encode_state_semantic(state):
 
 
 def get_state_dim():
-    """Returns the state dimension based on what's available."""
     if SEMANTIC_AVAILABLE:
         return 4 + EMBEDDING_DIM * 3 + 2
     return 4

@@ -36,7 +36,7 @@ _CSV_COLUMNS = [
     "episode", "rl_mean", "rl_std",
     "random_mean", "majority_mean", "greedy_llm_mean",
     "fewshot_k3_mean", "fewshot_k5_mean", "best_of_5_mean", "imitation_mean",
-    "lcs", "ess", "hrs", "comp", "delta_vs_greedy_llm",
+    "lcs", "ess", "grs", "comp", "delta_vs_greedy_llm",
 ]
 
 _TRAJ_PATH = "data/trajectories.jsonl"
@@ -55,8 +55,9 @@ class Trainer:
         seed=42,
         use_wandb=False,
         eval_dataset=None,
-        eval_every=10,
+        eval_every=25,
         baseline_n_episodes=5,
+        curriculum=None,
     ):
         import random, numpy as np
         random.seed(seed); np.random.seed(seed)
@@ -73,6 +74,10 @@ class Trainer:
         self.episodes = episodes
         self.algo = algo
         self.seed = seed
+        self.curriculum = curriculum
+        # Full training dataset for dynamic curriculum sampling each episode.
+        # env.dataset may be replaced per-episode, so we keep a stable reference.
+        self._train_dataset = list(env.dataset)
         self.tracker = ExperimentTracker(exp_name)
         self._eval_csv_path = _EVAL_CSV_PATH
 
@@ -241,7 +246,7 @@ class Trainer:
             "imitation_mean":   _get("imitation"),
             "lcs":              rl_metrics.get("eval/llm_LCS", ""),
             "ess":              rl_metrics.get("eval/llm_ESS", ""),
-            "hrs":              rl_metrics.get("eval/llm_HRS", ""),
+            "grs":              rl_metrics.get("eval/llm_GRS", ""),
             "comp":             rl_metrics.get("eval/llm_COMP", ""),
             "delta_vs_greedy_llm": rl_raw - ref_mean,
         }
@@ -257,7 +262,11 @@ class Trainer:
     # ------------------------------------------------------------------
 
     def train(self):
+        import math
         for ep in range(self.episodes):
+
+            if self.curriculum is not None:
+                self.env.dataset = [self.curriculum.sample(self._train_dataset)]
 
             state = self.env.reset()
             done = False
@@ -279,7 +288,7 @@ class Trainer:
 
                 action, payload, action_idx = self.policy.act(state)
 
-                prob = self.policy.get_probs(state)[action_idx]
+                prob = self.policy.last_probs[action_idx]   # already computed inside act()
                 value = self.policy.get_value(state)
 
                 # env step
@@ -360,12 +369,17 @@ class Trainer:
                     for t in trajectory
                 ])
 
+            if self.curriculum is not None:
+                # sigmoid maps normalized reward → [0, 1] performance signal
+                perf = 1.0 / (1.0 + math.exp(max(-50.0, min(50.0, -total_reward / 2.0))))
+                self.curriculum.update(perf)
+
             # LOGGING
             metrics = {
                 "episode": ep,
                 "reward": total_reward,
                 "reward_raw": total_reward,
-                "curriculum_level": getattr(self, "curriculum_level", None),
+                "curriculum_level": self.curriculum.level if self.curriculum is not None else None,
                 "num_steps": steps,
                 "entropy": self.policy.last_entropy,
                 "tokens": total_tokens

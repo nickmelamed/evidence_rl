@@ -29,10 +29,12 @@ class Evaluator:
         rewards_raw = []
         steps_list = []
         action_counts = {a: 0 for a in ACTIONS}
-        llm_score_totals = {"LCS": [], "ESS": [], "HRS": [], "COMP": []}
+        llm_score_totals = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
 
         try:
             for _ in range(self.n_eval_episodes):
+                if hasattr(self.policy, "reset_episode_cache"):
+                    self.policy.reset_episode_cache()
                 state = self.env.reset()
                 done = False
                 ep_reward = 0.0
@@ -80,6 +82,6 @@ class Evaluator:
             "eval/action_dist": {k: v / total_actions for k, v in action_counts.items()},
             "eval/llm_LCS": float(np.mean(llm_score_totals["LCS"])) if llm_score_totals["LCS"] else 0.0,
             "eval/llm_ESS": float(np.mean(llm_score_totals["ESS"])) if llm_score_totals["ESS"] else 0.0,
-            "eval/llm_HRS": float(np.mean(llm_score_totals["HRS"])) if llm_score_totals["HRS"] else 0.0,
+            "eval/llm_GRS": float(np.mean(llm_score_totals["GRS"])) if llm_score_totals["GRS"] else 0.0,
             "eval/llm_COMP": float(np.mean(llm_score_totals["COMP"])) if llm_score_totals["COMP"] else 0.0,
         }

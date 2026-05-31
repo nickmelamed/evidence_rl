@@ -1,4 +1,3 @@
-import atexit
 import random
 import numpy as np
 
@@ -8,37 +7,20 @@ from evid_rl_env.judge.reward import RewardFunction
 from evid_rl_env.judge.llm_judge import LLMJudge
 from evid_rl_env.data.evidence_fetcher import fetch_evidence
 
-# Both the JudgeLLMClient and the LLMJudge (which holds a shelve file handle)
-# are shared across all ClaimEnv instances.  Opening the same shelve file from
-# multiple LLMJudge objects simultaneously causes gdbm to create a POSIX
-# semaphore for locking; if any handle is not closed at exit that semaphore
-# leaks and can cause a segfault during interpreter shutdown cleanup.
+# JudgeLLMClient and LLMJudge are shared across all ClaimEnv instances.
+# LLMJudge now uses a sqlite3 cache (crash-safe, no POSIX semaphores).
 _judge_llm_cache: dict = {}   # model_name -> JudgeLLMClient
-_llm_judge_cache: dict = {}   # model_name -> LLMJudge  (owns the shelve handle)
+_llm_judge_cache: dict = {}   # model_name -> LLMJudge
 
 
 def _get_llm_judge(model_name: str, seed: int) -> LLMJudge:
     from evid_rl_env.agent.llm_client import JudgeLLMClient
     if model_name not in _judge_llm_cache:
         _judge_llm_cache[model_name] = JudgeLLMClient(model_name=model_name, seed=seed)
-    else:
-        _judge_llm_cache[model_name].seed = seed
-
+    # seed is fixed at init; the cached client is reused across all ClaimEnv instances
     if model_name not in _llm_judge_cache:
         _llm_judge_cache[model_name] = LLMJudge(_judge_llm_cache[model_name], weight=0.5)
     return _llm_judge_cache[model_name]
-
-
-def _close_llm_judges():
-    """atexit handler — flush and close every shared shelve handle before exit."""
-    for judge in _llm_judge_cache.values():
-        try:
-            judge.close()
-        except Exception:
-            pass
-
-
-atexit.register(_close_llm_judges)
 
 
 class ClaimEnv:

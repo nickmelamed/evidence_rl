@@ -1,10 +1,57 @@
 import json
 import logging
+import os
+import pickle
 import re
 import hashlib
+import sqlite3
 import numpy as np
 
 _logger = logging.getLogger(__name__)
+
+
+class _SQLiteCache:
+    """
+    Crash-safe key-value cache backed by sqlite3.
+
+    Replaces shelve/gdbm which creates POSIX semaphores that leak on SIGSEGV
+    and leave the database file corrupted for subsequent runs. sqlite3 uses WAL
+    mode so the file is always internally consistent even after a hard crash.
+    """
+
+    def __init__(self, path: str):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self._conn = sqlite3.connect(path, check_same_thread=False)
+        self._conn.execute("PRAGMA journal_mode=WAL")
+        self._conn.execute(
+            "CREATE TABLE IF NOT EXISTS cache "
+            "(key TEXT PRIMARY KEY, value BLOB NOT NULL)"
+        )
+        self._conn.commit()
+
+    def __contains__(self, key: str) -> bool:
+        cur = self._conn.execute("SELECT 1 FROM cache WHERE key=?", (key,))
+        return cur.fetchone() is not None
+
+    def __getitem__(self, key: str):
+        cur = self._conn.execute("SELECT value FROM cache WHERE key=?", (key,))
+        row = cur.fetchone()
+        if row is None:
+            raise KeyError(key)
+        return pickle.loads(row[0])
+
+    def __setitem__(self, key: str, value) -> None:
+        self._conn.execute(
+            "INSERT OR REPLACE INTO cache (key, value) VALUES (?, ?)",
+            (key, pickle.dumps(value)),
+        )
+        self._conn.commit()
+
+    def sync(self) -> None:
+        pass  # every __setitem__ commits immediately
+
+    def close(self) -> None:
+        self._conn.close()
 
 
 class LLMJudge:
@@ -12,13 +59,10 @@ class LLMJudge:
         self.llm = llm
         self.weight = weight
         self.cache_scores = cache_scores
-        import shelve, os
-        os.makedirs("artifacts/cache", exist_ok=True)
-        self._cache = shelve.open("artifacts/cache/judge_cache", writeback=True)
+        self._cache = _SQLiteCache("artifacts/cache/judge_cache.sqlite3")
 
     def close(self):
-        if hasattr(self._cache, "close"):
-            self._cache.close()
+        self._cache.close()
 
     def _cache_key(self, claim, reasoning, evidence):
         raw = claim + reasoning + "".join(e.text for e in evidence)
@@ -46,13 +90,11 @@ class LLMJudge:
         )
 
     def parse(self, response):
-        # Try direct JSON parse first
         try:
             return json.loads(response.strip())
         except (json.JSONDecodeError, AttributeError):
             pass
 
-        # Try extracting a JSON object with regex
         match = re.search(r'\{[^{}]*"LCS"[^{}]*\}', response, re.DOTALL)
         if match:
             try:
@@ -60,7 +102,6 @@ class LLMJudge:
             except json.JSONDecodeError:
                 pass
 
-        # Try extracting individual float values by key
         scores = {}
         for key in ["LCS", "ESS", "GRS", "COMP", "BIAS", "confidence"]:
             m = re.search(rf'"{key}"\s*:\s*([0-9.]+)', response)
@@ -75,7 +116,6 @@ class LLMJudge:
                 scores.setdefault(key, 0.5)
             return scores
 
-        # Hard fallback
         return {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.5}
 
     def compute_reward(self, claim, reasoning, evidence):
@@ -86,12 +126,9 @@ class LLMJudge:
             key = self._cache_key(claim, reasoning, evidence)
             if key in self._cache:
                 scores = self._cache[key]
-                reward = self._scores_to_reward(scores)
-                return reward, scores
+                return self._scores_to_reward(scores), scores
 
         prompt = self.build_prompt(claim, reasoning, evidence)
-        # AUDIT FIX: wrap generation in try/except so a crashed judge call falls back
-        # gracefully instead of propagating an exception that kills the episode
         try:
             if hasattr(self.llm, "generate_structured"):
                 response, _ = self.llm.generate_structured(prompt)
@@ -108,16 +145,13 @@ class LLMJudge:
             scores = {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.0}
             if self.cache_scores:
                 self._cache[key] = scores
-                self._cache.sync()
             return self._scores_to_reward(scores), scores
-        scores = self.parse(response)
 
+        scores = self.parse(response)
         if self.cache_scores:
             self._cache[key] = scores
-            self._cache.sync()
 
-        reward = self._scores_to_reward(scores)
-        return reward, scores
+        return self._scores_to_reward(scores), scores
 
     def _scores_to_reward(self, scores):
         lcs = float(scores.get("LCS", 0.5))
@@ -134,7 +168,6 @@ class LLMJudge:
             - 0.25 * grs
             - 0.15 * bias
         )
-        # blend toward neutral only when judge confidence is very low
         if conf < 0.4:
             reward = 0.5 * reward + 0.5 * 0.5
         return float(np.clip(reward, 0.0, 1.0))

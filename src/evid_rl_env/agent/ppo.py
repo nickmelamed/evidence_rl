@@ -15,10 +15,6 @@ class PPO:
         self.gae_lambda = getattr(config, "gae_lambda", 0.95)
 
     def compute_advantages(self, rewards, values, next_value=0.0):
-        """
-        Generalised Advantage Estimation (GAE-lambda).
-        next_value: bootstrap value for the state after the last step (0 if terminal).
-        """
         gae_lambda = getattr(self, "gae_lambda", 0.95)
         advantages = []
         gae = 0.0
@@ -43,7 +39,15 @@ class PPO:
             for state, action_idx, old_prob, ret, adv in zip(
                 states, actions, old_probs, returns, advantages
             ):
-                probs = self.policy.get_probs(state)
+                # Encode state once and reuse for all computations in this step.
+                # Previously encode_state was called 4-5 times per step per epoch
+                # (get_probs, get_value, grad_log_prob×2, explicit call).
+                features = encode_state(state)
+
+                logits = features @ self.policy.actor_params
+                logits -= np.max(logits)
+                exp = np.exp(logits)
+                probs = exp / np.sum(exp)
                 new_prob = probs[action_idx]
 
                 ratio = new_prob / (old_prob + 1e-8)
@@ -53,21 +57,17 @@ class PPO:
 
                 actor_loss = -min(unclipped, clipped)
 
-                # entropy bonus
                 entropy = -np.sum(probs * np.log(probs + 1e-8))
                 actor_loss -= self.entropy_coef * entropy
 
-                # value loss
-                value = self.policy.get_value(state)
+                value = float(features @ self.policy.value_params)
                 value_loss = (ret - value) ** 2
 
-                # gradients
-                grad_actor = self.policy.grad_log_prob(state, action_idx)
-                features = encode_state(state)
-
+                grad_actor = self.policy.grad_log_prob(
+                    state, action_idx, features=features, probs=probs
+                )
                 grad_value = features * (ret - value)
 
-                # gradient clipping
                 actor_norm = np.linalg.norm(grad_actor)
                 if actor_norm > self.max_grad_norm:
                     grad_actor = grad_actor * (self.max_grad_norm / (actor_norm + 1e-8))
@@ -76,6 +76,5 @@ class PPO:
                 if value_norm > self.max_grad_norm:
                     grad_value = grad_value * (self.max_grad_norm / (value_norm + 1e-8))
 
-                # updates
                 self.policy.actor_params -= self.lr * actor_loss * grad_actor
                 self.policy.value_params += self.lr * self.value_coef * grad_value

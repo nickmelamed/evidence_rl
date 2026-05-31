@@ -11,9 +11,16 @@ os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from transformers import pipeline, logging, set_seed as _transformers_set_seed
 
+import torch
+
 logging.set_verbosity_error()
 
 _logger = _logging.getLogger(__name__)
+
+# Use MPS on Apple Silicon if available, otherwise CPU.
+# set_seed (which triggers torch.mps.manual_seed) is called once at __init__,
+# not before every inference call, so MPS state is not repeatedly reset.
+_DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 
 
 def _extract_text(output):
@@ -44,7 +51,13 @@ class LLMClient:
             "text-generation",
             model=model_name,
             torch_dtype="auto",
+            device=_DEVICE,
         )
+        # Seed once at init. Calling transformers.set_seed() before every
+        # inference pass re-triggers torch.mps.manual_seed() on Apple Silicon
+        # (even when the pipeline is on CPU), which corrupts the MPS command
+        # queue after repeated calls and causes a native segfault.
+        _transformers_set_seed(self.seed)
 
     @property
     def pipe(self):
@@ -54,9 +67,6 @@ class LLMClient:
         return [{"role": "user", "content": prompt}]
 
     def generate(self, prompt):
-        # AUDIT FIX: seed HuggingFace's internal RNG before every pipeline call;
-        # Python/numpy seeding alone does not control transformers token sampling
-        _transformers_set_seed(self.seed)
         out = self._pipe(
             self._chat(prompt),
             max_new_tokens=128,
@@ -70,11 +80,9 @@ class LLMClient:
 
     def generate_structured(self, prompt, temperature=0.1):
         """Lower temperature for structured outputs like JSON."""
-        # AUDIT FIX: seed HuggingFace's internal RNG before every pipeline call
-        _transformers_set_seed(self.seed)
         out = self._pipe(
             self._chat(prompt),
-            max_new_tokens=256,
+            max_new_tokens=32,   # callers only need an action index (1-2 tokens)
             do_sample=True,
             temperature=temperature,
             return_full_text=False,
@@ -102,24 +110,22 @@ class JudgeLLMClient:
     ):
         self.model_name = model_name
         self.temperature = temperature
-        # AUDIT FIX: store seed so every pipeline call sets it via transformers.set_seed
         self.seed = seed
         self._pipe = pipeline(
             "text-generation",
             model=model_name,
             torch_dtype="auto",
+            device=_DEVICE,
         )
+        _transformers_set_seed(self.seed)
 
     def _chat(self, prompt):
         return [{"role": "user", "content": prompt}]
 
     def generate(self, prompt):
-        # AUDIT FIX: seed HuggingFace's internal RNG before every pipeline call so judge
-        # outputs are reproducible across eval runs with the same --seed
-        _transformers_set_seed(self.seed)
         out = self._pipe(
             self._chat(prompt),
-            max_new_tokens=256,
+            max_new_tokens=128,  # judge JSON output is ~80 tokens; 128 gives headroom
             do_sample=True,
             temperature=self.temperature,
             return_full_text=False,

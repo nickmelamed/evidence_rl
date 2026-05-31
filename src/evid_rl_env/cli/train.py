@@ -1,4 +1,6 @@
 import os
+import faulthandler
+faulthandler.enable()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from evid_rl_env.environment.environment import ClaimEnv
@@ -6,6 +8,7 @@ from evid_rl_env.environment.curriculum import Curriculum
 from evid_rl_env.agent.policy import ActorCriticPolicy
 from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.data.evidence_fetcher import warm_cache
 from evid_rl_env.agent.trainer import Trainer
 from evid_rl_env.agent.bandit_trainer import BanditTrainer
 from evid_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
@@ -15,7 +18,7 @@ import argparse
 import random
 
 
-def train(episodes, method="ppo", config_path=None, seed=42):
+def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None):
     dataset = load_dataset()
 
     # AUDIT FIX: isolate the split seed from training randomness — seed 42 must always
@@ -30,11 +33,10 @@ def train(episodes, method="ppo", config_path=None, seed=42):
     eval_dataset = [dataset[i] for i in indices[split:]]
     random.setstate(_saved_state)
 
+    warm_cache(train_dataset + eval_dataset)
+
     curriculum = Curriculum()
-    sampled_dataset = [curriculum.sample(train_dataset) for _ in range(len(train_dataset))]
-    # AUDIT FIX: pass seed so ClaimEnv threads it to JudgeLLMClient for reproducible
-    # judge outputs and ActorCriticPolicy threads it to LLMClient for reproducible actor outputs
-    env = ClaimEnv(sampled_dataset, seed=seed)
+    env = ClaimEnv(train_dataset, seed=seed)
 
     policy = ActorCriticPolicy(len(list(ACTIONS)), seed=seed)
 
@@ -48,6 +50,9 @@ def train(episodes, method="ppo", config_path=None, seed=42):
     elif method == 'bandit':
         config = BanditConfig()
 
+    # Default: eval twice per run (at midpoint and end), minimum every 25 episodes.
+    resolved_eval_every = eval_every if eval_every is not None else max(25, episodes // 2)
+
     if method == 'bandit':
         trainer = BanditTrainer(
             env=env,
@@ -56,8 +61,9 @@ def train(episodes, method="ppo", config_path=None, seed=42):
             episodes=episodes,
             exp_name=f"{method}_run",
             seed=seed,
-            # AUDIT FIX: pass eval_dataset so BanditTrainer can build an isolated eval env
             eval_dataset=eval_dataset,
+            eval_every=resolved_eval_every,
+            curriculum=curriculum,
         )
     else:
         trainer = Trainer(
@@ -69,6 +75,8 @@ def train(episodes, method="ppo", config_path=None, seed=42):
             exp_name=f"{method}_run",
             eval_dataset=eval_dataset,
             seed=seed,
+            eval_every=resolved_eval_every,
+            curriculum=curriculum,
         )
 
     trainer.train()
@@ -78,6 +86,8 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--episodes", type=int, default=50)
     parser.add_argument("--method", type=str, default="ppo")
+    parser.add_argument("--eval-every", type=int, default=None,
+                        help="Run evaluation every N episodes. Defaults to episodes//2 (twice per run).")
     parser.add_argument("--config", type=str, default=None, help="Path to a YAML config file (e.g. configs/ppo_baseline.yaml)")
     # AUDIT FIX: expose --seed so training runs are reproducible; consistent with
     # --seed in evid-eval and evid-collect
@@ -96,7 +106,8 @@ def main():
     else:
         seed = load_base_config().get("seed", 42)
 
-    train(args.episodes, args.method, args.config, seed=seed)
+    train(args.episodes, args.method, args.config, seed=seed,
+          eval_every=args.eval_every)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import numpy as np
+from evid_rl_env.agent.policy import encode_state
 
 
 class PolicyGradient:
@@ -17,7 +18,9 @@ class PolicyGradient:
 
             norm_r = (reward - mean) / std
 
-            grad = self.policy.grad_log_prob(state, action_idx)
+            # Encode once and pass through so grad_log_prob doesn't re-encode.
+            features = encode_state(state)
+            grad = self.policy.grad_log_prob(state, action_idx, features=features)
 
             grad_norm = np.linalg.norm(grad)
             if grad_norm > self.max_grad_norm:

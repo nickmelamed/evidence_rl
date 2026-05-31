@@ -23,18 +23,13 @@ class ActorCriticPolicy:
 
         from evid_rl_env.agent.llm_client import LLMClient
         actor_model = model_name or "google/gemma-2-2b-it"
-        # AUDIT FIX: propagate seed to LLMClient so transformers.set_seed is called
-        # with the top-level --seed value before every pipeline generation
+        # Propagate seed so LLMClient calls transformers.set_seed once at init.
         self.llm = LLMClient(model_name=actor_model, seed=seed)
 
     def generate_arguments_batch(self, prompts):
         """Generate multiple arguments in a single batched pipeline call."""
         if not prompts:
             return []
-        # AUDIT FIX: this method calls self.llm.pipe directly (bypassing generate()),
-        # so set_seed must be called here explicitly to cover this code path
-        from transformers import set_seed as _set_seed
-        _set_seed(self.llm.seed)
         outputs = self.llm.pipe(
             prompts,
             batch_size=min(len(prompts), 4),
@@ -160,12 +155,16 @@ Write a concise {action.lower()} argument.
 
         return action, None, idx
 
-    def grad_log_prob(self, state, action_idx):
-        probs = self.get_probs(state)
-        grad = -probs
+    def grad_log_prob(self, state, action_idx, features=None, probs=None):
+        if features is None:
+            features = encode_state(state)
+        if probs is None:
+            logits = features @ self.actor_params
+            logits -= np.max(logits)
+            exp = np.exp(logits)
+            probs = exp / np.sum(exp)
+        grad = -probs.copy()
         grad[action_idx] += 1
-
-        features = encode_state(state)
         return np.outer(features, grad)
 
     def save(self, path: str) -> None:
