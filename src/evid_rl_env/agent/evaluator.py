@@ -29,7 +29,7 @@ class Evaluator:
         rewards_raw = []
         steps_list = []
         action_counts = {a: 0 for a in ACTIONS}
-        llm_score_totals = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+        llm_score_totals = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         try:
             for _ in range(self.n_eval_episodes):
@@ -84,4 +84,5 @@ class Evaluator:
             "eval/llm_ESS": float(np.mean(llm_score_totals["ESS"])) if llm_score_totals["ESS"] else 0.0,
             "eval/llm_GRS": float(np.mean(llm_score_totals["GRS"])) if llm_score_totals["GRS"] else 0.0,
             "eval/llm_COMP": float(np.mean(llm_score_totals["COMP"])) if llm_score_totals["COMP"] else 0.0,
+            "eval/llm_BIAS": float(np.mean(llm_score_totals["BIAS"])) if llm_score_totals["BIAS"] else 0.0,
         }

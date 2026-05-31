@@ -74,7 +74,7 @@ def run_episode(env: ClaimEnv, action_fn) -> tuple:
     done = False
     total_reward = 0.0
     trajectory = []
-    llm_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+    llm_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
     while not done:
         action_idx = int(np.clip(action_fn(state), 0, N_ACTIONS - 1))
@@ -129,6 +129,7 @@ class BaseEvaluator(ABC):
             "ess": _mean(score_lists["ESS"]),
             "hrs": _mean(score_lists["GRS"]),
             "comp": _mean(score_lists["COMP"]),
+            "bias": _mean(score_lists["BIAS"]),
         }
 
     def _accumulate(self, all_scores: dict, ep_scores: dict) -> None:
@@ -149,7 +150,7 @@ class RandomBaseline(BaseEvaluator):
     def run(self, n_episodes: int) -> dict:
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(
@@ -192,7 +193,7 @@ class MajorityBaseline(BaseEvaluator):
         env = ClaimEnv(self.eval_dataset)
         majority = self._majority_idx
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(env, lambda state: majority)
@@ -260,7 +261,7 @@ class GreedyLLMBaseline(BaseEvaluator):
     def run(self, n_episodes: int) -> dict:
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(env, self._action_fn)
@@ -381,7 +382,7 @@ class FewShotLLMBaseline(BaseEvaluator):
         k_shots = k if k is not None else self.k
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(
@@ -455,7 +456,7 @@ class BestOfNBaseline(BaseEvaluator):
         env = ClaimEnv(self.eval_dataset)
         self._current_env = env
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
         total_llm_calls = 0
 
         for _ in range(n_episodes):
@@ -602,7 +603,7 @@ class ImitationBaseline(BaseEvaluator):
     def run(self, n_episodes: int) -> dict:
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": []}
+        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(env, self._action_fn)

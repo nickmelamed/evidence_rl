@@ -368,8 +368,8 @@ def main() -> None:
             "LCS":  round(r.get("lcs",  0.0), 4),
             "ESS":  round(r.get("ess",  0.0), 4),
             "COMP": round(r.get("comp", 0.0), 4),
-            "GRS":  round(r.get("grs",  0.0), 4),
-            "BIAS": 0.0,
+            "GRS":  round(r.get("hrs",  0.0), 4),  # _aggregate emits "hrs" not "grs"
+            "BIAS": round(r.get("bias", 0.0), 4),
         }
         _flush_json()
 

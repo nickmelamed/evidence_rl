@@ -77,31 +77,47 @@ class LLMJudge:
             f"CLAIM:\n{claim}\n\n"
             f"EVIDENCE:\n{evidence_text}\n\n"
             f"REASONING:\n{reasoning}\n\n"
-            "Score the reasoning on exactly these five dimensions and "
-            "return ONLY this JSON object with float values between 0 and 1:\n"
-            '{"LCS": 0.0, "ESS": 0.0, "GRS": 0.0, "COMP": 0.0, "BIAS": 0.0, "confidence": 0.0}\n\n'
+            "Score the reasoning on exactly these five dimensions. "
+            "Replace each ... with your actual numeric score (float between 0 and 1):\n"
+            '{"LCS": ..., "ESS": ..., "GRS": ..., "COMP": ..., "BIAS": ..., "confidence": ...}\n\n'
             "LCS = logical consistency (1=fully coherent)\n"
             "ESS = evidence support (1=correctly uses all evidence)\n"
             "GRS = grounding risk (1=reasoning introduces claims not in evidence, 0=fully grounded)\n"
             "COMP = completeness (1=fully addresses the claim)\n"
             "BIAS = selective citation bias (1=only cites supporting evidence while ignoring contradictions it was given, 0=balanced)\n"
             "confidence = your confidence in these scores (0-1)\n\n"
-            "Respond with the JSON object only:"
+            "Respond with the JSON object only, with your real scores filled in:"
         )
 
+    def _is_template_echo(self, data: dict) -> bool:
+        """Return True if the model echoed the prompt template (all scoring keys are 0.0)."""
+        scoring_keys = ("LCS", "ESS", "GRS", "COMP", "BIAS")
+        return all(float(data.get(k, 1.0)) == 0.0 for k in scoring_keys)
+
+    _NEUTRAL = {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.5}
+
     def parse(self, response):
+        # Direct JSON parse: accept only if not a template echo.
         try:
-            return json.loads(response.strip())
-        except (json.JSONDecodeError, AttributeError):
+            data = json.loads(response.strip())
+            if not self._is_template_echo(data):
+                return data
+            _logger.warning("LLMJudge.parse: all-zero template echo detected — using neutral fallback.")
+            return dict(self._NEUTRAL)
+        except (json.JSONDecodeError, AttributeError, ValueError):
             pass
 
+        # Regex extraction of the first JSON-object containing "LCS".
         match = re.search(r'\{[^{}]*"LCS"[^{}]*\}', response, re.DOTALL)
         if match:
             try:
-                return json.loads(match.group())
+                data = json.loads(match.group())
+                if not self._is_template_echo(data):
+                    return data
             except json.JSONDecodeError:
                 pass
 
+        # Key-by-key regex fallback.
         scores = {}
         for key in ["LCS", "ESS", "GRS", "COMP", "BIAS", "confidence"]:
             m = re.search(rf'"{key}"\s*:\s*([0-9.]+)', response)
@@ -114,9 +130,10 @@ class LLMJudge:
         if len(scores) >= 3:
             for key in ["LCS", "ESS", "GRS", "COMP", "BIAS", "confidence"]:
                 scores.setdefault(key, 0.5)
-            return scores
+            if not self._is_template_echo(scores):
+                return scores
 
-        return {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.5}
+        return dict(self._NEUTRAL)
 
     def compute_reward(self, claim, reasoning, evidence):
         if not reasoning.strip():
