@@ -12,10 +12,10 @@ class PPOConfig(BaseConfig):
         super().__init__()
         self.lr = 0.001
         self.clip = 0.2
-        self.entropy_coef = 0.01
+        self.entropy_coef = 0.05  # was 0.01 — too weak to prevent collapse on short runs
         self.value_coef = 0.05
         self.gae_lambda = 0.95
-        self.ppo_epochs = 4
+        self.ppo_epochs = 2       # was 4 — K=4 over-commits weights after only a few episodes
 
 class PGConfig(BaseConfig):
     def __init__(self):

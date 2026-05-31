@@ -1,3 +1,4 @@
+import atexit
 import random
 import numpy as np
 
@@ -7,19 +8,37 @@ from evid_rl_env.judge.reward import RewardFunction
 from evid_rl_env.judge.llm_judge import LLMJudge
 from evid_rl_env.data.evidence_fetcher import fetch_evidence
 
-# One JudgeLLMClient per model name, shared across all ClaimEnv instances.
-# Loading Qwen per-env would otherwise exhaust memory when multiple envs
-# (training, eval, baselines) are alive at the same time.
-_judge_cache: dict = {}
+# Both the JudgeLLMClient and the LLMJudge (which holds a shelve file handle)
+# are shared across all ClaimEnv instances.  Opening the same shelve file from
+# multiple LLMJudge objects simultaneously causes gdbm to create a POSIX
+# semaphore for locking; if any handle is not closed at exit that semaphore
+# leaks and can cause a segfault during interpreter shutdown cleanup.
+_judge_llm_cache: dict = {}   # model_name -> JudgeLLMClient
+_llm_judge_cache: dict = {}   # model_name -> LLMJudge  (owns the shelve handle)
 
 
-def _get_judge(model_name: str, seed: int):
+def _get_llm_judge(model_name: str, seed: int) -> LLMJudge:
     from evid_rl_env.agent.llm_client import JudgeLLMClient
-    if model_name not in _judge_cache:
-        _judge_cache[model_name] = JudgeLLMClient(model_name=model_name, seed=seed)
+    if model_name not in _judge_llm_cache:
+        _judge_llm_cache[model_name] = JudgeLLMClient(model_name=model_name, seed=seed)
     else:
-        _judge_cache[model_name].seed = seed
-    return _judge_cache[model_name]
+        _judge_llm_cache[model_name].seed = seed
+
+    if model_name not in _llm_judge_cache:
+        _llm_judge_cache[model_name] = LLMJudge(_judge_llm_cache[model_name], weight=0.5)
+    return _llm_judge_cache[model_name]
+
+
+def _close_llm_judges():
+    """atexit handler — flush and close every shared shelve handle before exit."""
+    for judge in _llm_judge_cache.values():
+        try:
+            judge.close()
+        except Exception:
+            pass
+
+
+atexit.register(_close_llm_judges)
 
 
 class ClaimEnv:
@@ -30,8 +49,7 @@ class ClaimEnv:
         self.reward_fn = RewardFunction()
 
         judge_model_name = judge_model or "Qwen/Qwen2.5-1.5B-Instruct"
-        judge_llm = _get_judge(judge_model_name, seed)
-        self.llm_judge = LLMJudge(judge_llm, weight=0.5)
+        self.llm_judge = _get_llm_judge(judge_model_name, seed)
         self._last_judge_step = 0
 
     def _evidence_diversity_bonus(self, new_evidence_id):

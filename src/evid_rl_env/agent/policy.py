@@ -66,25 +66,40 @@ class ActorCriticPolicy:
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
-        probs = self.get_probs(state)
+        probs = self.get_probs(state)  # fresh array — safe to mutate in place
 
-        entropy = -np.sum(probs * np.log(probs + 1e-8))
-        self.last_entropy = entropy
-
-        # mask QUERY when budget exhausted
+        # Mask 1: QUERY when per-episode budget exhausted
         if state.query_count >= state.max_queries:
-            probs = probs.copy()
-            query_idx = self.actions.index(Actions.QUERY)
-            probs[query_idx] = 0
-            probs = probs / np.sum(probs)
+            probs[self.actions.index(Actions.QUERY)] = 0
+            probs /= probs.sum()
 
+        # Mask 2: argument-generating and evidence-removing actions require at least
+        # one piece of evidence to be selected first.  Without evidence they call the
+        # LLM with an empty context, produce no useful signal, and (critically) fill
+        # every episode step with expensive LLM calls — the PPO-collapse OOM pattern.
+        # Masking before sampling keeps the gradient attribution correct.
+        if not state.selected_evidence and state.evidence_pool:
+            for _a in (Actions.SUPPORT, Actions.CONTRADICT,
+                       Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE):
+                probs[self.actions.index(_a)] = 0
+            _s = probs.sum()
+            probs /= _s if _s > 0 else 1.0
+
+        self.last_entropy = float(-np.sum(probs * np.log(probs + 1e-8)))
         self.last_probs = probs.copy()
 
         if force_action_idx is not None:
             idx = force_action_idx
+            action = self.actions[idx]
+            # Redirect invalid forced actions (e.g. from bandit) to SELECT
+            if (action in (Actions.SUPPORT, Actions.CONTRADICT,
+                           Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE)
+                    and not state.selected_evidence and state.evidence_pool):
+                action = Actions.SELECT
+                idx = self.actions.index(Actions.SELECT)
         else:
             idx = int(np.argmax(probs)) if greedy else np.random.choice(self.n_actions, p=probs)
-        action = self.actions[idx]
+            action = self.actions[idx]
 
         if action == Actions.SELECT:
             doc = np.random.choice(state.evidence_pool)

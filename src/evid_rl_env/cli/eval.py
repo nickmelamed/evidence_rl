@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import random
 import sys
 from pathlib import Path
@@ -321,6 +322,27 @@ def main() -> None:
         )
 
     # ------------------------------------------------------------------
+    # Write eval_results.json incrementally so a crash mid-baseline
+    # still leaves valid output (RL results are always saved first).
+    # ------------------------------------------------------------------
+    exp_dir = str(Path(checkpoint).parent)
+    out_path = os.path.join(exp_dir, "eval_results.json")
+
+    eval_json: dict = {
+        "checkpoint":  checkpoint,
+        "n_episodes":  args.n_episodes,
+        "baselines":   {"rl": {"mean": round(rl_raw, 4), "std": round(rl_std, 4)}},
+        "judge_metrics": {},
+    }
+
+    def _flush_json() -> None:
+        with open(out_path, "w") as _f:
+            json.dump(eval_json, _f, indent=2)
+
+    # Persist RL results immediately — a later segfault won't erase them.
+    _flush_json()
+
+    # ------------------------------------------------------------------
     # Baselines
     # ------------------------------------------------------------------
     print("\nInstantiating and running baselines...")
@@ -335,7 +357,21 @@ def main() -> None:
     baseline_results = {}
     for name, bl in baselines.items():
         print(f"  Running {name}...")
-        baseline_results[name] = bl.run(args.n_episodes)
+        r = bl.run(args.n_episodes)
+        baseline_results[name] = r
+        # Update JSON after each baseline so partial results survive a crash.
+        eval_json["baselines"][name] = {
+            "mean": round(r["mean_reward"], 4),
+            "std":  round(r["std_reward"],  4),
+        }
+        eval_json["judge_metrics"][name] = {
+            "LCS":  round(r.get("lcs",  0.0), 4),
+            "ESS":  round(r.get("ess",  0.0), 4),
+            "COMP": round(r.get("comp", 0.0), 4),
+            "GRS":  round(r.get("hrs",  0.0), 4),
+            "BIAS": 0.0,
+        }
+        _flush_json()
 
     # ------------------------------------------------------------------
     # Table + CI gate
@@ -346,6 +382,12 @@ def main() -> None:
         rl_raw,
         rl_std,
     )
+
+    if ref is not None:
+        eval_json["rl_win_rate_vs_greedy"] = 1.0 if rl_raw > ref else 0.0
+        _flush_json()
+
+    print(f"Eval results written → {out_path}")
 
     print()
     if ref is None:

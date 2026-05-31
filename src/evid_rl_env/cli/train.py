@@ -1,3 +1,6 @@
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 from evid_rl_env.environment.environment import ClaimEnv
 from evid_rl_env.environment.curriculum import Curriculum
 from evid_rl_env.agent.policy import ActorCriticPolicy

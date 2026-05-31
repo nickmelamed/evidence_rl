@@ -5,7 +5,9 @@ import random
 
 # Disable the fast tokenizer's Rust-backed parallel worker pool. Without this,
 # the pool's semaphores leak at interpreter shutdown and cause a segfault.
-os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+# Use an unconditional assignment so a shell-level TOKENIZERS_PARALLELISM=true
+# cannot override this and re-introduce the leak.
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 from transformers import pipeline, logging, set_seed as _transformers_set_seed
 

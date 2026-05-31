@@ -240,7 +240,7 @@ with tab0:
                 xaxis_title="Method",
                 yaxis_title="Mean reward",
             )
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_bar, width="stretch")
 
         if greedy_mean is not None and rows:
             st.subheader("Δ vs greedy_llm")
@@ -263,8 +263,8 @@ with tab0:
                 return ""
 
             st.dataframe(
-                delta_df.style.applymap(color_delta, subset=["Δ vs greedy_llm"]),
-                use_container_width=True,
+                delta_df.style.map(color_delta, subset=["Δ vs greedy_llm"]),
+                width="stretch",
                 hide_index=True,
             )
 
@@ -288,7 +288,7 @@ with tab0:
                 polar=dict(radialaxis=dict(visible=True, range=[0, 1])),
                 title="LLM judge dimensions — RL vs baselines",
             )
-            st.plotly_chart(radar_fig, use_container_width=True)
+            st.plotly_chart(radar_fig, width="stretch")
             st.caption(
                 "GRS (grounding risk) and BIAS are ↓ lower-is-better; all others ↑ higher-is-better. "
                 "RL's debate loop should produce structurally better LCS, ESS, and COMP "
@@ -355,19 +355,19 @@ with tab1:
             )
 
         fig = px.line(traj_df, x="step", y=["LCS", "ESS", "HRS"], title="LLM Scores Over Time")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if not demo_mode:
         if "value_estimate" in traj_df:
             fig = px.line(traj_df, x="step", y="value_estimate", title="Value Estimates")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         if "advantage" in traj_df:
             fig = px.line(traj_df, x="step", y="advantage", title="Advantage Signal")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
 
         fig = px.line(df, x="episode", y="tokens", title="Token Usage")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     # BEST EPISODE
     if "reward" not in df.columns or df["reward"].dropna().empty:
@@ -381,10 +381,10 @@ with tab1:
         colA, colB = st.columns(2)
         with colA:
             fig = px.line(df, x="episode", y="reward", title="Reward")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         with colB:
             fig = px.line(df, x="episode", y="reward_smooth", title="Smoothed")
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
         st.success(f"🏆 Best Episode: {int(best_ep)}")
 
     # ADD 5: Reward decomposition (uses already-loaded traj_by_episode)
@@ -404,7 +404,7 @@ with tab1:
             barmode="relative",
             color_discrete_map={"base reward": "#378ADD", "llm reward": "#1D9E75"},
         )
-        st.plotly_chart(fig_decomp, use_container_width=True)
+        st.plotly_chart(fig_decomp, width="stretch")
 
     if not demo_mode:
         st.subheader("Train vs eval reward")
@@ -433,7 +433,7 @@ with tab1:
                 line=dict(color="#D85A30", dash="dash"),
             ))
             fig_gap.update_layout(title="Train vs eval reward — gap indicates overfitting")
-            st.plotly_chart(fig_gap, use_container_width=True)
+            st.plotly_chart(fig_gap, width="stretch")
         else:
             st.info("Eval data not yet available. Set eval_every in Trainer to enable.")
 
@@ -449,7 +449,7 @@ with tab1:
             n_actions_ent = len(first_probs.iloc[0])
     max_entropy = math.log(n_actions_ent)
     fig.update_layout(yaxis=dict(range=[0, max_entropy * 1.05]))
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     # ADD 3: Policy collapse detector
     if "entropy" in df.columns:
@@ -471,25 +471,25 @@ with tab1:
 
     if "num_steps" in df.columns:
         fig = px.line(df, x="episode", y="num_steps", title="Steps per episode")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if "llm_reward" in traj_df.columns:
         traj_df["base_reward"] = traj_df["reward"] - traj_df.get("llm_reward", 0)
         fig = px.line(traj_df, x="step", y=["reward", "llm_reward"], title="Base vs LLM reward per step")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if "curriculum_level" in df.columns:
         fig = px.line(df, x="episode", y="curriculum_level", title="Curriculum level")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     if "reward_raw" in df.columns and "reward" in df.columns:
         fig = px.line(df, x="episode", y=["reward", "reward_raw"], title="Normalised vs raw reward")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
     action_dist_cols = [c for c in df.columns if c.startswith("action_dist.")]
     if action_dist_cols:
         fig = px.area(df, x="episode", y=action_dist_cols, title="Action distribution over time")
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
     else:
         st.info("Action distribution data not yet available (requires commit 5 trainer changes)")
 
@@ -517,7 +517,7 @@ with tab1:
                 color_continuous_scale="Blues",
                 aspect="auto",
             )
-            st.plotly_chart(fig_hm, use_container_width=True)
+            st.plotly_chart(fig_hm, width="stretch")
 
 # ── tab2: Compare ─────────────────────────────────────────────────────────────
 with tab2:
@@ -550,7 +550,7 @@ with tab2:
         )
         fig_bl.add_hline(y=0, line_dash="dot", line_color="#888780",
                          annotation_text="zero reward")
-        st.plotly_chart(fig_bl, use_container_width=True)
+        st.plotly_chart(fig_bl, width="stretch")
 
     # Smoothed training curves
     fig = go.Figure()
@@ -629,17 +629,22 @@ with tab2:
     if not fig.data:
         st.warning("No reward data available for the selected experiments yet.")
     else:
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
-    eval_cols = [c for c in data.columns if c.startswith("eval/")]
-    if eval_cols:
+    # Only show periodic eval chart if at least one experiment actually has eval rows.
+    # eval/mean_reward is always a column (it's in FIXED_FIELDS) but is NaN for every
+    # training row when eval_every hasn't fired yet — that produces a blank chart.
+    has_eval_rows = (
+        "eval/mean_reward" in data.columns
+        and data["eval/mean_reward"].notna().any()
+    )
+    if has_eval_rows:
         st.subheader("Eval metrics")
         fig_eval = go.Figure()
         for exp in selected:
             name = os.path.basename(exp)
-            df_e = data[data["experiment"] == name]
-            if "eval/mean_reward" in df_e.columns:
-                df_e = df_e.dropna(subset=["eval/mean_reward"])
+            df_e = data[data["experiment"] == name].dropna(subset=["eval/mean_reward"])
+            if not df_e.empty:
                 fig_eval.add_trace(go.Scatter(
                     x=df_e["episode"], y=df_e["eval/mean_reward"],
                     mode="lines", name=f"{name} eval",
@@ -649,7 +654,13 @@ with tab2:
                         visible=True,
                     ),
                 ))
-        st.plotly_chart(fig_eval, use_container_width=True)
+        if fig_eval.data:
+            st.plotly_chart(fig_eval, width="stretch")
+    else:
+        st.info(
+            "No periodic eval rounds recorded yet — increase training episodes past "
+            "`eval_every` (currently 10) to see this chart."
+        )
 
     st.subheader("LLM judge scores by experiment")
     fig_llm = go.Figure()
@@ -678,7 +689,7 @@ with tab2:
                 mode="lines", name=f"{name} LCS",
             ))
     if fig_llm.data:
-        st.plotly_chart(fig_llm, use_container_width=True)
+        st.plotly_chart(fig_llm, width="stretch")
 
 # ── tab3: Episode Drilldown ───────────────────────────────────────────────────
 with tab3:
@@ -777,7 +788,7 @@ with tab3:
                                 "confidence": "#888780",
                             },
                         )
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
 
                 if not demo_mode:
                     st.metric("Tokens Used", step.get("tokens", 0))
@@ -826,7 +837,7 @@ with tab3:
 
                     df_probs = pd.DataFrame({"action": names, "probability": probs})
                     fig = px.bar(df_probs, x="action", y="probability", title="Action Probabilities")
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
 
                     if chosen_idx is not None:
                         st.success(f"Chosen Action: {names[chosen_idx]}")
@@ -839,7 +850,7 @@ with tab3:
                     # FIX 2: fixed y-axis shows true exploration range
                     max_ent = math.log(len(ACTIONS))
                     fig.update_layout(yaxis=dict(range=[0, max_ent * 1.05]))
-                    st.plotly_chart(fig, use_container_width=True)
+                    st.plotly_chart(fig, width="stretch")
 
                 st.subheader("Selected Evidence")
                 selected_ids = step.get("selected_ids") or step.get("evidence_used", [])
@@ -884,7 +895,7 @@ with tab3:
                         },
                         symbol="action",
                     )
-                    st.plotly_chart(fig_tl, use_container_width=True)
+                    st.plotly_chart(fig_tl, width="stretch")
                 else:
                     st.info("No evidence select/remove actions in this episode")
 
