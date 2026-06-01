@@ -41,7 +41,7 @@ class BanditTrainer(EvalMixin):
         use_wandb=False,
         eval_dataset=None,
         eval_every=25,
-        baseline_n_episodes=5,
+        baseline_n_episodes=3,
         curriculum=None,
     ):
         random.seed(seed)

@@ -50,8 +50,7 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None):
     elif method == 'bandit':
         config = BanditConfig()
 
-    # Default: eval twice per run (at midpoint and end), minimum every 25 episodes.
-    resolved_eval_every = eval_every if eval_every is not None else max(25, episodes // 2)
+    resolved_eval_every = eval_every if eval_every is not None else 25
 
     if method == 'bandit':
         trainer = BanditTrainer(
