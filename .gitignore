@@ -9,9 +9,7 @@
 .venv/
 venv/
 env/
-ENV/
-ev_rl/  
-env_rl/
+ev_rl/
 
 # testing/coverage
 

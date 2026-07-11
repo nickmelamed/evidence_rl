@@ -10,28 +10,30 @@ PIP = pip
 # setup
 
 install:
-$(PIP) install -e .
+	$(PIP) install -e .
 
 install-dev:
-$(PIP) install -e .
-$(PIP) install pytest
+	$(PIP) install -e .[dev]
 
 clean:
-find . -name "**pycache**" -delete
-find . -name "*.pyc" -delete
+	find . -name "__pycache__" -delete
+	find . -name "*.pyc" -delete
 
-# run 
+# run
 
 train:
-$(PYTHON) scripts/train.py
+	train-rl
 
 episode:
-$(PYTHON) scripts/run_episode.py
+	run-episode
 
 # tests
 
 test:
-pytest
+	pytest
+
+lint:
+	ruff check .
 
 # evaluation
 
@@ -73,9 +75,6 @@ train-bandit:
 dashboard:
 	streamlit run dashboard/app.py
 
-train-exp:
-$(PYTHON) scripts/train.py --exp_name=default
-
 plot:
 	plot-exp --path=$(path)
 
@@ -85,31 +84,32 @@ compare:
 # full reset
 
 reset: clean
-rm -rf build dist *.egg-info
+	rm -rf build dist *.egg-info
 
-# help 
+# help
 
 help:
-@echo "Available commands:"
-@echo "  make install        Install package"
-@echo "  make install-dev    Install with dev deps"
-@echo "  make train          Run training"
-@echo "  make episode        Run single episode"
-@echo "  make test           Run tests"
-@echo "  make clean          Remove cache files"
-@echo "  make reset          Full cleanup"
-@echo ""
-@echo "Evaluation (requires checkpoint=<path>):"
-@echo "  make eval           Eval vs random,greedy,fewshot_k3,best_of_5"
-@echo "  make eval-quick     Fast eval (random,greedy, 20 episodes)"
-@echo "  make eval-full      Full eval all baselines, 100 episodes"
-@echo "  make eval-ci        CI gate — exits 1 if RL doesn't beat greedy"
-@echo "  make eval-imitation checkpoint=<path> trajectories=<path>"
-@echo "                      Eval including imitation baseline"
-@echo "  make collect        Collect trajectories via evid-collect"
-@echo "  make collect-n n=<int>  Collect N episodes of trajectories"
-@echo "  make migrate        Migrate trajectory files via evid-migrate"
-@echo ""
-@echo "Analysis:"
-@echo "  make plot path=<path>         Plot a single experiment"
-@echo "  make compare paths=<paths>    Compare multiple experiments"
+	@echo "Available commands:"
+	@echo "  make install        Install package"
+	@echo "  make install-dev    Install with dev deps (pytest, ruff)"
+	@echo "  make train          Run training (train-rl defaults)"
+	@echo "  make episode        Run single episode"
+	@echo "  make test           Run tests"
+	@echo "  make lint           Run ruff"
+	@echo "  make clean          Remove cache files"
+	@echo "  make reset          Full cleanup"
+	@echo ""
+	@echo "Evaluation (requires checkpoint=<path>):"
+	@echo "  make eval           Eval vs random,greedy,fewshot_k3,best_of_5"
+	@echo "  make eval-quick     Fast eval (random,greedy, 20 episodes)"
+	@echo "  make eval-full      Full eval all baselines, 100 episodes"
+	@echo "  make eval-ci        CI gate — exits 1 if RL doesn't beat greedy"
+	@echo "  make eval-imitation checkpoint=<path> trajectories=<path>"
+	@echo "                      Eval including imitation baseline"
+	@echo "  make collect        Collect trajectories via evid-collect"
+	@echo "  make collect-n n=<int>  Collect N episodes of trajectories"
+	@echo "  make migrate        Migrate trajectory files via evid-migrate"
+	@echo ""
+	@echo "Analysis:"
+	@echo "  make plot path=<path>         Plot a single experiment"
+	@echo "  make compare paths=<paths>    Compare multiple experiments"

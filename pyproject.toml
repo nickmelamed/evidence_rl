@@ -1,17 +1,45 @@
 [project]
 name = "evid_rl_env"
 version = "0.1.0"
-description = "RL environment for LLM training for Claims Evaluation"
+description = "RL environment for LLM training for Scientific Claims Evaluation"
 authors = [{name = "Nick Melamed"}]
 requires-python = ">=3.10"
 
 dependencies = [
     "numpy",
-    "tqdm"
+    "tqdm",
+    "pandas",
+    "PyYAML",
+    "streamlit",
+    "plotly",
+    "matplotlib",
+    "tavily-python",
+    "python-dotenv",
+    "sentence-transformers",
+    "wandb",
+    "accelerate",
+    "anthropic",
+    "transformers",
+    "torch",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# E501 (line-too-long) and E402 (import-not-at-top) are intentionally excluded:
+# this codebase relies on late imports before heavy/optional dependencies
+# (e.g. setting TOKENIZERS_PARALLELISM before importing transformers) and has
+# many pre-existing long lines not worth a blanket reformat in this pass.
+select = ["E", "F", "I"]
+ignore = ["E501", "E402"]
 
 [project.scripts]
 train-rl = "evid_rl_env.cli.train:main"
