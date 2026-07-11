@@ -8,11 +8,10 @@ Covers:
 - compute_reward returns non-zero values when the mock LLM returns real scores.
 """
 
-import json
 import pytest
 
-from evid_rl_env.judge.llm_judge import LLMJudge
 from evid_rl_env.environment.state import Evidence
+from evid_rl_env.judge.llm_judge import LLMJudge
 
 
 class _MockLLM:
@@ -41,7 +40,7 @@ EVIDENCE = [
 
 
 def _make_judge(response: str) -> LLMJudge:
-    return LLMJudge(_MockLLM(response), weight=0.5, cache_scores=False)
+    return LLMJudge(_MockLLM(response), cache_scores=False)
 
 
 def test_parse_valid_non_zero():
