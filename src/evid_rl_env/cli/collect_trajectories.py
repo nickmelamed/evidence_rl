@@ -22,10 +22,11 @@ from datetime import datetime, timezone
 
 import numpy as np
 
-from evid_rl_env.data.dataset import load_dataset
-from evid_rl_env.environment.environment import ClaimEnv
-from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.agent.baseline import _build_payload, _state_summary
+from evid_rl_env.agent.config_loader import load_base_config
+from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.environment.actions import ACTIONS
+from evid_rl_env.environment.environment import ClaimEnv
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(
@@ -35,14 +36,12 @@ logging.basicConfig(
 
 N_ACTIONS = len(ACTIONS)
 
-# AUDIT FIX: define the set of modes that originate from training-only collection;
+# define the set of modes that originate from training-only collection;
 # best_rollouts uses this to filter out any stray non-training records
 _TRAIN_COLLECTION_MODES = frozenset({"llm_annotator", "reward_filtered", "best_rollouts"})
 
 
-# ---------------------------------------------------------------------------
-# Dataset helpers
-# ---------------------------------------------------------------------------
+# dataset helpers 
 
 def _load_train_split(dataset_path: str | None) -> list:
     """Load the training split (same 80/20 seed-42 split as train.py)."""
@@ -58,9 +57,7 @@ def _load_train_split(dataset_path: str | None) -> list:
     return [dataset[i] for i in indices[:split]]
 
 
-# ---------------------------------------------------------------------------
-# Episode collection
-# ---------------------------------------------------------------------------
+# episode collection 
 
 def _collect_episode(env: ClaimEnv, action_fn, annotator_model: str, mode: str) -> dict:
     """
@@ -96,17 +93,13 @@ def _collect_episode(env: ClaimEnv, action_fn, annotator_model: str, mode: str) 
         "claim": claim,
         "annotator_model": annotator_model,
         "mode": mode,
-        # AUDIT FIX: add ISO timestamp so ImitationBaseline and best_rollouts can
-        # verify trajectory provenance and detect stale/mixed-run records
         "collected_at": datetime.now(timezone.utc).isoformat(),
         "total_reward": float(total_reward),
         "steps": steps,
     }
 
 
-# ---------------------------------------------------------------------------
-# Mode: llm_annotator
-# ---------------------------------------------------------------------------
+# LLM annotation 
 
 def collect_llm_annotator(env: ClaimEnv, annotator, n_episodes: int, model_name: str) -> list:
     trajectories = []
@@ -120,9 +113,7 @@ def collect_llm_annotator(env: ClaimEnv, annotator, n_episodes: int, model_name:
     return trajectories
 
 
-# ---------------------------------------------------------------------------
-# Mode: reward_filtered
-# ---------------------------------------------------------------------------
+# Reward filtered mode 
 
 def collect_reward_filtered(env: ClaimEnv, n_episodes: int, top_k_percent: float) -> list:
     all_trajectories = []
@@ -143,9 +134,7 @@ def collect_reward_filtered(env: ClaimEnv, n_episodes: int, top_k_percent: float
     return filtered
 
 
-# ---------------------------------------------------------------------------
-# Mode: best_rollouts
-# ---------------------------------------------------------------------------
+# Best rollouts mode 
 
 def collect_best_rollouts(min_reward: float, logs_dir: str = "logs") -> list:
     pattern = os.path.join(logs_dir, "**", "*.jsonl")
@@ -170,7 +159,7 @@ def collect_best_rollouts(min_reward: float, logs_dir: str = "logs") -> list:
                     rec = json.loads(line)
                 except json.JSONDecodeError:
                     continue
-                # AUDIT FIX: only include records whose mode is a recognized training
+                # only include records whose mode is a recognized training
                 # collection mode; records without a mode field or with an unknown mode
                 # are skipped with a warning to prevent eval-episode data leaking into
                 # the imitation learning dataset
@@ -201,9 +190,7 @@ def collect_best_rollouts(min_reward: float, logs_dir: str = "logs") -> list:
     return selected
 
 
-# ---------------------------------------------------------------------------
-# Output
-# ---------------------------------------------------------------------------
+# Output 
 
 def _write_jsonl(trajectories: list, output_path: str) -> None:
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
@@ -226,9 +213,7 @@ def _print_summary(trajectories: list, output_path: str) -> None:
     print(f"Output: {output_path}")
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+# CLI 
 
 def main():
     parser = argparse.ArgumentParser(
@@ -259,7 +244,7 @@ def main():
     )
     parser.add_argument(
         "--annotator-model",
-        default="claude-opus-4-5",
+        default=load_base_config().get("default_annotator_model", "claude-opus-4-5"),
         help="Anthropic model string for llm_annotator mode.",
     )
     parser.add_argument(
@@ -267,8 +252,7 @@ def main():
         default="data/trajectories.jsonl",
         help="Output JSONL path.",
     )
-    # AUDIT FIX: expose --seed so reward_filtered and llm_annotator episode ordering
-    # is reproducible; consistent with --seed in evid-train and evid-eval
+
     parser.add_argument(
         "--seed",
         type=int,
@@ -278,7 +262,7 @@ def main():
     )
     args = parser.parse_args()
 
-    # AUDIT FIX: seed before any collection so episode ordering is reproducible
+
     random.seed(args.seed)
     np.random.seed(args.seed)
 

@@ -15,13 +15,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import random
 import sys
 from pathlib import Path
 
-from evid_rl_env.data.dataset import load_dataset
 from evid_rl_env.agent.config_loader import load_base_config
+from evid_rl_env.data.dataset import load_dataset
 
 
 def _find_latest_checkpoint(base: str = "artifacts/experiments") -> str | None:
@@ -37,18 +38,18 @@ def _find_latest_checkpoint(base: str = "artifacts/experiments") -> str | None:
         return None
     latest = max(candidates, key=lambda p: p.stat().st_mtime)
     return str(latest / "policy.npz")
-from evid_rl_env.environment.environment import ClaimEnv
-from evid_rl_env.agent.policy import ActorCriticPolicy, BanditPolicyWrapper
 from evid_rl_env.agent.bandit import LinUCBBandit
-from evid_rl_env.agent.evaluator import Evaluator
 from evid_rl_env.agent.baseline import (
-    RandomBaseline,
-    MajorityBaseline,
-    GreedyLLMBaseline,
-    FewShotLLMBaseline,
     BestOfNBaseline,
+    FewShotLLMBaseline,
+    GreedyLLMBaseline,
     ImitationBaseline,
+    MajorityBaseline,
+    RandomBaseline,
 )
+from evid_rl_env.agent.evaluator import Evaluator
+from evid_rl_env.agent.policy import ActorCriticPolicy, BanditPolicyWrapper
+from evid_rl_env.environment.environment import ClaimEnv
 
 _TABLE_ORDER = [
     "random", "majority", "greedy_llm",
@@ -58,14 +59,11 @@ _TABLE_ORDER = [
 _AVAILABLE = frozenset(_TABLE_ORDER)
 
 
-# ---------------------------------------------------------------------------
-# Data helpers
-# ---------------------------------------------------------------------------
+# Data helpers 
 
 def _deterministic_split(dataset: list) -> tuple[list, list]:
     """Apply the same seed-42 80/20 split used during training."""
-    # AUDIT FIX: save/restore global random state so seeding to 42 for the split
-    # does not permanently alter the RNG sequence seen by downstream baseline runs
+
     _saved = random.getstate()
     random.seed(42)
     indices = list(range(len(dataset)))
@@ -87,9 +85,7 @@ def _load_datasets(eval_data_path: str | None) -> tuple[list, list | None]:
     return eval_, train
 
 
-# ---------------------------------------------------------------------------
-# Baseline instantiation
-# ---------------------------------------------------------------------------
+# Baseline instantiation 
 
 def _build_baselines(
     requested: list[str],
@@ -97,6 +93,7 @@ def _build_baselines(
     train_dataset: list | None,
     llm_client,
     trajectories_path: str | None,
+    fewshot_selection_mode: str = "random",
 ) -> dict:
     baselines = {}
     llm_baselines = {"greedy_llm", "fewshot_k3", "fewshot_k5", "best_of_5"}
@@ -116,7 +113,7 @@ def _build_baselines(
             continue
 
         if name == "imitation" and trajectories_path is None:
-            print(f"  [warn] 'imitation' requires --trajectories — skipped")
+            print("  [warn] 'imitation' requires --trajectories — skipped")
             continue
 
         if name == "random":
@@ -126,9 +123,13 @@ def _build_baselines(
         elif name == "greedy_llm":
             baselines[name] = GreedyLLMBaseline(eval_dataset, llm_client)
         elif name == "fewshot_k3":
-            baselines[name] = FewShotLLMBaseline(eval_dataset, train_dataset, llm_client, k=3)
+            baselines[name] = FewShotLLMBaseline(
+                eval_dataset, train_dataset, llm_client, k=3, selection_mode=fewshot_selection_mode
+            )
         elif name == "fewshot_k5":
-            baselines[name] = FewShotLLMBaseline(eval_dataset, train_dataset, llm_client, k=5)
+            baselines[name] = FewShotLLMBaseline(
+                eval_dataset, train_dataset, llm_client, k=5, selection_mode=fewshot_selection_mode
+            )
         elif name == "best_of_5":
             baselines[name] = BestOfNBaseline(eval_dataset, llm_client, n=5)
         elif name == "imitation":
@@ -137,9 +138,8 @@ def _build_baselines(
     return baselines
 
 
-# ---------------------------------------------------------------------------
-# Table printing (mirrors trainer._run_eval_round)
-# ---------------------------------------------------------------------------
+# Table printing 
+
 
 def _print_table(label: str, baseline_results: dict, rl_raw: float, rl_std: float) -> float | None:
     """Print the comparison table and return the greedy_llm mean (or None)."""
@@ -164,9 +164,7 @@ def _print_table(label: str, baseline_results: dict, rl_raw: float, rl_std: floa
     return ref
 
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+# CLI 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -197,13 +195,20 @@ def main() -> None:
         help="Comma-separated list of baselines to run.",
     )
     parser.add_argument(
+        "--fewshot-selection-mode",
+        choices=["random", "similarity"],
+        default=None,
+        help="Few-shot example retrieval strategy for fewshot_k3/fewshot_k5: "
+             "'random' or 'similarity' (sentence-transformers embedding lookup). "
+             "Defaults to the value in configs/base.yaml.",
+    )
+    parser.add_argument(
         "--greedy",
         action=argparse.BooleanOptionalAction,
         default=True,
         help="Use greedy (argmax) action selection for the RL policy (default: True).",
     )
-    # AUDIT FIX: expose --seed so baseline eval results are reproducible; does not
-    # affect the train/eval split (always seed-42 to match train.py)
+
     parser.add_argument(
         "--seed",
         type=int,
@@ -221,6 +226,11 @@ def main() -> None:
     else:
         seed = base_cfg.get("seed", 42)
 
+    if args.fewshot_selection_mode is not None:
+        fewshot_selection_mode = args.fewshot_selection_mode
+    else:
+        fewshot_selection_mode = base_cfg.get("fewshot_selection_mode", "random")
+
     if args.checkpoint is not None:
         checkpoint = args.checkpoint
     else:
@@ -236,18 +246,14 @@ def main() -> None:
         print(f"Unknown baselines: {unknown}. Choose from: {sorted(_AVAILABLE)}")
         sys.exit(1)
 
-    # ------------------------------------------------------------------
     # Load data
-    # ------------------------------------------------------------------
     eval_dataset, train_dataset = _load_datasets(args.eval_data)
     print(
         f"Eval: {len(eval_dataset)} samples"
         + (f" | Train: {len(train_dataset)}" if train_dataset else "")
     )
 
-    # ------------------------------------------------------------------
-    # Load policy (actor-critic or bandit)
-    # ------------------------------------------------------------------
+    # Load policy 
     import numpy as _np
     _peek = _np.load(checkpoint, allow_pickle=False)
     _ckpt_type = str(_peek.get("type", ["actor_critic"])[0])
@@ -272,13 +278,9 @@ def main() -> None:
     print(f"LLM seed: {seed}")
     llm_client = getattr(policy, "llm", None)
 
-    # ------------------------------------------------------------------
-    # RL policy evaluation — no reward normalizer (raw rewards for fair
-    # comparison with baselines which also report raw)
-    # ------------------------------------------------------------------
+    # Policy Evaluatio n
     print("\nRunning RL policy evaluation...")
-    # AUDIT FIX: pass seed so ClaimEnv threads it to JudgeLLMClient for reproducible
-    # judge outputs during eval
+
     eval_env = ClaimEnv(eval_dataset, seed=seed)
 
     if args.greedy:
@@ -295,10 +297,6 @@ def main() -> None:
     rl_raw = rl_metrics["eval/mean_reward_raw"]
     rl_std = rl_metrics["eval/std_reward_raw"]
 
-    # ------------------------------------------------------------------
-    # Write eval_results.json incrementally so a crash mid-baseline
-    # still leaves valid output (RL results are always saved first).
-    # ------------------------------------------------------------------
     exp_dir = str(Path(checkpoint).parent)
     out_path = os.path.join(exp_dir, "eval_results.json")
 
@@ -316,14 +314,13 @@ def main() -> None:
     # Persist RL results immediately — a later segfault won't erase them.
     _flush_json()
 
-    # ------------------------------------------------------------------
-    # Baselines
-    # ------------------------------------------------------------------
+    # Baselines 
     print("\nInstantiating and running baselines...")
-    baselines = _build_baselines(requested, eval_dataset, train_dataset, llm_client, args.trajectories)
+    baselines = _build_baselines(
+        requested, eval_dataset, train_dataset, llm_client, args.trajectories,
+        fewshot_selection_mode=fewshot_selection_mode,
+    )
 
-    # AUDIT FIX: seed global RNG before running baselines so results are reproducible
-    # across repeated evid-eval invocations with the same --seed value
     random.seed(seed)
     import numpy as np
     np.random.seed(seed)
@@ -347,9 +344,7 @@ def main() -> None:
         }
         _flush_json()
 
-    # ------------------------------------------------------------------
-    # Table + CI gate
-    # ------------------------------------------------------------------
+    # Table + CI Gate 
     ref = _print_table(
         f"Eval — {args.n_episodes} episodes | checkpoint: {checkpoint}",
         baseline_results,

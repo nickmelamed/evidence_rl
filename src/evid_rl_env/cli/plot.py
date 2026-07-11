@@ -1,7 +1,10 @@
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
 import argparse
+import os
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+from evid_rl_env.utils.smoothing import smooth_reward
 
 
 def plot_experiment(exp_path):
@@ -11,9 +14,7 @@ def plot_experiment(exp_path):
         raise FileNotFoundError(f"No metrics.csv in {exp_path}")
 
     df = pd.read_csv(csv_path)
-
-    # Smooth reward (rolling avg)
-    df["reward_smooth"] = df["reward"].rolling(window=5, min_periods=1).mean()
+    smooth_reward(df)
 
     plt.figure()
 

@@ -1,21 +1,31 @@
-import os
 import faulthandler
+import os
+
 faulthandler.enable()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from evid_rl_env.environment.environment import ClaimEnv
-from evid_rl_env.environment.curriculum import Curriculum
-from evid_rl_env.agent.policy import ActorCriticPolicy
-from evid_rl_env.environment.actions import ACTIONS
-from evid_rl_env.data.dataset import load_dataset
-from evid_rl_env.data.evidence_fetcher import warm_cache
-from evid_rl_env.agent.trainer import Trainer
-from evid_rl_env.agent.bandit_trainer import BanditTrainer
-from evid_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
-from evid_rl_env.agent.config_loader import load_config, load_base_config
-
 import argparse
 import random
+
+from evid_rl_env.agent.bandit_trainer import BanditTrainer
+from evid_rl_env.agent.config_loader import load_base_config, load_config
+from evid_rl_env.agent.policy import ActorCriticPolicy
+from evid_rl_env.agent.trainer import Trainer
+from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.data.evidence_fetcher import warm_cache
+from evid_rl_env.environment.actions import ACTIONS
+from evid_rl_env.environment.curriculum import Curriculum
+from evid_rl_env.environment.environment import ClaimEnv
+
+# configs/*_baseline.yaml is the single source of truth for RL hyperparameters
+# (see agent/config.py) — even the no-"--config" default path goes through
+# load_config() against these files rather than bare-constructing a Config
+# class, so a run never silently ends up with unset (None) tuning values.
+_DEFAULT_CONFIG_PATHS = {
+    "ppo": "configs/ppo_baseline.yaml",
+    "pg": "configs/pg_baseline.yaml",
+    "bandit": "configs/bandit_baseline.yaml",
+}
 
 
 def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None):
@@ -35,22 +45,20 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None):
 
     warm_cache(train_dataset + eval_dataset)
 
+    resolved_config_path = config_path or _DEFAULT_CONFIG_PATHS.get(method)
+    if resolved_config_path is None:
+        raise ValueError(f"Unknown method: {method}")
+    method, config = load_config(resolved_config_path)
+    config.seed = seed  # align config.seed with the resolved seed
+
     curriculum = Curriculum()
-    env = ClaimEnv(train_dataset, seed=seed)
+    # Config loaded first so judge_model/actor_model actually drive which
+    # models get instantiated instead of falling back to hardcoded defaults.
+    env = ClaimEnv(train_dataset, judge_model=config.judge_model, seed=seed)
 
-    policy = ActorCriticPolicy(len(list(ACTIONS)), seed=seed)
+    policy = ActorCriticPolicy(len(list(ACTIONS)), model_name=config.actor_model, seed=seed)
 
-    if config_path:
-        method, config = load_config(config_path)
-        config.seed = seed  # align config.seed with the resolved seed
-    elif method == 'ppo':
-        config = PPOConfig()
-    elif method == 'pg':
-        config = PGConfig()
-    elif method == 'bandit':
-        config = BanditConfig()
-
-    resolved_eval_every = eval_every if eval_every is not None else 25
+    resolved_eval_every = eval_every if eval_every is not None else getattr(config, "eval_every", 25)
 
     if method == 'bandit':
         trainer = BanditTrainer(
@@ -86,10 +94,10 @@ def main():
     parser.add_argument("--episodes", type=int, default=50)
     parser.add_argument("--method", type=str, default="ppo")
     parser.add_argument("--eval-every", type=int, default=None,
-                        help="Run evaluation every N episodes. Defaults to episodes//2 (twice per run).")
+                        help="Run evaluation every N episodes. Defaults to configs/base.yaml's "
+                             "eval_every (currently 10).")
     parser.add_argument("--config", type=str, default=None, help="Path to a YAML config file (e.g. configs/ppo_baseline.yaml)")
-    # AUDIT FIX: expose --seed so training runs are reproducible; consistent with
-    # --seed in evid-eval and evid-collect
+ 
     parser.add_argument(
         "--seed",
         type=int,

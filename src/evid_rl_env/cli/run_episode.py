@@ -1,17 +1,18 @@
-from evid_rl_env.environment.environment import ClaimEnv
-from evid_rl_env.data.dataset import load_dataset
-from evid_rl_env.agent.policy import ActorCriticPolicy
-from evid_rl_env.environment.actions import ACTIONS
 
-import argparse
+from evid_rl_env.agent.config import BaseConfig
+from evid_rl_env.agent.policy import ActorCriticPolicy
+from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.environment.actions import ACTIONS
+from evid_rl_env.environment.environment import ClaimEnv
 
 
 def run():
     dataset = load_dataset()
+    config = BaseConfig()
 
-    env = ClaimEnv(dataset)
+    env = ClaimEnv(dataset, judge_model=config.judge_model, seed=config.seed)
 
-    policy = ActorCriticPolicy(len(list(ACTIONS)))
+    policy = ActorCriticPolicy(len(list(ACTIONS)), model_name=config.actor_model, seed=config.seed)
 
     state = env.reset()
     done = False

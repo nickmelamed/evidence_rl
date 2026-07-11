@@ -1,7 +1,10 @@
-import os
-import pandas as pd
-import matplotlib.pyplot as plt
 import argparse
+import os
+
+import matplotlib.pyplot as plt
+import pandas as pd
+
+from evid_rl_env.utils.smoothing import smooth_reward
 
 
 def compare_experiments(exp_paths):
@@ -17,7 +20,7 @@ def compare_experiments(exp_paths):
         df = pd.read_csv(csv_path)
         label = os.path.basename(path)
 
-        df["reward_smooth"] = df["reward"].rolling(window=5, min_periods=1).mean()
+        smooth_reward(df)
 
         plt.plot(df["episode"], df["reward_smooth"], label=label)
 
