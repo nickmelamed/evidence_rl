@@ -1,3 +1,5 @@
 seed: 42
 default_annotator_model: claude-opus-4-5
 eval_every: 10
+max_grad_norm: 0.5             # gradient clip norm for PPO/PolicyGradient updates
+fewshot_selection_mode: random # "random" or "similarity" — FewShotLLMBaseline's example retrieval strategy

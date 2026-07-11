@@ -1,6 +1,7 @@
 algo: pg
 rl:
   lr: 0.01
-  gamma: 0.99
+  lr_decay_episodes: 200   # span over which LR decays linearly
+  lr_min_fraction: 0.2     # floor: LR never drops below 20% of initial
   actor_model: "google/gemma-2-2b-it"
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
