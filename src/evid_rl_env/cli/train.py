@@ -12,7 +12,7 @@ from evid_rl_env.agent.config_loader import load_base_config, load_config
 from evid_rl_env.agent.policy import ActorCriticPolicy
 from evid_rl_env.agent.trainer import Trainer
 from evid_rl_env.data.dataset import load_dataset
-from evid_rl_env.data.evidence_fetcher import warm_cache
+from evid_rl_env.data.evidence_fetcher import use_snapshot, warm_cache
 from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.environment.curriculum import Curriculum
 from evid_rl_env.environment.environment import ClaimEnv
@@ -28,7 +28,10 @@ _DEFAULT_CONFIG_PATHS = {
 }
 
 
-def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None):
+def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None, evidence_snapshot=None):
+    if evidence_snapshot is not None:
+        use_snapshot(evidence_snapshot)
+
     dataset = load_dataset()
 
     # AUDIT FIX: isolate the split seed from training randomness — seed 42 must always
@@ -97,7 +100,14 @@ def main():
                         help="Run evaluation every N episodes. Defaults to configs/base.yaml's "
                              "eval_every (currently 10).")
     parser.add_argument("--config", type=str, default=None, help="Path to a YAML config file (e.g. configs/ppo_baseline.yaml)")
- 
+    parser.add_argument(
+        "--evidence-snapshot",
+        type=str,
+        default=None,
+        help="Path to a JSON snapshot from evid-snapshot. If set, evidence for "
+             "matching claims is reproduced from the snapshot instead of the "
+             "live Tavily/sqlite-cache path.",
+    )
     parser.add_argument(
         "--seed",
         type=int,
@@ -114,7 +124,7 @@ def main():
         seed = load_base_config().get("seed", 42)
 
     train(args.episodes, args.method, args.config, seed=seed,
-          eval_every=args.eval_every)
+          eval_every=args.eval_every, evidence_snapshot=args.evidence_snapshot)
 
 
 if __name__ == "__main__":

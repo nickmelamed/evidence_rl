@@ -34,6 +34,15 @@ def _encode_text(text: str) -> np.ndarray:
     return _embed_cache[text]
 
 
+def embed_text(text: str):
+    """Public embedding accessor for callers outside the policy state encoder
+    (e.g. RERANK's claim-similarity sort). Returns None if sentence-transformers
+    isn't installed rather than raising, so callers can fall back gracefully."""
+    if not SEMANTIC_AVAILABLE:
+        return None
+    return _encode_text(text)
+
+
 def encode_state_semantic(state):
     """
     Returns a flat numpy float32 vector combining:

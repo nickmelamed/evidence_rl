@@ -23,6 +23,7 @@ from pathlib import Path
 
 from evid_rl_env.agent.config_loader import load_base_config
 from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.data.evidence_fetcher import use_snapshot
 
 
 def _find_latest_checkpoint(base: str = "artifacts/experiments") -> str | None:
@@ -217,7 +218,18 @@ def main() -> None:
              "Defaults to the value in configs/base.yaml. "
              "The train/eval split always uses seed 42 regardless of this value.",
     )
+    parser.add_argument(
+        "--evidence-snapshot",
+        type=str,
+        default=None,
+        help="Path to a JSON snapshot from evid-snapshot. If set, evidence for "
+             "matching claims is reproduced from the snapshot instead of the "
+             "live Tavily/sqlite-cache path.",
+    )
     args = parser.parse_args()
+
+    if args.evidence_snapshot is not None:
+        use_snapshot(args.evidence_snapshot)
 
     base_cfg = load_base_config()
 
