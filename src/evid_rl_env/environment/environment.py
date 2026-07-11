@@ -27,10 +27,7 @@ def _get_llm_judge(model_name: str, seed: int) -> LLMJudge:
 
 
 def _get_evidence_labeler(model_name: str, seed: int) -> EvidenceLabeler:
-    # Reuses the same cached JudgeLLMClient as _get_llm_judge (same default
-    # model, Qwen/Qwen2.5-1.5B-Instruct) — labeling evidence doesn't need a
-    # separate model download, just a second cached-by-content-hash wrapper
-    # around the same client.
+    # Reuses the same cached JudgeLLMClient as _get_llm_judge 
     from evid_rl_env.agent.llm_client import JudgeLLMClient
     if model_name not in _judge_llm_cache:
         _judge_llm_cache[model_name] = JudgeLLMClient(model_name=model_name, seed=seed)
@@ -40,14 +37,15 @@ def _get_evidence_labeler(model_name: str, seed: int) -> EvidenceLabeler:
 
 
 def _default_embedder(text: str):
-    # Lazy import so environment.py never gains a module-level sentence-
-    # transformers/torch dependency — the cost is only paid the first time
-    # RERANK actually runs, not at ClaimEnv construction or import time.
+    # Lazy import
     from evid_rl_env.agent.state_encoder import embed_text
     return embed_text(text)
 
 
 class ClaimEnv:
+    # Per-step SELECT reward, keyed by evidence label 
+    _SELECT_LABEL_REWARD = {"support": 0.15, "contradict": 0.10, "neutral": 0.0, "adversarial": -0.15}
+
     def __init__(self, dataset, judge_model=None, seed: int = 42, llm_judge=None,
                  embedder=None, evidence_labeler=None):
         self.dataset = dataset
@@ -66,14 +64,10 @@ class ClaimEnv:
             self.llm_judge = _get_llm_judge(judge_model_name, seed)
         self._last_judge_step = -1
 
-        # Test/injection hook for RERANK's claim-similarity sort — same shape
-        # as llm_judge= above. embedder(text) must return an embedding vector
-        # or None (treated as "unavailable", falls back to a text-length sort).
+        # Test/injection hook for RERANK's claim-similarity sort 
         self.embedder = embedder if embedder is not None else _default_embedder
 
-        # Test/injection hook for evidence stance/reliability labeling — same
-        # shape again. evidence_labeler.label(claim, text) must return one of
-        # support/contradict/neutral/adversarial.
+        # Test/injection hook for evidence stance/reliability labeling
         if evidence_labeler is not None:
             self.evidence_labeler = evidence_labeler
         else:
@@ -82,15 +76,6 @@ class ClaimEnv:
     def _evidence_diversity_bonus(self, new_evidence_id):
         """Returns a small bonus if this evidence id hasn't been selected before."""
         return 0.05 if new_evidence_id not in self.state.selected_evidence_ids else 0.0
-
-    @staticmethod
-    def _claim_similarity(claim: str, text: str) -> float:
-        """Word-overlap proxy: fraction of >3-char claim words that appear in text."""
-        claim_words = {w.lower().strip(".,!?;:\"'()[]") for w in claim.split() if len(w) > 3}
-        if not claim_words:
-            return 0.0
-        text_lower = text.lower()
-        return sum(1 for w in claim_words if w in text_lower) / len(claim_words)
 
     def reset(self):
         self._prev_phi = 0.0
@@ -137,8 +122,7 @@ class ClaimEnv:
                 s.selected_evidence.append(doc)
                 diversity = self._evidence_diversity_bonus(payload)
                 s.selected_evidence_ids.add(payload)
-                sim = self._claim_similarity(s.claim, doc.text)
-                reward = 0.1 + diversity + 0.1 * sim
+                reward = self._SELECT_LABEL_REWARD.get(doc.label, 0.0) + diversity
             elif doc is not None:
                 # doc is in the pool but already selected — penalise redundancy
                 reward = -0.1
@@ -237,19 +221,18 @@ class ClaimEnv:
                     evidence=s.selected_evidence
                 )
 
-                # hybrid reward calculation
-                base_reward = self.reward_fn.compute(s, final_output, llm_reward=llm_reward)
-
-                # RLHF
-                alpha = 0.3
-                reward = (1 - alpha) * base_reward + alpha * llm_reward
+                # no outer re-blend here (previously this re-added llm_reward at alpha=0.3, pushing its effective weight to ~0.37)
+                reward = self.reward_fn.compute(s, final_output, llm_reward=llm_reward)
 
                 # penalty for empty debate
                 if not s.debate_history:
                     reward -= 0.3
 
-                # reward for evidence use
-                reward += 0.2 * len(s.selected_evidence)
+                # reward for having gathered usable (support/contradict) evidence,
+                # capped so it can't swamp base_reward/llm_reward and doesn't fight
+                # the overselection penalty already applied inside RewardFunction.compute
+                useful_selected = sum(1 for e in s.selected_evidence if e.label in ("support", "contradict"))
+                reward += min(0.3, 0.1 * useful_selected)
 
                 # bounded, single-purpose calibration signal for the curriculum
                 # (distinct from `reward`, which mixes in shaping/evidence terms)
@@ -275,7 +258,8 @@ class ClaimEnv:
                             for i, e in enumerate(raw)
                         ]
                         s.evidence_pool.extend(new_evidence)
-                        reward = 0.05 * len(new_evidence)
+                        useful = sum(1 for e in new_evidence if e.label in ("support", "contradict"))
+                        reward = min(0.15, 0.05 * useful)
                     except Exception:
                         reward = 0.0
 
@@ -382,7 +366,8 @@ class ClaimEnv:
                             for i, e in enumerate(raw)
                         ]
                         s.evidence_pool.extend(new_evidence)
-                        reward = 0.05 * len(new_evidence)
+                        useful = sum(1 for e in new_evidence if e.label in ("support", "contradict"))
+                        reward = min(0.15, 0.05 * useful)
                     except Exception:
                         reward = 0.0
 

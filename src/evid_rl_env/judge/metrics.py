@@ -1,7 +1,10 @@
+_RELEVANT_LABELS = ("support", "contradict")
+
+
 def compute_precision(selected):
     if not selected:
         return 0.0
-    return sum(1 for e in selected if e.label == "support") / len(selected)
+    return sum(1 for e in selected if e.label in _RELEVANT_LABELS) / len(selected)
 
 
 def compute_recall(selected, available):

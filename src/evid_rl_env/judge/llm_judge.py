@@ -1,71 +1,23 @@
+import hashlib
 import json
 import logging
-import os
-import pickle
 import re
-import hashlib
-import sqlite3
+
 import numpy as np
+
+from evid_rl_env.judge.cache import SQLiteCache
 
 _logger = logging.getLogger(__name__)
 
 
-class _SQLiteCache:
-    """
-    Crash-safe key-value cache backed by sqlite3.
-
-    Replaces shelve/gdbm which creates POSIX semaphores that leak on SIGSEGV
-    and leave the database file corrupted for subsequent runs. sqlite3 uses WAL
-    mode so the file is always internally consistent even after a hard crash.
-    """
-
-    def __init__(self, path: str):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        self._conn = sqlite3.connect(path, check_same_thread=False)
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute(
-            "CREATE TABLE IF NOT EXISTS cache "
-            "(key TEXT PRIMARY KEY, value BLOB NOT NULL)"
-        )
-        self._conn.commit()
-
-    def __contains__(self, key: str) -> bool:
-        cur = self._conn.execute("SELECT 1 FROM cache WHERE key=?", (key,))
-        return cur.fetchone() is not None
-
-    def __getitem__(self, key: str):
-        cur = self._conn.execute("SELECT value FROM cache WHERE key=?", (key,))
-        row = cur.fetchone()
-        if row is None:
-            raise KeyError(key)
-        return pickle.loads(row[0])
-
-    def __setitem__(self, key: str, value) -> None:
-        self._conn.execute(
-            "INSERT OR REPLACE INTO cache (key, value) VALUES (?, ?)",
-            (key, pickle.dumps(value)),
-        )
-        self._conn.commit()
-
-    def sync(self) -> None:
-        pass  # every __setitem__ commits immediately
-
-    def close(self) -> None:
-        self._conn.close()
-
-
 class LLMJudge:
-    def __init__(self, llm, weight=0.5, cache_scores=True):
+    def __init__(self, llm, cache_scores=True):
         self.llm = llm
-        self.weight = weight
         self.cache_scores = cache_scores
-        self._cache = _SQLiteCache("artifacts/cache/judge_cache.sqlite3")
-
-    def close(self):
-        self._cache.close()
+        self._cache = SQLiteCache("artifacts/cache/judge_cache.sqlite3")
 
     def _cache_key(self, claim, reasoning, evidence):
-        raw = claim + reasoning + "".join(e.text for e in evidence)
+        raw = "\x1f".join([claim, reasoning, *(e.text for e in evidence)])
         return hashlib.md5(raw.encode()).hexdigest()
 
     def build_prompt(self, claim, reasoning, evidence):
@@ -160,8 +112,8 @@ class LLMJudge:
                 claim,
             )
             scores = {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.0}
-            if self.cache_scores:
-                self._cache[key] = scores
+            # not cached — a transient failure shouldn't permanently deny
+            # this (claim, reasoning, evidence) combo a real judge score
             return self._scores_to_reward(scores), scores
 
         scores = self.parse(response)
@@ -178,6 +130,12 @@ class LLMJudge:
         bias = float(scores.get("BIAS", 0.5))
         conf = float(scores.get("confidence", 0.5))
 
+        if lcs == ess == grs == comp == bias == 0.5:
+            # fallback/parse-failure sentinel — no usable judge signal, so
+            # treat it as neutral rather than running it through the asymmetric
+            # weight formula below (which maps all-0.5 to 0.175, not 0.5)
+            return 0.5
+
         reward = (
             0.30 * lcs
             + 0.25 * ess
@@ -185,6 +143,7 @@ class LLMJudge:
             - 0.25 * grs
             - 0.15 * bias
         )
-        if conf < 0.4:
-            reward = 0.5 * reward + 0.5 * 0.5
+        # continuous blend toward neutral as the judge's own confidence drops,
+        # instead of a hard threshold that made reward discontinuous in conf
+        reward = conf * reward + (1 - conf) * 0.5
         return float(np.clip(reward, 0.0, 1.0))
