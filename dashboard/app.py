@@ -1,12 +1,14 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import os
 import json
 import math
+import os
 import time
+
+import numpy as np
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import streamlit as st
+
 from evid_rl_env.environment.actions import ACTIONS
 
 st.set_page_config(layout="wide")
@@ -41,7 +43,7 @@ ACTION_COLORS = {
 # sidebar
 auto_refresh = st.sidebar.checkbox("Live Monitoring", value=False)
 refresh_rate = st.sidebar.slider("Refresh (sec)", 1, 10, 3)
-demo_mode = st.sidebar.toggle(
+demo_mode: bool = st.sidebar.toggle(
     "🎬 Demo mode", value=False,
     help="Hides internal training diagnostics; shows only demo-relevant charts."
 )
@@ -56,10 +58,22 @@ def list_experiments():
         if os.path.isdir(os.path.join(BASE_DIR, d))
     ]
 
+@st.cache_data
+def _read_metrics_csv(path: str, mtime: float) -> pd.DataFrame:
+    # mtime is part of the cache key (not a leading-underscore param) so a
+    # file rewritten mid-training (e.g. during Live Monitoring auto-refresh)
+    #  invalidates the cache instead of serving a stale DataFrame forever.
+    return pd.read_csv(path)
+
+@st.cache_data
+def _read_json_file(path: str, mtime: float):
+    with open(path) as f:
+        return json.load(f)
+
 def load_metrics(exp_path):
     path = os.path.join(exp_path, "metrics.csv")
     if os.path.exists(path):
-        df = pd.read_csv(path)
+        df = _read_metrics_csv(path, os.path.getmtime(path))
         df["experiment"] = os.path.basename(exp_path)
         return df
     return None
@@ -67,23 +81,26 @@ def load_metrics(exp_path):
 def load_config(exp_path):
     path = os.path.join(exp_path, "config.json")
     if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
+        return _read_json_file(path, os.path.getmtime(path))
     return {}
 
 def load_trajectory(exp_path, episode):
     path = os.path.join(exp_path, "trajectories", f"episode_{episode}.json")
     if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
+        return _read_json_file(path, os.path.getmtime(path))
     return []
 
 def load_eval_results(exp_path):
     path = os.path.join(exp_path, "eval_results.json")
     if os.path.exists(path):
-        with open(path) as f:
-            return json.load(f)
+        return _read_json_file(path, os.path.getmtime(path))
     return None
+
+def _line_chart(df, x, y, title):
+    """Shared px.line + st.plotly_chart pattern used throughout this dashboard."""
+    fig = px.line(df, x=x, y=y, title=title)
+    st.plotly_chart(fig, width="stretch")
+    return fig
 
 def compute_baselines(data, selected):
     results = {}
@@ -128,7 +145,7 @@ if not dfs:
     st.stop()
 data = pd.concat(dfs, ignore_index=True)
 
-# sidebar health summary (ADD 8)
+# sidebar health summary
 st.sidebar.divider()
 st.sidebar.subheader("Training health")
 for exp in selected[:1]:
@@ -156,7 +173,7 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "⚙️ Config"
 ])
 
-# ── tab0: Eval Results (ADD 1) ────────────────────────────────────────────────
+# tab0: Eval Results
 with tab0:
     st.header("Eval Results — RL vs Baselines")
 
@@ -295,7 +312,7 @@ with tab0:
                 "even when raw reward differences are small."
             )
 
-# ── tab1: Single Run ──────────────────────────────────────────────────────────
+# 1: Single Run
 with tab1:
     st.header("Single Experiment")
 
@@ -346,7 +363,7 @@ with tab1:
             lambda x: x.get("HRS", 0.5) if isinstance(x, dict) else 0.5
         )
 
-        # FIX 3: warn when scores are stuck at the fallback value
+        # warn when scores are stuck at the fallback value
         if abs(traj_df["LCS"].mean() - 0.5) < 0.01:
             st.warning(
                 "⚠️ LLM judge scores are all 0.5 — this is the fallback value. "
@@ -354,20 +371,16 @@ with tab1:
                 "Check src/evid_rl_env/judge/llm_judge.py for parsing errors."
             )
 
-        fig = px.line(traj_df, x="step", y=["LCS", "ESS", "HRS"], title="LLM Scores Over Time")
-        st.plotly_chart(fig, width="stretch")
+        _line_chart(traj_df, "step", ["LCS", "ESS", "HRS"], "LLM Scores Over Time")
 
     if not demo_mode:
         if "value_estimate" in traj_df:
-            fig = px.line(traj_df, x="step", y="value_estimate", title="Value Estimates")
-            st.plotly_chart(fig, width="stretch")
+            _line_chart(traj_df, "step", "value_estimate", "Value Estimates")
 
         if "advantage" in traj_df:
-            fig = px.line(traj_df, x="step", y="advantage", title="Advantage Signal")
-            st.plotly_chart(fig, width="stretch")
+            _line_chart(traj_df, "step", "advantage", "Advantage Signal")
 
-        fig = px.line(df, x="episode", y="tokens", title="Token Usage")
-        st.plotly_chart(fig, width="stretch")
+        _line_chart(df, "episode", "tokens", "Token Usage")
 
     # BEST EPISODE
     if "reward" not in df.columns or df["reward"].dropna().empty:
@@ -380,14 +393,12 @@ with tab1:
     if best_ep is not None:
         colA, colB = st.columns(2)
         with colA:
-            fig = px.line(df, x="episode", y="reward", title="Reward")
-            st.plotly_chart(fig, width="stretch")
+            _line_chart(df, "episode", "reward", "Reward")
         with colB:
-            fig = px.line(df, x="episode", y="reward_smooth", title="Smoothed")
-            st.plotly_chart(fig, width="stretch")
+            _line_chart(df, "episode", "reward_smooth", "Smoothed")
         st.success(f"🏆 Best Episode: {int(best_ep)}")
 
-    # ADD 5: Reward decomposition (uses already-loaded traj_by_episode)
+    # Reward decomposition (uses already-loaded traj_by_episode)
     st.subheader("Reward decomposition")
     decomp_rows = []
     for ep, traj_ep in traj_by_episode.items():
@@ -405,6 +416,10 @@ with tab1:
             color_discrete_map={"base reward": "#378ADD", "llm reward": "#1D9E75"},
         )
         st.plotly_chart(fig_decomp, width="stretch")
+
+    if "llm_reward" in traj_df.columns:
+        traj_df["base_reward"] = traj_df["reward"] - traj_df.get("llm_reward", 0)
+        _line_chart(traj_df, "step", ["reward", "llm_reward"], "Base vs LLM reward per step")
 
     if not demo_mode:
         st.subheader("Train vs eval reward")
@@ -437,93 +452,86 @@ with tab1:
         else:
             st.info("Eval data not yet available. Set eval_every in Trainer to enable.")
 
-    # Policy behavior
-    st.subheader("Policy Behavior")
+    # Policy behavior — internal training diagnostics, hidden in demo mode
+    if not demo_mode:
+        st.subheader("Policy Behavior")
 
-    # FIX 2: Entropy with full 0→ln(n_actions) y-axis so chart is honest
-    fig = px.line(df, x="episode", y="entropy", title="Entropy (Exploration)")
-    n_actions_ent = len(ACTIONS)
-    if "action_probs" in traj_df.columns and len(traj_df) > 0:
-        first_probs = traj_df["action_probs"].dropna()
-        if not first_probs.empty and hasattr(first_probs.iloc[0], "__len__"):
-            n_actions_ent = len(first_probs.iloc[0])
-    max_entropy = math.log(n_actions_ent)
-    fig.update_layout(yaxis=dict(range=[0, max_entropy * 1.05]))
-    st.plotly_chart(fig, width="stretch")
-
-    # ADD 3: Policy collapse detector
-    if "entropy" in df.columns:
-        latest_entropy = df.sort_values("episode")["entropy"].iloc[-1]
-        max_entropy_val = math.log(len(ACTIONS))
-        entropy_pct = latest_entropy / max_entropy_val * 100
-        col_e1, col_e2, col_e3 = st.columns(3)
-        with col_e1:
-            st.metric("Current entropy", f"{latest_entropy:.4f}")
-        with col_e2:
-            st.metric("Max possible entropy", f"{max_entropy_val:.4f}")
-        with col_e3:
-            status = (
-                "✅ Exploring"  if entropy_pct > 70
-                else "⚠️ Narrowing" if entropy_pct > 40
-                else "🚨 Collapsing"
-            )
-            st.metric("Policy status", status, f"{entropy_pct:.1f}% of max")
-
-    if "num_steps" in df.columns:
-        fig = px.line(df, x="episode", y="num_steps", title="Steps per episode")
+        # Entropy with full 0→ln(n_actions) y-axis
+        fig = px.line(df, x="episode", y="entropy", title="Entropy (Exploration)")
+        n_actions_ent = len(ACTIONS)
+        if "action_probs" in traj_df.columns and len(traj_df) > 0:
+            first_probs = traj_df["action_probs"].dropna()
+            if not first_probs.empty and hasattr(first_probs.iloc[0], "__len__"):
+                n_actions_ent = len(first_probs.iloc[0])
+        max_entropy = math.log(n_actions_ent)
+        fig.update_layout(yaxis=dict(range=[0, max_entropy * 1.05]))
         st.plotly_chart(fig, width="stretch")
 
-    if "llm_reward" in traj_df.columns:
-        traj_df["base_reward"] = traj_df["reward"] - traj_df.get("llm_reward", 0)
-        fig = px.line(traj_df, x="step", y=["reward", "llm_reward"], title="Base vs LLM reward per step")
-        st.plotly_chart(fig, width="stretch")
+        # Policy collapse detector
+        if "entropy" in df.columns:
+            latest_entropy = df.sort_values("episode")["entropy"].iloc[-1]
+            max_entropy_val = math.log(len(ACTIONS))
+            entropy_pct = latest_entropy / max_entropy_val * 100
+            col_e1, col_e2, col_e3 = st.columns(3)
+            with col_e1:
+                st.metric("Current entropy", f"{latest_entropy:.4f}")
+            with col_e2:
+                st.metric("Max possible entropy", f"{max_entropy_val:.4f}")
+            with col_e3:
+                status = (
+                    "✅ Exploring"  if entropy_pct > 70
+                    else "⚠️ Narrowing" if entropy_pct > 40
+                    else "🚨 Collapsing"
+                )
+                st.metric("Policy status", status, f"{entropy_pct:.1f}% of max")
 
-    if "curriculum_level" in df.columns:
-        fig = px.line(df, x="episode", y="curriculum_level", title="Curriculum level")
-        st.plotly_chart(fig, width="stretch")
+        if "num_steps" in df.columns:
+            _line_chart(df, "episode", "num_steps", "Steps per episode")
 
-    if "reward_raw" in df.columns and "reward" in df.columns:
-        fig = px.line(df, x="episode", y=["reward", "reward_raw"], title="Normalised vs raw reward")
-        st.plotly_chart(fig, width="stretch")
+        if "curriculum_level" in df.columns:
+            _line_chart(df, "episode", "curriculum_level", "Curriculum level")
 
-    action_dist_cols = [c for c in df.columns if c.startswith("action_dist.")]
-    if action_dist_cols:
-        fig = px.area(df, x="episode", y=action_dist_cols, title="Action distribution over time")
-        st.plotly_chart(fig, width="stretch")
-    else:
-        st.info("Action distribution data not yet available (requires commit 5 trainer changes)")
+        if "reward_raw" in df.columns and "reward" in df.columns:
+            _line_chart(df, "episode", ["reward", "reward_raw"], "Normalised vs raw reward")
 
-    # ADD 4: Action frequency heatmap (uses traj_by_episode — no extra file reads)
-    st.subheader("Action preference heatmap")
-    if traj_by_episode:
-        ep_action_rows = []
-        for ep, traj_ep in traj_by_episode.items():
-            if not traj_ep:
-                continue
-            action_counts = {}
-            for step in traj_ep:
-                a = step.get("action", "unknown")
-                action_counts[a] = action_counts.get(a, 0) + 1
-            row = {"episode": ep}
-            row.update(action_counts)
-            ep_action_rows.append(row)
-        if ep_action_rows:
-            heatmap_df   = pd.DataFrame(ep_action_rows).fillna(0).set_index("episode")
-            action_cols_hm = [c for c in heatmap_df.columns]
-            fig_hm = px.imshow(
-                heatmap_df[action_cols_hm].T,
-                title="Action frequency per episode (darker = more frequent)",
-                labels=dict(x="Episode", y="Action", color="Count"),
-                color_continuous_scale="Blues",
-                aspect="auto",
-            )
-            st.plotly_chart(fig_hm, width="stretch")
+        action_dist_cols = [c for c in df.columns if c.startswith("action_dist.")]
+        if action_dist_cols:
+            fig = px.area(df, x="episode", y=action_dist_cols, title="Action distribution over time")
+            st.plotly_chart(fig, width="stretch")
+        else:
+            st.info("Action distribution data not yet available (requires commit 5 trainer changes)")
 
-# ── tab2: Compare ─────────────────────────────────────────────────────────────
+        # Action frequency heatmap (uses traj_by_episode — no extra file reads)
+        st.subheader("Action preference heatmap")
+        if traj_by_episode:
+            ep_action_rows = []
+            for ep, traj_ep in traj_by_episode.items():
+                if not traj_ep:
+                    continue
+                action_counts = {}
+                for step in traj_ep:
+                    a = step.get("action", "unknown")
+                    action_counts[a] = action_counts.get(a, 0) + 1
+                row = {"episode": ep}
+                row.update(action_counts)
+                ep_action_rows.append(row)
+            if ep_action_rows:
+                heatmap_df   = pd.DataFrame(ep_action_rows).fillna(0).set_index("episode")
+                action_cols_hm = [c for c in heatmap_df.columns]
+                fig_hm = px.imshow(
+                    heatmap_df[action_cols_hm].T,
+                    title="Action frequency per episode (darker = more frequent)",
+                    labels=dict(x="Episode", y="Action", color="Count"),
+                    color_continuous_scale="Blues",
+                    aspect="auto",
+                )
+                st.plotly_chart(fig_hm, width="stretch")
+
+# tab2: Compare
 with tab2:
     st.header("Compare Experiments")
 
-    # ADD 2: Baseline comparison bar chart
+    # Baseline comparison bar chart
     st.subheader("Baseline comparison")
     baselines_cmp = compute_baselines(data, selected)
     if baselines_cmp:
@@ -569,7 +577,7 @@ with tab2:
             mode="lines", name=trace_label,
         ))
 
-    # ADD 2: annotated baseline bands from eval_results.json
+    # annotated baseline bands from eval_results.json
     first_exp       = selected[0]
     eval_data_cmp   = load_eval_results(first_exp)
     if eval_data_cmp:
@@ -633,7 +641,7 @@ with tab2:
 
     # Only show periodic eval chart if at least one experiment actually has eval rows.
     # eval/mean_reward is always a column (it's in FIXED_FIELDS) but is NaN for every
-    # training row when eval_every hasn't fired yet — that produces a blank chart.
+    # training row when eval_every hasn't fired yet
     has_eval_rows = (
         "eval/mean_reward" in data.columns
         and data["eval/mean_reward"].notna().any()
@@ -691,7 +699,7 @@ with tab2:
     if fig_llm.data:
         st.plotly_chart(fig_llm, width="stretch")
 
-# ── tab3: Episode Drilldown ───────────────────────────────────────────────────
+# tab3: Episode Drilldown
 with tab3:
     st.header("Episode Drilldown")
 
@@ -735,7 +743,7 @@ with tab3:
             for e in evidence:
                 st.markdown(f"**[{e['id']}]** {e['text']}")
 
-            # ADD 7: Debate timeline — ACTION_SHORT maps full names to color keys
+            # Debate timeline — ACTION_SHORT maps full names to color keys
             st.subheader("Debate timeline")
             debate_html = "<div style='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;'>"
             for s_idx, s in enumerate(traj):
@@ -828,7 +836,7 @@ with tab3:
                 names      = step.get("action_names")
                 chosen_idx = step.get("action_idx")
 
-                # FIX 1: fall back to ACTIONS when action_names is absent or mismatched
+                # fall back to ACTIONS when action_names is absent or mismatched
                 if probs:
                     if not names:
                         names = ACTIONS
@@ -847,7 +855,6 @@ with tab3:
 
                 if "entropy" in traj_df:
                     fig = px.line(traj_df, x="step", y="entropy", title="Entropy Over Steps")
-                    # FIX 2: fixed y-axis shows true exploration range
                     max_ent = math.log(len(ACTIONS))
                     fig.update_layout(yaxis=dict(range=[0, max_ent * 1.05]))
                     st.plotly_chart(fig, width="stretch")
@@ -858,7 +865,7 @@ with tab3:
                     if e["id"] in selected_ids:
                         st.success(f"[{e['id']}] {e['text']}")
 
-                # ADD 6: Evidence selection timeline
+                # Evidence selection timeline
                 # Infer evidence IDs from selected_ids delta between steps
                 st.subheader("Evidence selection timeline")
                 timeline_rows = []
@@ -899,7 +906,7 @@ with tab3:
                 else:
                     st.info("No evidence select/remove actions in this episode")
 
-# ── tab4: Config ──────────────────────────────────────────────────────────────
+# tab4: Config
 with tab4:
     st.header("Configs")
 
