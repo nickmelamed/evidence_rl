@@ -40,6 +40,21 @@ ACTION_COLORS = {
     "FINALIZE":   "#FFD700",
 }
 
+# Baseline method ordering/coloring shared by the Eval Results and Compare
+# tabs, so both read eval_results.json's "baselines" dict the same way.
+METHOD_ORDER = ["random", "majority", "greedy_llm", "fewshot_k3",
+                "fewshot_k5", "best_of_5", "imitation", "rl"]
+COLOR_MAP = {
+    "random":     "#888780",
+    "majority":   "#AAAAAA",
+    "greedy_llm": "#D85A30",
+    "fewshot_k3": "#7F77DD",
+    "fewshot_k5": "#9B91E8",
+    "best_of_5":  "#378ADD",
+    "imitation":  "#F5A623",
+    "rl":         "#1D9E75",
+}
+
 # sidebar
 auto_refresh = st.sidebar.checkbox("Live Monitoring", value=False)
 refresh_rate = st.sidebar.slider("Refresh (sec)", 1, 10, 3)
@@ -102,21 +117,28 @@ def _line_chart(df, x, y, title):
     st.plotly_chart(fig, width="stretch")
     return fig
 
-def compute_baselines(data, selected):
-    results = {}
+def _load_real_baselines(selected):
+    """Per-experiment baseline results from evid-eval's eval_results.json —
+    the actual RandomBaseline/GreedyLLMBaseline/etc. evaluator classes, not a
+    heuristic proxy. Returns (rows, experiment_names_missing_eval_results)."""
+    rows = []
+    missing = []
     for exp in selected:
         name = os.path.basename(exp)
-        df = data[data["experiment"] == name].copy()
-        if df.empty or "reward" not in df.columns:
+        eval_data = load_eval_results(exp)
+        if eval_data is None:
+            missing.append(name)
             continue
-        first_ep = df.sort_values("episode").iloc[0]["reward"] if not df.empty else 0
-        trained = df.sort_values("episode").tail(3)["reward"].mean()
-        results[name] = {
-            "random (ep 0)":        round(first_ep, 3),
-            "early finalize":       -0.5,
-            "trained (last 3 eps)": round(trained, 3),
-        }
-    return results
+        baselines_eval = eval_data.get("baselines", {})
+        for method in METHOD_ORDER:
+            if method in baselines_eval:
+                rows.append({
+                    "experiment":  name,
+                    "method":      method,
+                    "mean_reward": baselines_eval[method].get("mean", 0),
+                    "std":         baselines_eval[method].get("std", 0),
+                })
+    return rows, missing
 
 # load experiments
 experiments = list_experiments()
@@ -211,18 +233,6 @@ with tab0:
             with kpi3:
                 if win_pct is not None:
                     st.metric("RL win rate vs greedy_llm", f"{win_pct:.0%}")
-
-        METHOD_ORDER = ["random", "majority", "greedy_llm", "fewshot_k3",
-                        "fewshot_k5", "best_of_5", "rl"]
-        COLOR_MAP = {
-            "random":     "#888780",
-            "majority":   "#AAAAAA",
-            "greedy_llm": "#D85A30",
-            "fewshot_k3": "#7F77DD",
-            "fewshot_k5": "#9B91E8",
-            "best_of_5":  "#378ADD",
-            "rl":         "#1D9E75",
-        }
 
         rows = [
             {
@@ -531,34 +541,31 @@ with tab1:
 with tab2:
     st.header("Compare Experiments")
 
-    # Baseline comparison bar chart
+    # Baseline comparison bar chart — the real RandomBaseline/GreedyLLMBaseline/
+    # etc. evaluator results from each experiment's evid-eval run, not a proxy
+    # computed from the training curve.
     st.subheader("Baseline comparison")
-    baselines_cmp = compute_baselines(data, selected)
-    if baselines_cmp:
-        baseline_rows = []
-        for exp_name_cmp, vals in baselines_cmp.items():
-            algo = configs.get(exp_name_cmp, {}).get("algo", "unknown")
-            for baseline_name, val in vals.items():
-                baseline_rows.append({
-                    "experiment":  exp_name_cmp,
-                    "algo":        algo,
-                    "baseline":    baseline_name,
-                    "mean_reward": val,
-                })
-        bl_df  = pd.DataFrame(baseline_rows)
+    baseline_rows, missing_eval = _load_real_baselines(selected)
+    if missing_eval:
+        st.info(
+            f"No eval_results.json for: {', '.join(missing_eval)} — run `evid-eval` "
+            "for these experiments to include them here."
+        )
+    if baseline_rows:
+        bl_df = pd.DataFrame(baseline_rows)
         fig_bl = px.bar(
-            bl_df, x="experiment", y="mean_reward", color="baseline",
+            bl_df, x="experiment", y="mean_reward", color="method",
             barmode="group",
-            title="Trained agent vs baselines",
-            color_discrete_map={
-                "random (ep 0)":        "#888780",
-                "early finalize":       "#E24B4A",
-                "trained (last 3 eps)": "#1D9E75",
-            },
+            error_y="std",
+            title="Baselines vs each experiment's RL policy (from evid-eval)",
+            category_orders={"method": METHOD_ORDER},
+            color_discrete_map=COLOR_MAP,
         )
         fig_bl.add_hline(y=0, line_dash="dot", line_color="#888780",
                          annotation_text="zero reward")
         st.plotly_chart(fig_bl, width="stretch")
+    elif not missing_eval:
+        st.info("Run `evid-eval` for at least one selected experiment to see baseline comparisons here.")
 
     # Smoothed training curves
     fig = go.Figure()

@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import pickle
 import sqlite3
@@ -20,8 +21,48 @@ _conn.commit()
 
 _TAVILY_TIMEOUT = 8  # seconds; fail fast and fall back to seed data
 
+# Set via use_snapshot() — {claim: {"search_query": ..., "results": [...]}}.
+# Keyed on (claim, search_query) together (not claim alone) so a loaded
+# snapshot only intercepts the deterministic reset()-time fetch (dataset's
+# own search_query) and never QUERY's agent-generated follow-up searches,
+# which aren't reproducible/snapshot-able in the first place.
+_snapshot: dict | None = None
+
+
+def use_snapshot(path: str) -> None:
+    """Load a snapshot written by export_snapshot() — fetch_evidence() then
+    prefers it over the sqlite cache/live Tavily call for matching claims."""
+    global _snapshot
+    with open(path) as f:
+        _snapshot = json.load(f)
+    print(f"[Snapshot] Loaded {len(_snapshot)} claims from {path}")
+
+
+def export_snapshot(claims: list, output_path: str) -> None:
+    """Dump this machine's cached Tavily results for `claims` to a portable
+    JSON file, so a later run (anywhere) can reproduce the exact same
+    evidence pool via use_snapshot() instead of depending on live Tavily
+    results (which change over time) or a machine-local sqlite cache."""
+    snapshot = {}
+    for sample in claims:
+        claim = sample["claim"]
+        query = sample.get("search_query", claim)
+        key = hashlib.md5(f"{query}:5".encode()).hexdigest()
+        row = _conn.execute("SELECT value FROM cache WHERE key=?", (key,)).fetchone()
+        if row is not None:
+            snapshot[claim] = {"search_query": query, "results": pickle.loads(row[0])}
+
+    with open(output_path, "w") as f:
+        json.dump(snapshot, f, indent=2)
+    print(f"[Snapshot] Exported {len(snapshot)}/{len(claims)} claims to {output_path}")
+
 
 def fetch_evidence(claim: str, search_query: str, max_results: int = 5) -> list[dict]:
+    if _snapshot is not None:
+        entry = _snapshot.get(claim)
+        if entry is not None and entry["search_query"] == search_query:
+            return entry["results"]
+
     cache_key = hashlib.md5(f"{search_query}:{max_results}".encode()).hexdigest()
 
     row = _conn.execute("SELECT value FROM cache WHERE key=?", (cache_key,)).fetchone()
