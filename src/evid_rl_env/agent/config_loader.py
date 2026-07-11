@@ -56,12 +56,24 @@ def load_config(path: str):
     for k, v in d.get("rl", {}).items():
         if hasattr(cfg, k):
             setattr(cfg, k, v)
+        else:
+            logger.warning(
+                "Config: rl.%s in %s has no matching field on %s — ignored. "
+                "Add a matching attribute in agent/config.py if this should take effect.",
+                k, path, type(cfg).__name__,
+            )
 
     for k, v in d.items():
         if k in ("algo", "rl"):
             continue
         if hasattr(cfg, k):
             setattr(cfg, k, v)
+        else:
+            logger.warning(
+                "Config: top-level key %r in %s has no matching field on %s — ignored. "
+                "Add a matching attribute in agent/config.py if this should take effect.",
+                k, path, type(cfg).__name__,
+            )
 
     logger.info("Config: base.yaml + %s.yaml | Seed: %s", Path(path).stem, cfg.seed)
 

@@ -1,6 +1,14 @@
 class BaseConfig:
+    """Fields shared across every algorithm, safe as real hardcoded defaults
+    because they aren't per-run tuning knobs (model choices, seed, and other
+    cross-cutting operational defaults sourced from configs/base.yaml).
+
+    Algorithm-specific RL hyperparameters live on the subclasses below and are
+    intentionally left as None — configs/*_baseline.yaml's `rl:` block is the
+    single source of truth for those; see config_loader.load_config(), which
+    always overwrites them before a config is used for real training.
+    """
     def __init__(self):
-        self.gamma = 0.99
         self.actor_model = "google/gemma-2-2b-it"
         self.judge_model = "Qwen/Qwen2.5-1.5B-Instruct"
         self.seed = 42
@@ -14,21 +22,22 @@ class BaseConfig:
 class PPOConfig(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.lr = 0.001
-        self.clip = 0.2
-        self.entropy_coef = 0.05  
-        self.value_coef = 0.05
-        self.gae_lambda = 0.95
-        self.ppo_epochs = 2       
+        self.lr = None
+        self.clip = None
+        self.gamma = None
+        self.entropy_coef = None
+        self.value_coef = None
+        self.gae_lambda = None
+        self.ppo_epochs = None
 
 class PGConfig(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.lr = 0.01
-        self.lr_decay_episodes = 200   
-        self.lr_min_fraction = 0.2    
+        self.lr = None
+        self.lr_decay_episodes = None
+        self.lr_min_fraction = None
 
 class BanditConfig(BaseConfig):
     def __init__(self):
         super().__init__()
-        self.alpha = 1.0
+        self.alpha = None
