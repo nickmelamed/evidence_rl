@@ -135,7 +135,8 @@ class BanditTrainer(BaseTrainer):
                 state = next_state
                 total_reward += reward
 
-            self._update_curriculum(total_reward)
+            claim_id = self.env.current_sample.get("id", self.env.current_sample.get("claim"))
+            self._update_curriculum(claim_id, info.get("task_success"))
 
             metrics = self._build_episode_metrics(
                 ep, total_reward, total_reward_raw, steps, total_tokens, viz

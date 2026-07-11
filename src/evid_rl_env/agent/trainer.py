@@ -177,7 +177,8 @@ class Trainer(BaseTrainer):
                     for t in trajectory
                 ])
 
-            self._update_curriculum(total_reward)
+            claim_id = self.env.current_sample.get("id", self.env.current_sample.get("claim"))
+            self._update_curriculum(claim_id, info.get("task_success"))
 
             extra = {"pg_lr": self.rl.current_lr} if self.algo == "pg" else {}
             metrics = self._build_episode_metrics(

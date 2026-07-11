@@ -42,6 +42,15 @@ def _build_payload(action: str, state) -> object:
         return {"summary": "summary", "tokens": 1}
     if action == Actions.CONCEDE:
         return {"argument": "concession", "evidence_ids": [], "tokens": 1}
+    if action == Actions.ASSIGN_CONFIDENCE:
+        return 0.5
+    if action == Actions.CHALLENGE_EVIDENCE:
+        target = random.choice(state.evidence_pool) if state.evidence_pool else None
+        return {"evidence_id": target.id if target else 0, "argument": "challenge", "tokens": 1}
+    if action == Actions.REQUEST_CLARIFICATION:
+        return state.claim
+    if action == Actions.HEDGE:
+        return {"argument": "hedge", "evidence_ids": [], "tokens": 1}
     return None  # RERANK, FINALIZE
 
 

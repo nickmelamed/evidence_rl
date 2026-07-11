@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 
+
 @dataclass
 class Evidence:
     id: int
@@ -19,6 +20,8 @@ class State:
     query_count: int = 0
     max_queries: int = 2
     summary: str = ""
+    confidence: float | None = None
+    challenged_evidence_ids: set = field(default_factory=set)
 
     def is_done(self):
         return self.steps_taken >= self.max_steps

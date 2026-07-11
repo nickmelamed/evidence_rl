@@ -8,6 +8,10 @@ class Actions:
     RERANK = "rerank_evidence"
     SUMMARIZE = "summarize_evidence"
     CONCEDE = "concede_point"
+    ASSIGN_CONFIDENCE = "assign_confidence"
+    CHALLENGE_EVIDENCE = "challenge_evidence"
+    REQUEST_CLARIFICATION = "request_clarification"
+    HEDGE = "hedge"
 
 ACTIONS = [
     Actions.SELECT,
@@ -19,4 +23,8 @@ ACTIONS = [
     Actions.RERANK,
     Actions.SUMMARIZE,
     Actions.CONCEDE,
+    Actions.ASSIGN_CONFIDENCE,
+    Actions.CHALLENGE_EVIDENCE,
+    Actions.REQUEST_CLARIFICATION,
+    Actions.HEDGE,
 ]

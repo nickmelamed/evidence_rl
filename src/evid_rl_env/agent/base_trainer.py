@@ -1,4 +1,3 @@
-import math
 import random
 from pathlib import Path
 
@@ -130,13 +129,17 @@ class BaseTrainer(EvalMixin):
         if self.use_wandb:
             wandb.init(project="evid-rl", name=exp_name, config=wandb_config)
 
-    def _update_curriculum(self, total_reward: float) -> None:
-        """Map normalized episode reward to a [0,1] performance signal via a
-        sigmoid and feed it to the curriculum, if one is configured."""
+    def _update_curriculum(self, claim_id, task_success) -> None:
+        """Feed the episode's task-success signal to the curriculum, keyed by
+        the specific claim just attempted (per-claim Prioritized Level
+        Replay — see curriculum.py). task_success is the bounded [0,1]
+        calibration score from the FINALIZE step's info dict (1 - |confidence
+        - true_score|); episodes that never reach FINALIZE (step-limit cutoff,
+        token budget) count as 0 — the agent didn't complete the task."""
         if self.curriculum is None:
             return
-        perf = 1.0 / (1.0 + math.exp(max(-50.0, min(50.0, -total_reward / 2.0))))
-        self.curriculum.update(perf)
+        perf = task_success if task_success is not None else 0.0
+        self.curriculum.update(claim_id, perf)
 
     def _apply_token_budget(self, total_tokens: float, reward: float, done: bool) -> tuple:
         """Force-end the episode, like the environment's own step-limit does,
@@ -162,7 +165,7 @@ class BaseTrainer(EvalMixin):
             "episode": ep,
             "reward": total_reward,
             "reward_raw": total_reward_raw,
-            "curriculum_level": self.curriculum.level if self.curriculum is not None else None,
+            "curriculum_mean_score": self.curriculum.mean_score if self.curriculum is not None else None,
             "num_steps": steps,
             "entropy": self.policy.last_entropy,
             "tokens": total_tokens,

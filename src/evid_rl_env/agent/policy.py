@@ -1,3 +1,5 @@
+import re
+
 import numpy as np
 
 from evid_rl_env.agent.llm_client import LLMClient
@@ -50,18 +52,34 @@ class ActorCriticPolicy:
 
         probs = self.get_probs(state)  # fresh array — safe to mutate in place
 
-        # Mask 1: QUERY when per-episode budget exhausted
+        # Mask 1: QUERY / REQUEST_CLARIFICATION share the per-episode query budget
         if state.query_count >= state.max_queries:
             probs[self.actions.index(Actions.QUERY)] = 0
+            probs[self.actions.index(Actions.REQUEST_CLARIFICATION)] = 0
             probs /= probs.sum()
 
         # Mask 2: argument-generating and evidence-removing actions require at least
-        # one piece of evidence to be selected first. 
+        # one piece of evidence to be selected first.
         # Masking before sampling keeps the gradient attribution correct.
         if not state.selected_evidence and state.evidence_pool:
             for _a in (Actions.SUPPORT, Actions.CONTRADICT,
-                       Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE):
+                       Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE,
+                       Actions.ASSIGN_CONFIDENCE, Actions.CHALLENGE_EVIDENCE,
+                       Actions.HEDGE):
                 probs[self.actions.index(_a)] = 0
+            _s = probs.sum()
+            probs /= _s if _s > 0 else 1.0
+
+        # Mask 3: FINALIZE requires the agent to have explicitly assigned a
+        # confidence first, so FINALIZE can never fall back to the
+        # evidence-count heuristic (which has no relationship to whether the
+        # claim is actually true). Only enforced when there's evidence to
+        # work with — if the pool is empty the agent has no path to
+        # ASSIGN_CONFIDENCE either (Mask 2 requires evidence too), so
+        # FINALIZE is left available and hits the environment's
+        # zero-evidence penalty instead of creating a deadlock.
+        if state.confidence is None and state.evidence_pool:
+            probs[self.actions.index(Actions.FINALIZE)] = 0
             _s = probs.sum()
             probs /= _s if _s > 0 else 1.0
 
@@ -73,8 +91,13 @@ class ActorCriticPolicy:
             action = self.actions[idx]
             # Redirect invalid forced actions (e.g. from bandit) to SELECT
             if (action in (Actions.SUPPORT, Actions.CONTRADICT,
-                           Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE)
+                           Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE,
+                           Actions.ASSIGN_CONFIDENCE, Actions.CHALLENGE_EVIDENCE,
+                           Actions.HEDGE)
                     and not state.selected_evidence and state.evidence_pool):
+                action = Actions.SELECT
+                idx = self.actions.index(Actions.SELECT)
+            elif action == Actions.FINALIZE and state.confidence is None and state.evidence_pool:
                 action = Actions.SELECT
                 idx = self.actions.index(Actions.SELECT)
         else:
@@ -135,6 +158,66 @@ Write a concise {action.lower()} argument.
             else:
                 concede_prompt = f"Claim: {state.claim}\nEvidence: {texts}\nWrite a concise acknowledgement of the strongest counterpoint to the claim."
                 argument, tokens = self.llm.generate(concede_prompt)
+                self._arg_cache[cache_key] = (argument, tokens)
+            return action, {"argument": argument, "evidence_ids": [e.id for e in state.selected_evidence], "tokens": tokens}, idx
+
+        elif action == Actions.ASSIGN_CONFIDENCE:
+            cache_key = (str(action), frozenset(e.id for e in state.selected_evidence), len(state.debate_history))
+            if cache_key in self._arg_cache:
+                confidence, tokens = self._arg_cache[cache_key]
+            else:
+                texts = [e.text for e in state.selected_evidence]
+                conf_prompt = f"""
+Claim: {state.claim}
+Evidence: {texts}
+Debate so far: {" ".join(state.debate_history)}
+On a scale from 0.0 (definitely false) to 1.0 (definitely true), output only a single number for your confidence that the claim is true.
+"""
+                raw, tokens = self.llm.generate(conf_prompt)
+                match = re.search(r"[-+]?\d*\.?\d+", raw)
+                confidence = max(0.0, min(1.0, float(match.group()))) if match else 0.5
+                self._arg_cache[cache_key] = (confidence, tokens)
+            return action, confidence, idx
+
+        elif action == Actions.CHALLENGE_EVIDENCE:
+            if not state.evidence_pool:
+                return action, None, idx
+            target = np.random.choice(state.evidence_pool)
+            cache_key = (str(action), target.id, frozenset(e.id for e in state.selected_evidence))
+            if cache_key in self._arg_cache:
+                argument, tokens = self._arg_cache[cache_key]
+            else:
+                argument, tokens = self.llm.generate(
+                    f"""
+Claim: {state.claim}
+Evidence under scrutiny: {target.text}
+Write a concise argument challenging the reliability or relevance of this evidence.
+"""
+                )
+                self._arg_cache[cache_key] = (argument, tokens)
+            return action, {"evidence_id": target.id, "argument": argument, "tokens": tokens}, idx
+
+        elif action == Actions.REQUEST_CLARIFICATION:
+            clarify_prompt = (
+                f"Given claim: {state.claim}\n"
+                "Write a short, narrower search query that clarifies or disambiguates "
+                "a key term or scope of this claim."
+            )
+            clarify_text, tokens = self.llm.generate(clarify_prompt)
+            return action, clarify_text.strip(), idx
+
+        elif action == Actions.HEDGE:
+            cache_key = (str(action), frozenset(e.id for e in state.selected_evidence))
+            if cache_key in self._arg_cache:
+                argument, tokens = self._arg_cache[cache_key]
+            else:
+                texts = [e.text for e in state.selected_evidence]
+                hedge_prompt = (
+                    f"Claim: {state.claim}\nEvidence: {texts}\n"
+                    "Write a concise, qualified statement acknowledging both supporting "
+                    "and conflicting evidence for this claim."
+                )
+                argument, tokens = self.llm.generate(hedge_prompt)
                 self._arg_cache[cache_key] = (argument, tokens)
             return action, {"argument": argument, "evidence_ids": [e.id for e in state.selected_evidence], "tokens": tokens}, idx
 
