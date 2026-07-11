@@ -1,7 +1,8 @@
 import numpy as np
-from evid_rl_env.environment.actions import Actions, ACTIONS
+
 from evid_rl_env.agent.llm_client import LLMClient
-from evid_rl_env.agent.state_encoder import encode_state_semantic, get_state_dim, SEMANTIC_AVAILABLE
+from evid_rl_env.agent.state_encoder import encode_state_semantic, get_state_dim
+from evid_rl_env.environment.actions import ACTIONS, Actions
 
 STATE_DIM = get_state_dim()
 
@@ -10,7 +11,8 @@ def encode_state(state):
 
 class ActorCriticPolicy:
     def __init__(self, n_actions, state_dim=None, model_name=None, seed: int = 42):
-        if state_dim is None: state_dim = get_state_dim()
+        if state_dim is None:
+            state_dim = get_state_dim()
         self.actions = ACTIONS
         self.n_actions = n_actions
         self.state_dim = state_dim
@@ -21,7 +23,6 @@ class ActorCriticPolicy:
         # Critic (value function)
         self.value_params = np.zeros(state_dim)
 
-        from evid_rl_env.agent.llm_client import LLMClient
         actor_model = model_name or "google/gemma-2-2b-it"
         # Propagate seed so LLMClient calls transformers.set_seed once at init.
         self.llm = LLMClient(model_name=actor_model, seed=seed)
@@ -55,9 +56,7 @@ class ActorCriticPolicy:
             probs /= probs.sum()
 
         # Mask 2: argument-generating and evidence-removing actions require at least
-        # one piece of evidence to be selected first.  Without evidence they call the
-        # LLM with an empty context, produce no useful signal, and (critically) fill
-        # every episode step with expensive LLM calls — the PPO-collapse OOM pattern.
+        # one piece of evidence to be selected first. 
         # Masking before sampling keeps the gradient attribution correct.
         if not state.selected_evidence and state.evidence_pool:
             for _a in (Actions.SUPPORT, Actions.CONTRADICT,

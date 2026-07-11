@@ -1,7 +1,7 @@
 import logging as _logging
 import os
-import re
 import random
+import re
 
 # Disable the fast tokenizer's Rust-backed parallel worker pool. Without this,
 # the pool's semaphores leak at interpreter shutdown and cause a segfault.
@@ -9,9 +9,9 @@ import random
 # cannot override this and re-introduce the leak.
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-from transformers import pipeline, logging, set_seed as _transformers_set_seed
-
 import torch
+from transformers import logging, pipeline
+from transformers import set_seed as _transformers_set_seed
 
 logging.set_verbosity_error()
 
@@ -43,9 +43,7 @@ class LLMClient:
     def __init__(self, model_name="google/gemma-2-2b-it", temperature=0.7, seed: int = 42):
         self.model_name = model_name
         self.temperature = temperature
-        # AUDIT FIX: store seed so every pipeline call sets it via transformers.set_seed,
-        # making generation deterministic and auditable (HuggingFace RNG is separate from
-        # Python random/numpy and must be seeded independently)
+        # store seed so every pipeline call sets it via transformers.set_seed,
         self.seed = seed
         self._pipe = pipeline(
             "text-generation",
@@ -53,15 +51,8 @@ class LLMClient:
             torch_dtype="auto",
             device=_DEVICE,
         )
-        # Seed once at init. Calling transformers.set_seed() before every
-        # inference pass re-triggers torch.mps.manual_seed() on Apple Silicon
-        # (even when the pipeline is on CPU), which corrupts the MPS command
-        # queue after repeated calls and causes a native segfault.
+        # Seed once at init
         _transformers_set_seed(self.seed)
-
-    @property
-    def pipe(self):
-        return self._pipe
 
     def _chat(self, prompt):
         return [{"role": "user", "content": prompt}]
@@ -125,7 +116,7 @@ class JudgeLLMClient:
     def generate(self, prompt):
         out = self._pipe(
             self._chat(prompt),
-            max_new_tokens=128,  # judge JSON output is ~80 tokens; 128 gives headroom
+            max_new_tokens=128,  
             do_sample=True,
             temperature=self.temperature,
             return_full_text=False,
@@ -161,9 +152,9 @@ class AnnotatorClient:
 
         self.model = model
         self._client = anthropic.Anthropic()
-        # AUDIT FIX: cache API responses keyed on (observation, actions) so identical
+        # cache API responses keyed on (observation, actions) so identical
         # prompts within a collection run don't generate redundant billable API calls;
-        # dict is per-instance so isolated between separate AnnotatorClient objects
+
         self._cache: dict = {}
 
     def select_action(self, observation: str, action_descriptions: list) -> int:
@@ -171,8 +162,8 @@ class AnnotatorClient:
         Ask the model to choose the best action index for the given observation.
         Falls back to a random valid index on parse failure.
         """
-        # AUDIT FIX: check per-instance cache before making an API call; the annotator
-        # is a deterministic oracle so identical (obs, actions) should return the same index
+        # check per-instance cache before making an API call
+
         cache_key = (observation, tuple(action_descriptions))
         if cache_key in self._cache:
             return self._cache[cache_key]
@@ -198,13 +189,12 @@ class AnnotatorClient:
                 result = int(max(0, min(int(match.group()), len(action_descriptions) - 1)))
                 self._cache[cache_key] = result
                 return result
-            # AUDIT FIX: include model and observation context so parse failures are debuggable
+            # include model and observation context so parse failures are debuggable
             _logger.warning(
                 "AnnotatorClient: could not parse index from response %r | model=%s | obs='%.80s'",
                 text, self.model, observation,
             )
         except Exception as exc:
-            # AUDIT FIX: include model and observation context so call failures are debuggable
             _logger.warning(
                 "AnnotatorClient: LLM call failed (%s) | model=%s | obs='%.80s' — returning random.",
                 exc, self.model, observation,

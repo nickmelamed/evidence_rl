@@ -1,9 +1,5 @@
 # For bandit training use BanditTrainer in bandit_trainer.py
 import os
-import random
-from pathlib import Path
-
-import numpy as np
 
 try:
     import wandb
@@ -11,27 +7,13 @@ try:
 except ImportError:
     WANDB_AVAILABLE = False
 
-from evid_rl_env.utils.experiment import ExperimentTracker
-from evid_rl_env.agent.eval_mixin import EvalMixin
-from evid_rl_env.agent.evaluator import Evaluator
-from evid_rl_env.utils.running_stats import RunningMeanStd
+from evid_rl_env.agent.base_trainer import BaseTrainer
 from evid_rl_env.agent.policy_gradient import PolicyGradient
 from evid_rl_env.agent.ppo import PPO
 from evid_rl_env.environment.actions import ACTIONS
-from evid_rl_env.agent.baseline import (
-    RandomBaseline,
-    MajorityBaseline,
-    GreedyLLMBaseline,
-    FewShotLLMBaseline,
-    BestOfNBaseline,
-    ImitationBaseline,
-)
-
-_TRAJ_PATH = "data/trajectories.jsonl"
-_EVAL_CSV_PATH = "logs/eval_metrics.csv"
 
 
-class Trainer(EvalMixin):
+class Trainer(BaseTrainer):
     def __init__(
         self,
         env,
@@ -47,84 +29,28 @@ class Trainer(EvalMixin):
         baseline_n_episodes=3,
         curriculum=None,
     ):
-        import random, numpy as np
-        random.seed(seed); np.random.seed(seed)
-
-        self.use_wandb = use_wandb and WANDB_AVAILABLE
-        self.eval_every = eval_every
-        self.baseline_n_episodes = baseline_n_episodes
-        self.reward_rms = RunningMeanStd()
-        self.token_penalty = 0.0001  # penalty per token used
-        self.max_tokens_per_episode = 2000
-        self.env = env
-        self.policy = policy
-        self.config = config
-        self.episodes = episodes
         self.algo = algo
-        self.seed = seed
-        self.curriculum = curriculum
-        # Full training dataset for dynamic curriculum sampling each episode.
-        # env.dataset may be replaced per-episode, so we keep a stable reference.
-        self._train_dataset = list(env.dataset)
-        self.tracker = ExperimentTracker(exp_name)
-        self._eval_csv_path = _EVAL_CSV_PATH
-
-        wandb_config = {
-            "algo": self.algo,
-            "policy_type": self.policy.__class__.__name__,
-            "episodes": self.episodes,
-            "seed": seed,
-
-            # RL config
-            "lr": getattr(self.config, "lr", None),
-            "gamma": getattr(self.config, "gamma", None),
-
-            # PPO
-            "clip": getattr(self.config, "clip", None),
-            "entropy_coef": getattr(self.config, "entropy_coef", None),
-            "value_coef": getattr(self.config, "value_coef", None),
-
-            # Policy
-            "state_dim": getattr(self.policy, "state_dim", None),
-            "eval_every": self.eval_every,
-        }
-
-        self.tracker.save_config(wandb_config)
-
-        # RL evaluator — receives the training normalizer for reward scale alignment.
-        # The normalizer is read-only inside Evaluator (never updated there).
-        self.evaluator = None
-        self.baselines = {}
-        self.llm_client = getattr(self.policy, "llm", None)
-
-        if eval_dataset is not None:
-            from evid_rl_env.environment.environment import ClaimEnv
-            eval_env = ClaimEnv(eval_dataset)
-            self.evaluator = Evaluator(
-                eval_env, policy, reward_normalizer=self.reward_rms
-            )
-
-            if self.llm_client is not None:
-                train_dataset = env.dataset
-                self.baselines = {
-                    "random":     RandomBaseline(eval_dataset),
-                    "majority":   MajorityBaseline(eval_dataset),
-                    "greedy_llm": GreedyLLMBaseline(eval_dataset, self.llm_client),
-                    "fewshot_k3": FewShotLLMBaseline(eval_dataset, train_dataset, self.llm_client, k=3),
-                    "fewshot_k5": FewShotLLMBaseline(eval_dataset, train_dataset, self.llm_client, k=5),
-                    "best_of_5":  BestOfNBaseline(eval_dataset, self.llm_client, n=5),
-                }
-                if Path(_TRAJ_PATH).exists():
-                    self.baselines["imitation"] = ImitationBaseline(eval_dataset, _TRAJ_PATH)
-
-        print(
-            f"Train: {len(env.dataset)} samples | "
-            f"Eval: {len(eval_dataset) if eval_dataset else 0} samples | "
-            f"Baselines: {list(self.baselines)}"
+        self._init_common(
+            env=env,
+            policy=policy,
+            config=config,
+            episodes=episodes,
+            exp_name=exp_name,
+            seed=seed,
+            use_wandb=use_wandb,
+            eval_dataset=eval_dataset,
+            eval_every=eval_every,
+            baseline_n_episodes=baseline_n_episodes,
+            curriculum=curriculum,
+            extra_wandb_config={
+                "algo": self.algo,
+                "lr": getattr(config, "lr", None),
+                "gamma": getattr(config, "gamma", None),
+                "clip": getattr(config, "clip", None),
+                "entropy_coef": getattr(config, "entropy_coef", None),
+                "value_coef": getattr(config, "value_coef", None),
+            },
         )
-
-        if self.use_wandb:
-            wandb.init(project="evid-rl", name=exp_name, config=wandb_config)
 
         # RL algorithm
         if algo == "ppo":
@@ -138,12 +64,9 @@ class Trainer(EvalMixin):
         else:
             raise ValueError(f"Unknown algo: {algo}")
 
-    # ------------------------------------------------------------------
-    # Training loop
-    # ------------------------------------------------------------------
-
+    # Training loop 
+    
     def train(self):
-        import math
         for ep in range(self.episodes):
 
             if self.curriculum is not None:
@@ -152,7 +75,8 @@ class Trainer(EvalMixin):
             state = self.env.reset()
             done = False
 
-            total_reward = 0
+            total_reward = 0.0
+            total_reward_raw = 0.0
             total_tokens = 0
             steps = 0
 
@@ -183,6 +107,9 @@ class Trainer(EvalMixin):
                     total_tokens += ep_tokens
                     reward -= self.token_penalty * ep_tokens
 
+                reward, done = self._apply_token_budget(total_tokens, reward, done)
+
+                total_reward_raw += reward
                 self.reward_rms.update([reward])
                 reward = float(self.reward_rms.normalize(reward))
 
@@ -250,36 +177,12 @@ class Trainer(EvalMixin):
                     for t in trajectory
                 ])
 
-            if self.curriculum is not None:
-                # sigmoid maps normalized reward → [0, 1] performance signal
-                perf = 1.0 / (1.0 + math.exp(max(-50.0, min(50.0, -total_reward / 2.0))))
-                self.curriculum.update(perf)
+            self._update_curriculum(total_reward)
 
-            # LOGGING
-            metrics = {
-                "episode": ep,
-                "reward": total_reward,
-                "reward_raw": total_reward,
-                "curriculum_level": self.curriculum.level if self.curriculum is not None else None,
-                "num_steps": steps,
-                "entropy": self.policy.last_entropy,
-                "tokens": total_tokens
-            }
-
-            if self.algo == "pg":
-                metrics["pg_lr"] = self.rl.current_lr
-
-            action_dist = {}
-            for t in viz:
-                a = t["action"]
-                action_dist[a] = action_dist.get(a, 0) + 1
-
-            metrics["action_dist"] = {k: v / max(steps, 1) for k, v in action_dist.items()}
-            for action_name, frac in metrics.get("action_dist", {}).items():
-                safe_key = "action_dist." + action_name.replace(" ", "_")
-                metrics[safe_key] = frac
-            metrics.pop("action_dist", None)
-            metrics["entropy"] = self.policy.last_entropy
+            extra = {"pg_lr": self.rl.current_lr} if self.algo == "pg" else {}
+            metrics = self._build_episode_metrics(
+                ep, total_reward, total_reward_raw, steps, total_tokens, viz, extra=extra
+            )
 
             if self.use_wandb:
                 wandb.log(metrics, step=ep)
@@ -297,5 +200,4 @@ class Trainer(EvalMixin):
         self.policy.save(checkpoint_path)
         print(f"Checkpoint saved: {checkpoint_path}.npz")
 
-        if self.use_wandb:
-            wandb.finish()
+        self._finish()

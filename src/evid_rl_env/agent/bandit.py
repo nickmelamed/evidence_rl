@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class LinUCBBandit:
     def __init__(self, n_actions, d, alpha=1.0):
         self.A = [np.eye(d) for _ in range(n_actions)]

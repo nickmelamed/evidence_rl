@@ -1,4 +1,5 @@
 import numpy as np
+
 from evid_rl_env.environment.actions import ACTIONS
 
 
@@ -9,20 +10,14 @@ class Evaluator:
         self.env = env
         self.policy = policy
         self.n_eval_episodes = n_eval_episodes
-        # RunningMeanStd instance or None. Used read-only — stats are never
-        # updated here so training normalization stays uncontaminated.
         self.reward_normalizer = reward_normalizer
 
     def evaluate(self):
         print("[Eval] greedy mode active — running evaluation...")
-        # AUDIT FIX: log the LLM seed so every eval run is auditable from logs;
-        # the seed is stored on policy.llm.seed if the policy uses an LLMClient
+
         _llm_seed = getattr(getattr(self.policy, "llm", None), "seed", None)
         if _llm_seed is not None:
             print(f"[Eval] LLM seed: {_llm_seed}")
-        # AUDIT FIX: lock the reward normalizer for the duration of this eval pass so
-        # any accidental .update() call inside the loop raises immediately rather than
-        # silently corrupting the training normalizer state
         if self.reward_normalizer is not None:
             self.reward_normalizer._locked = True
 
@@ -57,12 +52,12 @@ class Evaluator:
                 rewards_raw.append(ep_reward)
                 steps_list.append(ep_steps)
         finally:
-            # AUDIT FIX: always unlock so the normalizer can be updated by training
+            # always unlock so the normalizer can be updated by training
             # even if an exception occurs mid-eval
             if self.reward_normalizer is not None:
                 self.reward_normalizer._locked = False
 
-        # Optionally normalize using training stats (read-only — no .update() calls)
+        # Optionally normalize using training stats
         if self.reward_normalizer is not None:
             rewards_norm = [
                 float(self.reward_normalizer.normalize(r)) for r in rewards_raw
@@ -72,10 +67,9 @@ class Evaluator:
 
         total_actions = max(sum(action_counts.values()), 1)
         return {
-            # Normalized (or raw if no normalizer) — primary signal for tracking
+            # Normalized (or raw if no normalizer)
             "eval/mean_reward": float(np.mean(rewards_norm)),
             "eval/std_reward": float(np.std(rewards_norm)),
-            # Raw always present so baselines and RL can be compared on the same scale
             "eval/mean_reward_raw": float(np.mean(rewards_raw)),
             "eval/std_reward_raw": float(np.std(rewards_raw)),
             "eval/mean_steps": float(np.mean(steps_list)),

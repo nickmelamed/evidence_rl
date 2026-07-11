@@ -1,4 +1,5 @@
 import numpy as np
+
 from evid_rl_env.agent.policy import encode_state
 
 
@@ -6,7 +7,7 @@ class PolicyGradient:
     def __init__(self, policy, config):
         self.policy = policy
         self.lr = config.lr
-        self.max_grad_norm = getattr(config, "max_grad_norm", 0.5)
+        self.max_grad_norm = config.max_grad_norm
         self.lr_decay_episodes = getattr(config, "lr_decay_episodes", 200)
         self.lr_min_fraction = getattr(config, "lr_min_fraction", 0.2)
         self._episode_count = 0

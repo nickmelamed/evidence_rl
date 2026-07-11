@@ -1,7 +1,9 @@
 import logging
-import yaml
 from pathlib import Path
-from evid_rl_env.agent.config import PPOConfig, PGConfig, BanditConfig
+
+import yaml
+
+from evid_rl_env.agent.config import BanditConfig, PGConfig, PPOConfig
 
 logger = logging.getLogger(__name__)
 

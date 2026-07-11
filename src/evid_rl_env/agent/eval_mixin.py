@@ -19,7 +19,7 @@ _CSV_COLUMNS = [
     "episode", "rl_mean", "rl_std",
     "random_mean", "majority_mean", "greedy_llm_mean",
     "fewshot_k3_mean", "fewshot_k5_mean", "best_of_5_mean", "imitation_mean",
-    "lcs", "ess", "grs", "comp", "delta_vs_greedy_llm",
+    "lcs", "ess", "grs", "comp", "bias", "delta_vs_greedy_llm",
 ]
 
 
@@ -116,6 +116,7 @@ class EvalMixin:
             "ess":               rl_metrics.get("eval/llm_ESS", ""),
             "grs":               rl_metrics.get("eval/llm_GRS", ""),
             "comp":              rl_metrics.get("eval/llm_COMP", ""),
+            "bias":              rl_metrics.get("eval/llm_BIAS", ""),
             "delta_vs_greedy_llm": rl_raw - ref_mean,
         }
 

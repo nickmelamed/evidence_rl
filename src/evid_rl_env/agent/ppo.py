@@ -1,4 +1,5 @@
 import numpy as np
+
 from evid_rl_env.agent.policy import encode_state
 
 
@@ -11,7 +12,7 @@ class PPO:
         self.entropy_coef = config.entropy_coef
         self.value_coef = config.value_coef
         self.K = getattr(config, "ppo_epochs", 4)
-        self.max_grad_norm = getattr(config, "max_grad_norm", 0.5)
+        self.max_grad_norm = config.max_grad_norm
         self.gae_lambda = getattr(config, "gae_lambda", 0.95)
 
     def compute_advantages(self, rewards, values, next_value=0.0):
@@ -40,7 +41,6 @@ class PPO:
                 states, actions, old_probs, returns, advantages
             ):
                 # Encode state once and reuse for all computations in this step.
-                # Previously encode_state was called 4-5 times per step per epoch
                 # (get_probs, get_value, grad_log_prob×2, explicit call).
                 features = encode_state(state)
 
@@ -61,7 +61,6 @@ class PPO:
                 actor_loss -= self.entropy_coef * entropy
 
                 value = float(features @ self.policy.value_params)
-                value_loss = (ret - value) ** 2
 
                 grad_actor = self.policy.grad_log_prob(
                     state, action_idx, features=features, probs=probs

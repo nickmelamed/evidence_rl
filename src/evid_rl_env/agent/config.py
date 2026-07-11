@@ -6,23 +6,27 @@ class BaseConfig:
         self.seed = 42
         self.default_annotator_model = "claude-opus-4-5"
         self.eval_every = 10
+        self.max_grad_norm = 0.5
+        # "random" or "similarity" (sentence-transformers embedding lookup) —
+        # selects FewShotLLMBaseline's few-shot example retrieval strategy.
+        self.fewshot_selection_mode = "random"
 
 class PPOConfig(BaseConfig):
     def __init__(self):
         super().__init__()
         self.lr = 0.001
         self.clip = 0.2
-        self.entropy_coef = 0.05  # was 0.01 — too weak to prevent collapse on short runs
+        self.entropy_coef = 0.05  
         self.value_coef = 0.05
         self.gae_lambda = 0.95
-        self.ppo_epochs = 2       # was 4 — K=4 over-commits weights after only a few episodes
+        self.ppo_epochs = 2       
 
 class PGConfig(BaseConfig):
     def __init__(self):
         super().__init__()
         self.lr = 0.01
-        self.lr_decay_episodes = 200   # span over which LR decays linearly
-        self.lr_min_fraction = 0.2     # floor: LR never drops below 20% of initial
+        self.lr_decay_episodes = 200   
+        self.lr_min_fraction = 0.2    
 
 class BanditConfig(BaseConfig):
     def __init__(self):
