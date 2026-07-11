@@ -1,12 +1,12 @@
-import os
-import json
 import csv
+import json
+import os
 from datetime import datetime
-
 
 FIXED_FIELDS = [
     "episode",
     "reward",
+    "reward_raw",
     "num_steps",
     "final_decision",
     "correct",
@@ -18,6 +18,8 @@ FIXED_FIELDS = [
     "tokens",
     "policy_type",
     "algo",
+    "curriculum_mean_score",
+    "pg_lr",
     "action_dist.select_evidence",
     "action_dist.remove_evidence",
     "action_dist.generate_support_argument",
@@ -27,6 +29,10 @@ FIXED_FIELDS = [
     "action_dist.rerank_evidence",
     "action_dist.summarize_evidence",
     "action_dist.concede_point",
+    "action_dist.assign_confidence",
+    "action_dist.challenge_evidence",
+    "action_dist.request_clarification",
+    "action_dist.hedge",
     "eval/mean_reward",
     "eval/std_reward",
 ]
