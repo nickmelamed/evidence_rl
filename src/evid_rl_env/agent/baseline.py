@@ -13,13 +13,12 @@ import json
 import logging
 import random
 import re
-import warnings
 from abc import ABC, abstractmethod
 
 import numpy as np
 
-from evid_rl_env.environment.environment import ClaimEnv
 from evid_rl_env.environment.actions import ACTIONS, Actions
+from evid_rl_env.environment.environment import ClaimEnv
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +26,7 @@ N_ACTIONS = len(ACTIONS)
 ACTION_DESCRIPTIONS = "\n".join(f"{i}: {a}" for i, a in enumerate(ACTIONS))
 
 
-# ---------------------------------------------------------------------------
-# Shared helpers
-# ---------------------------------------------------------------------------
+# shared helpers 
 
 def _build_payload(action: str, state) -> object:
     """Minimal valid payload for each action type."""
@@ -102,9 +99,7 @@ def run_episode(env: ClaimEnv, action_fn) -> tuple:
     return trajectory, total_reward, llm_scores
 
 
-# ---------------------------------------------------------------------------
-# Abstract base
-# ---------------------------------------------------------------------------
+# abstract base 
 
 class BaseEvaluator(ABC):
     """All baseline implementations inherit from this class."""
@@ -137,9 +132,7 @@ class BaseEvaluator(ABC):
             all_scores[key].extend(ep_scores[key])
 
 
-# ---------------------------------------------------------------------------
-# Block 4: Random and Majority baselines
-# ---------------------------------------------------------------------------
+# random and majority baselines 
 
 class RandomBaseline(BaseEvaluator):
     """Uniformly random action selection over the full action space."""
@@ -203,9 +196,7 @@ class MajorityBaseline(BaseEvaluator):
         return self._aggregate(rewards, all_scores)
 
 
-# ---------------------------------------------------------------------------
-# Shared LLM prompt helpers (Blocks 5-7)
-# ---------------------------------------------------------------------------
+# shared LLM prompt helpers 
 
 def _greedy_llm_prompt(state) -> str:
     return (
@@ -221,7 +212,7 @@ def _parse_action_idx(response: str, caller: str) -> int:
     match = re.search(r"\d+", response.strip())
     if match:
         return int(np.clip(int(match.group()), 0, N_ACTIONS - 1))
-    # AUDIT FIX: use logger.warning (not warnings.warn) and include the raw response
+    # use logger.warning (not warnings.warn) and include the raw response
     # so parse failures are visible in structured logs with enough context to debug
     logger.warning(
         "[%s] LLM response could not be parsed (response=%r) — falling back to random.",
@@ -230,9 +221,7 @@ def _parse_action_idx(response: str, caller: str) -> int:
     return random.randint(0, N_ACTIONS - 1)
 
 
-# ---------------------------------------------------------------------------
-# Block 5: Greedy LLM baseline
-# ---------------------------------------------------------------------------
+# Greedy LLM baseline 
 
 class GreedyLLMBaseline(BaseEvaluator):
     """Single LLM call per step to select the predicted best action."""
@@ -247,7 +236,7 @@ class GreedyLLMBaseline(BaseEvaluator):
             response, _ = self.llm.generate_structured(prompt)
             return _parse_action_idx(response, "GreedyLLMBaseline")
         except Exception as exc:
-            # AUDIT FIX: include model name and observation snippet so LLM failures
+            # include model name and observation snippet so LLM failures
             # are debuggable from logs without having to reproduce the episode
             logger.warning(
                 "[GreedyLLMBaseline] LLM call failed: %s | model=%s | obs='%.80s' "
@@ -271,9 +260,7 @@ class GreedyLLMBaseline(BaseEvaluator):
         return self._aggregate(rewards, all_scores)
 
 
-# ---------------------------------------------------------------------------
-# Block 6: Few-shot LLM baseline
-# ---------------------------------------------------------------------------
+# few-shot LLM baseline 
 
 class FewShotLLMBaseline(BaseEvaluator):
     """LLM action selection augmented with few-shot examples from train_dataset."""
@@ -319,7 +306,7 @@ class FewShotLLMBaseline(BaseEvaluator):
     def _embed(self, texts: list):
         try:
             from sentence_transformers import SentenceTransformer
-            # AUDIT FIX: reuse the cached SentenceTransformer instance instead of
+            # reuse the cached SentenceTransformer instance instead of
             # re-instantiating it on every _select_examples() call (one per step per episode)
             if self._st_model is None:
                 self._st_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -367,7 +354,7 @@ class FewShotLLMBaseline(BaseEvaluator):
             response, _ = self.llm.generate_structured(prompt)
             return _parse_action_idx(response, "FewShotLLMBaseline")
         except Exception as exc:
-            # AUDIT FIX: include model name and observation snippet so LLM failures
+            # include model name and observation snippet so LLM failures
             # are debuggable from logs without having to reproduce the episode
             logger.warning(
                 "[FewShotLLMBaseline] LLM call failed: %s | model=%s | obs='%.80s' "
@@ -394,9 +381,7 @@ class FewShotLLMBaseline(BaseEvaluator):
         return self._aggregate(rewards, all_scores)
 
 
-# ---------------------------------------------------------------------------
-# Block 7: Best-of-N baseline
-# ---------------------------------------------------------------------------
+# Best of N Baseline 
 
 class BestOfNBaseline(BaseEvaluator):
     """
@@ -415,7 +400,14 @@ class BestOfNBaseline(BaseEvaluator):
         try:
             response, _ = self.llm.generate_structured(_greedy_llm_prompt(state))
             return _parse_action_idx(response, "BestOfNBaseline")
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "[BestOfNBaseline] LLM call failed: %s | model=%s | obs='%.80s' "
+                "— falling back to random.",
+                exc,
+                getattr(self.llm, "model_name", "unknown"),
+                _state_summary(state),
+            )
             return random.randint(0, N_ACTIONS - 1)
 
     def _snapshot(self, env: ClaimEnv) -> dict:
@@ -470,9 +462,9 @@ class BestOfNBaseline(BaseEvaluator):
         return self._aggregate(rewards, all_scores)
 
 
-# ---------------------------------------------------------------------------
-# Block 9: Imitation baseline (behavioral cloning at inference time)
-# ---------------------------------------------------------------------------
+
+# Imitation baseline (behavioral cloning at inference time)
+
 
 class ImitationBaseline(BaseEvaluator):
     """
@@ -489,9 +481,7 @@ class ImitationBaseline(BaseEvaluator):
         self._lookup: dict = {}
         self._load(trajectories_path)
 
-    # ------------------------------------------------------------------
-    # Loading
-    # ------------------------------------------------------------------
+    # Loading 
 
     def _obs_hash(self, obs: str) -> int:
         return int(hashlib.md5(obs.encode()).hexdigest(), 16)
@@ -501,7 +491,7 @@ class ImitationBaseline(BaseEvaluator):
 
     def _load(self, path: str) -> None:
         n_trajectories = 0
-        # AUDIT FIX: track provenance fields so callers can audit which models/modes
+        # track provenance fields so callers can audit which models/modes
         # contributed to the lookup table; warn on records missing these fields
         annotator_models_seen: set = set()
         modes_seen: set = set()
@@ -528,7 +518,7 @@ class ImitationBaseline(BaseEvaluator):
                 self._lookup[claim].extend(entries)
                 n_trajectories += 1
 
-                # AUDIT FIX: collect provenance from each record
+                # collect provenance from each record
                 ann = rec.get("annotator_model")
                 mode = rec.get("mode")
                 if ann:
@@ -556,9 +546,7 @@ class ImitationBaseline(BaseEvaluator):
             sorted(modes_seen) or ["unknown"],
         )
 
-    # ------------------------------------------------------------------
-    # Action selection
-    # ------------------------------------------------------------------
+    # Action Selection 
 
     def _action_fn(self, state) -> int:
         obs = _state_summary(state)
@@ -596,9 +584,7 @@ class ImitationBaseline(BaseEvaluator):
         )
         return random.randint(0, N_ACTIONS - 1)
 
-    # ------------------------------------------------------------------
     # Evaluation
-    # ------------------------------------------------------------------
 
     def run(self, n_episodes: int) -> dict:
         env = ClaimEnv(self.eval_dataset)
