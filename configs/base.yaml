@@ -3,3 +3,7 @@ default_annotator_model: claude-opus-4-5
 eval_every: 10
 max_grad_norm: 0.5             # gradient clip norm for PPO/PolicyGradient updates
 fewshot_selection_mode: random # "random" or "similarity" — FewShotLLMBaseline's example retrieval strategy
+gold_judge_model: mistralai/Mistral-7B-Instruct-v0.2  # held-out judge for gold_eval only, never used in training reward; v0.2 already cached locally, no new download
+gold_eval_every: 5             # in eval rounds, not episodes — gold_eval is expensive (7B model)
+gold_eval_n_episodes: 20
+expensive_baseline_every: 5    # in eval rounds, not episodes — gates fewshot_k3/fewshot_k5/best_of_5

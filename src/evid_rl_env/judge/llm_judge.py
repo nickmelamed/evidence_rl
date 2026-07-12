@@ -11,10 +11,10 @@ _logger = logging.getLogger(__name__)
 
 
 class LLMJudge:
-    def __init__(self, llm, cache_scores=True):
+    def __init__(self, llm, cache_scores=True, cache_path="artifacts/cache/judge_cache.sqlite3"):
         self.llm = llm
         self.cache_scores = cache_scores
-        self._cache = SQLiteCache("artifacts/cache/judge_cache.sqlite3")
+        self._cache = SQLiteCache(cache_path)
 
     def _cache_key(self, claim, reasoning, evidence):
         raw = "\x1f".join([claim, reasoning, *(e.text for e in evidence)])
@@ -87,15 +87,16 @@ class LLMJudge:
 
         return dict(self._NEUTRAL)
 
-    def compute_reward(self, claim, reasoning, evidence):
+    def get_scores(self, claim, reasoning, evidence) -> dict:
+        """Raw per-dimension scores dict, independent of the reward formula
+        — used by compute_reward below, and by EnsembleJudge to aggregate
+        multiple members' scores before computing a single reward."""
         if not reasoning.strip():
-            return 0.0, {"LCS": 0.0, "ESS": 0.0, "GRS": 0.5, "COMP": 0.0, "BIAS": 0.5, "confidence": 0.0}
+            return {"LCS": 0.0, "ESS": 0.0, "GRS": 0.5, "COMP": 0.0, "BIAS": 0.5, "confidence": 0.0}
 
-        if self.cache_scores:
-            key = self._cache_key(claim, reasoning, evidence)
-            if key in self._cache:
-                scores = self._cache[key]
-                return self._scores_to_reward(scores), scores
+        key = self._cache_key(claim, reasoning, evidence) if self.cache_scores else None
+        if key is not None and key in self._cache:
+            return self._cache[key]
 
         prompt = self.build_prompt(claim, reasoning, evidence)
         try:
@@ -111,18 +112,23 @@ class LLMJudge:
                 getattr(self.llm, "model_name", "unknown"),
                 claim,
             )
-            scores = {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.0}
             # not cached — a transient failure shouldn't permanently deny
             # this (claim, reasoning, evidence) combo a real judge score
-            return self._scores_to_reward(scores), scores
+            return {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.0}
 
         scores = self.parse(response)
-        if self.cache_scores:
+        if key is not None:
             self._cache[key] = scores
+        return scores
 
+    def compute_reward(self, claim, reasoning, evidence):
+        scores = self.get_scores(claim, reasoning, evidence)
+        if not reasoning.strip():
+            return 0.0, scores
         return self._scores_to_reward(scores), scores
 
-    def _scores_to_reward(self, scores):
+    @staticmethod
+    def _scores_to_reward(scores):
         lcs = float(scores.get("LCS", 0.5))
         ess = float(scores.get("ESS", 0.5))
         grs = float(scores.get("GRS", 0.5))

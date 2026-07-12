@@ -44,11 +44,26 @@ def test_remove_evidence_is_penalized(make_env):
     assert reward == pytest.approx(-0.05)
 
 
-def test_query_within_budget_rewards_new_documents(make_env, fake_evidence_docs):
-    env = make_env()
+def test_query_within_budget_rewards_new_documents(make_env, fake_evidence_docs, fake_evidence_labeler):
+    labels = {
+        fake_evidence_docs[0]["content"]: "support",
+        fake_evidence_docs[1]["content"]: "contradict",
+        fake_evidence_docs[2]["content"]: "neutral",
+    }
+    env = make_env(evidence_labeler=fake_evidence_labeler(labels))
     env.reset()
     _, reward, _, _ = env.step(Actions.QUERY, "more evidence please")
-    assert reward == pytest.approx(0.05 * len(fake_evidence_docs))
+    assert reward == pytest.approx(0.10)  # 2 useful (support+contradict) docs, below the 0.15 cap
+
+
+def test_query_gives_no_reward_for_only_neutral_documents(make_env):
+    """Root-cause regression test: QUERY reward used to be 0.05 * raw doc
+    count regardless of label, so spamming queries for filler evidence paid
+    off. It's now gated on support/contradict labels."""
+    env = make_env()  # default labeler labels everything "neutral"
+    env.reset()
+    _, reward, _, _ = env.step(Actions.QUERY, "more evidence please")
+    assert reward == 0.0
 
 
 def test_query_over_budget_is_penalized(make_env):
@@ -119,8 +134,8 @@ def test_first_debate_action_at_step_one_reaches_the_judge(make_env):
     env = make_env(mock_response=GOOD_SCORES_JSON)
     env.reset()
     _, _, _, info = env.step(Actions.SUPPORT, "opening argument")
-    assert info["llm_reward"] == pytest.approx(0.52)
-    assert env.state.last_llm_score == pytest.approx(0.52)
+    assert info["llm_reward"] == pytest.approx(0.518)
+    assert env.state.last_llm_score == pytest.approx(0.518)
 
 
 def test_judge_is_not_called_again_within_two_steps(make_env):
@@ -130,8 +145,8 @@ def test_judge_is_not_called_again_within_two_steps(make_env):
     _, _, _, info2 = env.step(Actions.SUPPORT, "argument two")
     # If the gate incorrectly let a second call through, info2 would reflect
     # OTHER_SCORES_JSON instead of the reused first score.
-    assert info1["llm_reward"] == pytest.approx(0.52)
-    assert info2["llm_reward"] == pytest.approx(0.52)
+    assert info1["llm_reward"] == pytest.approx(0.518)
+    assert info2["llm_reward"] == pytest.approx(0.518)
 
 
 def test_judge_is_called_again_after_two_steps(make_env):
@@ -140,7 +155,7 @@ def test_judge_is_called_again_after_two_steps(make_env):
     env.step(Actions.SUPPORT, "argument one")       # step 1, calls judge
     env.step(Actions.RERANK, None)                   # step 2, no judge call
     _, _, _, info = env.step(Actions.SUPPORT, "argument two")  # step 3, gate reopens
-    assert info["llm_reward"] == pytest.approx(0.035)  # OTHER_SCORES_JSON's reward
+    assert info["llm_reward"] == pytest.approx(0.0815)  # OTHER_SCORES_JSON's reward
 
 
 # ---------------------------------------------------------------------------
@@ -187,7 +202,7 @@ def test_finalize_passes_llm_reward_into_base_reward(make_env, monkeypatch):
     _, _, done, info = env.step(Actions.FINALIZE, None)  # step 3
 
     assert done is True
-    assert captured["llm_reward"] == pytest.approx(0.52)
+    assert captured["llm_reward"] == pytest.approx(0.518)
     assert captured["llm_reward"] == info["llm_reward"]
 
 
@@ -356,11 +371,11 @@ def test_challenge_evidence_bonus_for_targeting_adversarial_evidence(
     _, reward, _, info = env.step(
         Actions.CHALLENGE_EVIDENCE, {"evidence_id": 0, "argument": "unreliable source"}
     )
-    assert info["llm_reward"] == pytest.approx(0.52)
+    assert info["llm_reward"] == pytest.approx(0.518)
     # base debate reward + adversarial-target bonus + potential-based shaping
     # (phi_prev=0 on the first step, phi_next=llm_reward since the episode
-    # isn't done yet: shaping = 0.1 * (0.99 * 0.52 - 0))
-    assert reward == pytest.approx(0.05 + 0.15 * 0.52 + 0.1 + 0.1 * (0.99 * 0.52))
+    # isn't done yet: shaping = 0.1 * (0.99 * 0.518 - 0))
+    assert reward == pytest.approx(0.05 + 0.15 * 0.518 + 0.1 + 0.1 * (0.99 * 0.518))
     assert 0 in env.state.challenged_evidence_ids
     assert "CHALLENGE(0): unreliable source" in env.state.debate_history
 
@@ -375,7 +390,7 @@ def test_challenge_evidence_penalty_for_targeting_supporting_evidence(
     _, reward, _, _ = env.step(
         Actions.CHALLENGE_EVIDENCE, {"evidence_id": 0, "argument": "unreliable source"}
     )
-    assert reward == pytest.approx(0.05 + 0.15 * 0.52 - 0.05 + 0.1 * (0.99 * 0.52))
+    assert reward == pytest.approx(0.05 + 0.15 * 0.518 - 0.05 + 0.1 * (0.99 * 0.518))
 
 
 def test_challenge_evidence_with_unknown_target_is_noop(make_env):
@@ -388,11 +403,16 @@ def test_challenge_evidence_with_unknown_target_is_noop(make_env):
     assert env.state.debate_history == []
 
 
-def test_request_clarification_within_budget_fetches_new_evidence(make_env, fake_evidence_docs):
-    env = make_env()
+def test_request_clarification_within_budget_fetches_new_evidence(make_env, fake_evidence_docs, fake_evidence_labeler):
+    labels = {
+        fake_evidence_docs[0]["content"]: "support",
+        fake_evidence_docs[1]["content"]: "contradict",
+        fake_evidence_docs[2]["content"]: "neutral",
+    }
+    env = make_env(evidence_labeler=fake_evidence_labeler(labels))
     env.reset()
     _, reward, _, _ = env.step(Actions.REQUEST_CLARIFICATION, "narrower query")
-    assert reward == pytest.approx(0.05 * len(fake_evidence_docs))
+    assert reward == pytest.approx(0.10)  # 2 useful (support+contradict) docs, below the 0.15 cap
     assert env.state.query_count == 1
     assert "CLARIFY: narrower query" in env.state.debate_history
 
@@ -411,8 +431,8 @@ def test_hedge_triggers_judge_and_reward_like_concede(make_env):
     env = make_env(mock_response=GOOD_SCORES_JSON)
     env.reset()
     _, reward, _, info = env.step(Actions.HEDGE, {"argument": "partially true"})
-    assert info["llm_reward"] == pytest.approx(0.52)
-    assert reward == pytest.approx(0.05 + 0.1 * 0.52 + 0.1 * (0.99 * 0.52))
+    assert info["llm_reward"] == pytest.approx(0.518)
+    assert reward == pytest.approx(0.05 + 0.1 * 0.518 + 0.1 * (0.99 * 0.518))
     assert "HEDGE: partially true" in env.state.debate_history
 
 
@@ -436,3 +456,197 @@ def test_non_finalize_steps_have_no_task_success(make_env):
     env.reset()
     _, _, _, info = env.step(Actions.SELECT, 0)
     assert info["task_success"] is None
+
+
+# ---------------------------------------------------------------------------
+# judge_ensemble_models dispatch (Phase 2: multi-judge ensemble)
+# ---------------------------------------------------------------------------
+
+def test_judge_ensemble_models_dispatches_to_ensemble_judge(monkeypatch):
+    """ClaimEnv(judge_ensemble_models=[...]) must use _get_ensemble_judge,
+    not the single-judge _get_llm_judge path — monkeypatched so this never
+    loads a real model."""
+    from evid_rl_env.environment import environment as env_module
+
+    sentinel = object()
+    captured = {}
+
+    def _fake_get_ensemble_judge(model_names, seed):
+        captured["model_names"] = model_names
+        captured["seed"] = seed
+        return sentinel
+
+    def _fail_get_llm_judge(model_name, seed):
+        raise AssertionError("single-judge path should not be used when judge_ensemble_models is set")
+
+    monkeypatch.setattr(env_module, "_get_ensemble_judge", _fake_get_ensemble_judge)
+    monkeypatch.setattr(env_module, "_get_llm_judge", _fail_get_llm_judge)
+
+    env = env_module.ClaimEnv(
+        [{"id": "c1", "claim": "test claim", "label": 1.0}],
+        seed=7,
+        judge_ensemble_models=["model-a", "model-b"],
+        evidence_labeler=object(),  # avoid _get_evidence_labeler's model load too
+    )
+
+    assert env.llm_judge is sentinel
+    assert captured["model_names"] == ("model-a", "model-b")
+    assert captured["seed"] == 7
+
+
+def test_judge_escalation_dispatches_to_escalating_judge(monkeypatch):
+    """ClaimEnv(judge_ensemble_models=[...], judge_escalation=True) must use
+    _get_escalating_judge, not the always-on _get_ensemble_judge path —
+    monkeypatched so this never loads a real model."""
+    from evid_rl_env.environment import environment as env_module
+
+    sentinel = object()
+    captured = {}
+
+    def _fake_get_escalating_judge(judge_model_name, ensemble_models, seed, escalation_target="ensemble"):
+        captured["judge_model_name"] = judge_model_name
+        captured["ensemble_models"] = ensemble_models
+        captured["seed"] = seed
+        captured["escalation_target"] = escalation_target
+        return sentinel
+
+    def _fail_get_ensemble_judge(model_names, seed):
+        raise AssertionError("always-on ensemble path should not be used when judge_escalation is True")
+
+    monkeypatch.setattr(env_module, "_get_escalating_judge", _fake_get_escalating_judge)
+    monkeypatch.setattr(env_module, "_get_ensemble_judge", _fail_get_ensemble_judge)
+
+    env = env_module.ClaimEnv(
+        [{"id": "c1", "claim": "test claim", "label": 1.0}],
+        seed=7,
+        judge_model="model-cheap",
+        judge_ensemble_models=["model-a", "model-b"],
+        judge_escalation=True,
+        evidence_labeler=object(),
+    )
+
+    assert env.llm_judge is sentinel
+    assert captured["judge_model_name"] == "model-cheap"
+    assert captured["ensemble_models"] == ("model-a", "model-b")
+    assert captured["seed"] == 7
+
+
+def test_judge_escalation_false_still_uses_always_on_ensemble(monkeypatch):
+    """Regression check: judge_ensemble_models alone (judge_escalation
+    unset/False) must keep dispatching to _get_ensemble_judge exactly as it
+    did before this phase."""
+    from evid_rl_env.environment import environment as env_module
+
+    sentinel = object()
+
+    def _fake_get_ensemble_judge(model_names, seed):
+        return sentinel
+
+    def _fail_get_escalating_judge(*args, **kwargs):
+        raise AssertionError("escalation path should not be used when judge_escalation is False")
+
+    monkeypatch.setattr(env_module, "_get_ensemble_judge", _fake_get_ensemble_judge)
+    monkeypatch.setattr(env_module, "_get_escalating_judge", _fail_get_escalating_judge)
+
+    env = env_module.ClaimEnv(
+        [{"id": "c1", "claim": "test claim", "label": 1.0}],
+        judge_ensemble_models=["model-a", "model-b"],
+        evidence_labeler=object(),
+    )
+
+    assert env.llm_judge is sentinel
+
+
+def test_get_escalating_judge_debate_target_uses_debate_judge(monkeypatch):
+    """_get_escalating_judge(..., escalation_target="debate") must call
+    _get_debate_judge, not _get_ensemble_judge — monkeypatched so this
+    never loads a real model."""
+    from evid_rl_env.environment import environment as env_module
+
+    cheap_sentinel = object()
+    debate_sentinel = object()
+
+    monkeypatch.setattr(env_module, "_get_llm_judge", lambda name, seed: cheap_sentinel)
+    monkeypatch.setattr(env_module, "_get_debate_judge", lambda seed: debate_sentinel)
+
+    def _fail_get_ensemble_judge(model_names, seed):
+        raise AssertionError("ensemble path should not be used for escalation_target='debate'")
+
+    monkeypatch.setattr(env_module, "_get_ensemble_judge", _fail_get_ensemble_judge)
+
+    result = env_module._get_escalating_judge(
+        "model-cheap", ("model-a", "model-b"), seed=7, escalation_target="debate",
+    )
+
+    assert result.cheap_judge is cheap_sentinel
+    assert result.escalated_judge is debate_sentinel
+
+
+def test_get_escalating_judge_ensemble_target_still_uses_ensemble_judge(monkeypatch):
+    """Regression check: the default escalation_target='ensemble' must keep
+    dispatching to _get_ensemble_judge exactly as Phase 3 left it."""
+    from evid_rl_env.environment import environment as env_module
+
+    cheap_sentinel = object()
+    ensemble_sentinel = object()
+
+    monkeypatch.setattr(env_module, "_get_llm_judge", lambda name, seed: cheap_sentinel)
+    monkeypatch.setattr(env_module, "_get_ensemble_judge", lambda model_names, seed: ensemble_sentinel)
+
+    def _fail_get_debate_judge(seed):
+        raise AssertionError("debate path should not be used for escalation_target='ensemble'")
+
+    monkeypatch.setattr(env_module, "_get_debate_judge", _fail_get_debate_judge)
+
+    result = env_module._get_escalating_judge(
+        "model-cheap", ("model-a", "model-b"), seed=7,
+    )
+
+    assert result.cheap_judge is cheap_sentinel
+    assert result.escalated_judge is ensemble_sentinel
+
+
+def test_claim_env_forwards_judge_escalation_target(monkeypatch):
+    from evid_rl_env.environment import environment as env_module
+
+    sentinel = object()
+    captured = {}
+
+    def _fake_get_escalating_judge(judge_model_name, ensemble_models, seed, escalation_target="ensemble"):
+        captured["escalation_target"] = escalation_target
+        return sentinel
+
+    monkeypatch.setattr(env_module, "_get_escalating_judge", _fake_get_escalating_judge)
+
+    env = env_module.ClaimEnv(
+        [{"id": "c1", "claim": "test claim", "label": 1.0}],
+        judge_ensemble_models=["model-a", "model-b"],
+        judge_escalation=True,
+        judge_escalation_target="debate",
+        evidence_labeler=object(),
+    )
+
+    assert env.llm_judge is sentinel
+    assert captured["escalation_target"] == "debate"
+
+
+def test_llm_judge_override_takes_priority_over_ensemble(monkeypatch):
+    """The existing test-injection seam (llm_judge=) must still win even
+    when judge_ensemble_models is also set."""
+    from evid_rl_env.environment import environment as env_module
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("should not be called when llm_judge= is provided")
+
+    monkeypatch.setattr(env_module, "_get_ensemble_judge", _fail)
+    monkeypatch.setattr(env_module, "_get_llm_judge", _fail)
+
+    injected = object()
+    env = env_module.ClaimEnv(
+        [{"id": "c1", "claim": "test claim", "label": 1.0}],
+        llm_judge=injected,
+        judge_ensemble_models=["model-a", "model-b"],
+        evidence_labeler=object(),
+    )
+
+    assert env.llm_judge is injected

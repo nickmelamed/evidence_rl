@@ -28,7 +28,8 @@ _DEFAULT_CONFIG_PATHS = {
 }
 
 
-def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None, evidence_snapshot=None):
+def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
+          evidence_snapshot=None, exp_name=None):
     if evidence_snapshot is not None:
         use_snapshot(evidence_snapshot)
 
@@ -57,11 +58,17 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None, ev
     curriculum = Curriculum()
     # Config loaded first so judge_model/actor_model actually drive which
     # models get instantiated instead of falling back to hardcoded defaults.
-    env = ClaimEnv(train_dataset, judge_model=config.judge_model, seed=seed)
+    env = ClaimEnv(
+        train_dataset, judge_model=config.judge_model, seed=seed,
+        judge_ensemble_models=getattr(config, "judge_ensemble_models", None),
+        judge_escalation=getattr(config, "judge_escalation", False),
+        judge_escalation_target=getattr(config, "judge_escalation_target", "ensemble"),
+    )
 
     policy = ActorCriticPolicy(len(list(ACTIONS)), model_name=config.actor_model, seed=seed)
 
     resolved_eval_every = eval_every if eval_every is not None else getattr(config, "eval_every", 25)
+    resolved_exp_name = exp_name or f"{method}_run"
 
     if method == 'bandit':
         trainer = BanditTrainer(
@@ -69,7 +76,7 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None, ev
             policy=policy,
             config=config,
             episodes=episodes,
-            exp_name=f"{method}_run",
+            exp_name=resolved_exp_name,
             seed=seed,
             eval_dataset=eval_dataset,
             eval_every=resolved_eval_every,
@@ -82,7 +89,7 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None, ev
             config=config,
             episodes=episodes,
             algo=method,
-            exp_name=f"{method}_run",
+            exp_name=resolved_exp_name,
             eval_dataset=eval_dataset,
             seed=seed,
             eval_every=resolved_eval_every,
@@ -100,6 +107,12 @@ def main():
                         help="Run evaluation every N episodes. Defaults to configs/base.yaml's "
                              "eval_every (currently 10).")
     parser.add_argument("--config", type=str, default=None, help="Path to a YAML config file (e.g. configs/ppo_baseline.yaml)")
+    parser.add_argument(
+        "--exp-name", type=str, default=None,
+        help="Experiment name prefix (a timestamp is always appended). "
+             "Defaults to '<method>_run' — useful for telling runs apart "
+             "under artifacts/experiments/ when comparing configs.",
+    )
     parser.add_argument(
         "--evidence-snapshot",
         type=str,
@@ -124,7 +137,8 @@ def main():
         seed = load_base_config().get("seed", 42)
 
     train(args.episodes, args.method, args.config, seed=seed,
-          eval_every=args.eval_every, evidence_snapshot=args.evidence_snapshot)
+          eval_every=args.eval_every, evidence_snapshot=args.evidence_snapshot,
+          exp_name=args.exp_name)
 
 
 if __name__ == "__main__":

@@ -40,8 +40,8 @@ Issued at each action to shape the learning signal mid-episode:
 
 | Action | Reward |
 |---|---|
-| `SELECT` (new evidence) | +0.10 + 0.05 diversity bonus |
-| `SELECT` (duplicate) | 0 |
+| `SELECT` (new evidence) | +0.10 + 0.05 diversity bonus + 0.1 × claim-similarity |
+| `SELECT` (duplicate) | −0.1 |
 | `REMOVE` | −0.05 |
 | `SUPPORT` | +0.05 + 0.15 × ΔLLM |
 | `CONTRADICT` | +0.05 + 0.15 × ΔLLM |
@@ -100,10 +100,11 @@ The pipeline is intentionally lightweight:
 
 1. Claim arrives at episode reset
 2. Tavily query fires; top-k results are fetched and structured as `Evidence` objects
-3. Evidence pool is passed to `ClaimEnv` — no further preprocessing
-4. Agent interacts with live-retrieved evidence for the full episode
+3. Each document is labeled by `judge.evidence_labeler.EvidenceLabeler` — a cached LLM call (reusing the judge model) classifying its stance toward the claim (`support`/`contradict`/`neutral`) and whether it looks adversarial (unreliable/low-quality), which feeds directly into `base_reward`'s F1/CA/AC terms
+4. Evidence pool is passed to `ClaimEnv`
+5. Agent interacts with live-retrieved, labeled evidence for the full episode
 
-This design keeps the evidence pipeline stateless and eliminates retrieval infrastructure entirely. The tradeoff is nondeterminism across runs (web content changes), which is acceptable in a training setting where diversity of evidence is a feature, not a bug.
+This design keeps retrieval infrastructure minimal (no pre-indexed corpus, no vector DB). The tradeoff is that a fresh checkout with a cold cache sees different evidence than a previous run (web content changes) — the fetch cache (`artifacts/cache/fetch_cache.sqlite3`) makes results stable *within* a machine once warmed, but not portable across machines. For results you need to reproduce exactly (e.g. in a report), use `evid-snapshot` to export a portable JSON snapshot, and pass `--evidence-snapshot` to `evid-train`/`evid-eval` to load it — this bypasses both the live Tavily call and the local sqlite cache for any claim it covers.
 
 ---
 
@@ -145,7 +146,24 @@ source ev_rl/bin/activate
 pip install -e .
 ```
 
-This installs the `evid_rl_env` package and registers the CLI entry points: `evid-train`, `evid-eval`, `evid-collect`, `evid-migrate`, `plot-exp`, `compare-exp`, and `run-episode`.
+This installs the `evid_rl_env` package and registers the CLI entry points: `evid-train`, `evid-eval`, `evid-collect`, `evid-migrate`, `evid-snapshot`, `plot-exp`, `compare-exp`, and `run-episode`.
+
+For running the test suite and linter, install the `dev` extra instead: `pip install -e .[dev]`.
+
+---
+
+## Testing
+
+```bash
+make test   # or: pytest
+make lint   # or: ruff check .
+```
+
+The test suite mocks every LLM/judge boundary (`ClaimEnv` accepts an injected
+`llm_judge=`, and the baseline classes take a duck-typed `llm_client`), so it
+never downloads or runs the actual gemma/qwen generation models and needs no
+API keys or network access. A GitHub Actions workflow (`.github/workflows/ci.yml`)
+runs both on every push and pull request.
 
 ---
 
@@ -166,16 +184,16 @@ algo: ppo
 rl:
   lr: 0.001
   clip: 0.2
-  entropy_coef: 0.01
+  entropy_coef: 0.05  # raised from 0.01 — too weak to prevent collapse on short runs
   value_coef: 0.05
   gamma: 0.99
-  ppo_epochs: 4
+  ppo_epochs: 2        # lowered from 4 — K=4 over-commits weights after only a few episodes
   gae_lambda: 0.95
   actor_model: "google/gemma-2-2b-it"
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
 ```
 
-Alternatively, override individual settings via the `BaseConfig` / `PPOConfig` / `PGConfig` / `BanditConfig` classes in `src/evid_rl_env/agent/config.py`.
+`src/evid_rl_env/agent/config.py`'s `BaseConfig`/`PPOConfig`/`PGConfig`/`BanditConfig` classes define the config *schema* and hold real defaults only for cross-cutting fields that aren't per-run tuning knobs (model choices, seed). Algorithm-specific RL hyperparameters (`lr`, `clip`, `entropy_coef`, `gamma`, `alpha`, ...) are intentionally left unset there — `configs/*_baseline.yaml` is the single source of truth for those, so edit the YAML (or point `--config` at a new file) rather than the Python class to tune a run.
 
 ---
 
@@ -381,8 +399,7 @@ Score-to-reward conversion: `0.30 × LCS + 0.25 × ESS + 0.20 × COMP − 0.25 �
 
 ## Future Work
 
-- **Learned reward models:** replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less sensitive to brittle heuristics like adversarial contamination labels
-- **Embedding-based reranking:** `RERANK` currently orders selected evidence by text length as a proxy for relevance; replace with embedding similarity to the claim once the state encoder is wired into the action handler
-- **Re-annotation pipeline:** `evid-eval --annotator-model` is wired for post-hoc re-annotation of imitation trajectories but not yet connected to a re-scoring workflow; completing this would enable iterative dataset improvement without full recollection
+- **Learned reward models:** replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less dependent on the `EvidenceLabeler`'s own LLM-based stance/reliability judgments (an improvement over the old static `"neutral"` default, but still a heuristic proxy, not ground truth)
+- **Re-annotation pipeline:** `evid-collect --annotator-model` is wired for labeling trajectories with a strong LLM but not yet connected to a re-scoring workflow for *existing* imitation trajectories; completing this would enable iterative dataset improvement without full recollection
 - **Multi-agent debate:** pit two independent agents against each other — one constrained to support, one to contradiction — with a separate arbiter issuing the final reward signal; this separates role from policy and eliminates the need for a single agent to self-regulate debate balance
 - **Domain expansion:** extend beyond scientific claims to regulatory filings, clinical trial reports, and policy documents, with domain-specific evidence retrievers and reward calibration for each domain's ground-truth structure

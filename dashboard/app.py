@@ -55,6 +55,21 @@ COLOR_MAP = {
     "rl":         "#1D9E75",
 }
 
+# Gold-eval tab: proxy (cheap training judge) vs gold (held-out judge) reused
+
+PROXY_COLOR = "#378ADD"
+GOLD_COLOR = "#1D9E75"
+DIMENSION_COLORS = {
+    "LCS":  "#378ADD",
+    "ESS":  "#7F77DD",
+    "GRS":  "#E24B4A",
+    "COMP": "#1D9E75",
+    "BIAS": "#F5A623",
+}
+
+# Cross-experiment gold-eval comparison (Compare tab)
+GOLD_COMPARE_COLORS = ["#378ADD", "#1D9E75", "#D85A30", "#7F77DD", "#F5A623", "#888780", "#E24B4A", "#9B91E8"]
+
 # sidebar
 auto_refresh = st.sidebar.checkbox("Live Monitoring", value=False)
 refresh_rate = st.sidebar.slider("Refresh (sec)", 1, 10, 3)
@@ -110,6 +125,39 @@ def load_eval_results(exp_path):
     if os.path.exists(path):
         return _read_json_file(path, os.path.getmtime(path))
     return None
+
+@st.cache_data
+def _read_jsonl(path: str, mtime: float) -> pd.DataFrame:
+    rows = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                rows.append(json.loads(line))
+    return pd.DataFrame(rows)
+
+def load_gold_eval(exp_path):
+    """Rows written by EvalMixin._maybe_run_gold_eval during training and/or
+    evid-gold-eval standalone runs — see agent/gold_evaluator.py. Flattens
+    the nested "dimensions" dict (LCS/ESS/GRS/COMP/BIAS -> proxy/gold/
+    disagreement) into flat columns so it's plot-ready."""
+    path = os.path.join(exp_path, "gold_eval.jsonl")
+    if not os.path.exists(path):
+        return None
+    df = _read_jsonl(path, os.path.getmtime(path))
+    if df.empty or "dimensions" not in df.columns:
+        return df
+    for dim in ("LCS", "ESS", "GRS", "COMP", "BIAS"):
+        df[f"{dim}_proxy"] = df["dimensions"].apply(
+            lambda d: d.get(dim, {}).get("proxy_mean") if isinstance(d, dict) else None
+        )
+        df[f"{dim}_gold"] = df["dimensions"].apply(
+            lambda d: d.get(dim, {}).get("gold_mean") if isinstance(d, dict) else None
+        )
+        df[f"{dim}_disagreement"] = df["dimensions"].apply(
+            lambda d: d.get(dim, {}).get("mean_abs_disagreement") if isinstance(d, dict) else None
+        )
+    return df
 
 def _line_chart(df, x, y, title):
     """Shared px.line + st.plotly_chart pattern used throughout this dashboard."""
@@ -462,6 +510,59 @@ with tab1:
         else:
             st.info("Eval data not yet available. Set eval_every in Trainer to enable.")
 
+        st.subheader("Gold-Judge Overoptimization Check")
+        gold_df = load_gold_eval(exp_path)
+        if gold_df is None or gold_df.empty:
+            st.info(
+                "No gold_eval.jsonl yet — set gold_judge_model in configs/base.yaml "
+                "and train with gold_eval_every set, or run evid-gold-eval against "
+                "a checkpoint."
+            )
+        else:
+            gold_df = gold_df.sort_values("episode", na_position="last")
+
+            fig_gold = go.Figure()
+            fig_gold.add_trace(go.Scatter(
+                x=gold_df["episode"], y=gold_df["proxy_reward_mean"],
+                mode="lines+markers", name="Proxy judge (training)",
+                line=dict(color=PROXY_COLOR, width=2),
+            ))
+            fig_gold.add_trace(go.Scatter(
+                x=gold_df["episode"], y=gold_df["gold_reward_mean"],
+                mode="lines+markers", name="Gold judge (held-out)",
+                line=dict(color=GOLD_COLOR, width=2),
+            ))
+            fig_gold.update_layout(
+                title="Proxy vs gold judge reward — divergence signals reward hacking",
+                yaxis_title="reward",
+            )
+            st.plotly_chart(fig_gold, width="stretch")
+
+            if "GRS" in DIMENSION_COLORS:
+                dim_rows = []
+                for _, row in gold_df.iterrows():
+                    for dim in DIMENSION_COLORS:
+                        val = row.get(f"{dim}_disagreement")
+                        if val is not None and not pd.isna(val):
+                            dim_rows.append({"episode": row["episode"], "dimension": dim, "disagreement": val})
+                if dim_rows:
+                    fig_dim = px.line(
+                        pd.DataFrame(dim_rows), x="episode", y="disagreement", color="dimension",
+                        category_orders={"dimension": list(DIMENSION_COLORS)},
+                        color_discrete_map=DIMENSION_COLORS,
+                        title="Per-dimension |proxy − gold| disagreement over training",
+                    )
+                    fig_dim.update_traces(line=dict(width=2))
+                    st.plotly_chart(fig_dim, width="stretch")
+
+            if "outcome_accuracy" in gold_df.columns:
+                fig_acc = px.line(
+                    gold_df, x="episode", y="outcome_accuracy",
+                    title="Outcome accuracy vs. ground-truth label (gold-eval split)",
+                )
+                fig_acc.update_traces(line=dict(color=GOLD_COLOR, width=2))
+                st.plotly_chart(fig_acc, width="stretch")
+
     # Policy behavior — internal training diagnostics, hidden in demo mode
     if not demo_mode:
         st.subheader("Policy Behavior")
@@ -498,8 +599,8 @@ with tab1:
         if "num_steps" in df.columns:
             _line_chart(df, "episode", "num_steps", "Steps per episode")
 
-        if "curriculum_level" in df.columns:
-            _line_chart(df, "episode", "curriculum_level", "Curriculum level")
+        if "curriculum_mean_score" in df.columns:
+            _line_chart(df, "episode", "curriculum_mean_score", "Curriculum mean PLR score")
 
         if "reward_raw" in df.columns and "reward" in df.columns:
             _line_chart(df, "episode", ["reward", "reward_raw"], "Normalised vs raw reward")
@@ -705,6 +806,105 @@ with tab2:
             ))
     if fig_llm.data:
         st.plotly_chart(fig_llm, width="stretch")
+
+    st.subheader("Gold-eval comparison across experiments")
+    raw_frames = []
+    for exp in selected:
+        name = os.path.basename(exp)
+        gdf = load_gold_eval(exp)
+        if gdf is None or gdf.empty or "n_scored" not in gdf.columns:
+            continue
+        gdf = gdf.copy()
+        gdf["experiment"] = name
+        gdf["finalize_rate"] = gdf["n_scored"] / gdf["n_episodes"]
+        raw_frames.append(gdf)
+
+    if not raw_frames:
+        st.info("No selected experiments have gold_eval.jsonl data yet — set gold_judge_model in configs/base.yaml and train with gold_eval_every set, or run evid-gold-eval against a checkpoint.")
+    else:
+        raw_combined = pd.concat(raw_frames, ignore_index=True)
+        exp_order = raw_combined["experiment"].unique().tolist()
+        exp_color_map = {n: GOLD_COMPARE_COLORS[i % len(GOLD_COMPARE_COLORS)] for i, n in enumerate(exp_order)}
+        _px_kwargs = dict(
+            category_orders={"experiment": exp_order}, color_discrete_map=exp_color_map, markers=True,
+        )
+
+        # Finalize rate uses every row, including n_scored=0 ones 
+        fig_finalize = px.line(
+            raw_combined, x="episode", y="finalize_rate", color="experiment",
+            title="Finalize rate (n_scored / n_episodes) over training, by experiment",
+            **_px_kwargs,
+        )
+        fig_finalize.update_traces(line=dict(width=2))
+        fig_finalize.update_yaxes(range=[0, 1])
+        st.plotly_chart(fig_finalize, width="stretch")
+
+        reward_combined = (
+            raw_combined.dropna(subset=["proxy_reward_mean", "gold_reward_mean"]).copy()
+            if "proxy_reward_mean" in raw_combined.columns else pd.DataFrame()
+        )
+        if reward_combined.empty:
+            st.info("No selected experiments have scored episodes yet for reward-based comparisons.")
+        else:
+            reward_combined["divergence"] = (
+                reward_combined["proxy_reward_mean"] - reward_combined["gold_reward_mean"]
+            ).abs()
+
+            fig_gold_reward = px.line(
+                reward_combined, x="episode", y="gold_reward_mean", color="experiment",
+                title="Gold-judge reward over training, by experiment", **_px_kwargs,
+            )
+            fig_gold_reward.update_traces(line=dict(width=2))
+            st.plotly_chart(fig_gold_reward, width="stretch")
+
+            fig_divergence = px.line(
+                reward_combined, x="episode", y="divergence", color="experiment",
+                title="|proxy − gold| reward divergence over training, by experiment", **_px_kwargs,
+            )
+            fig_divergence.update_traces(line=dict(width=2))
+            st.plotly_chart(fig_divergence, width="stretch")
+
+            dim_cols = [f"{d}_disagreement" for d in ("LCS", "ESS", "GRS", "COMP", "BIAS")]
+            if all(c in reward_combined.columns for c in dim_cols):
+                long_dim = reward_combined.melt(
+                    id_vars=["episode", "experiment"], value_vars=dim_cols,
+                    var_name="dimension", value_name="disagreement",
+                )
+                long_dim["dimension"] = long_dim["dimension"].str.replace("_disagreement", "", regex=False)
+                long_dim = long_dim.dropna(subset=["disagreement"])
+                if not long_dim.empty:
+                    fig_dims = px.line(
+                        long_dim, x="episode", y="disagreement", color="experiment",
+                        facet_col="dimension", facet_col_wrap=3,
+                        category_orders={"experiment": exp_order, "dimension": ["LCS", "ESS", "GRS", "COMP", "BIAS"]},
+                        color_discrete_map=exp_color_map, markers=True,
+                        title="Per-dimension |proxy − gold| disagreement over training, by experiment",
+                    )
+                    fig_dims.update_traces(line=dict(width=2))
+                    st.plotly_chart(fig_dims, width="stretch")
+
+            esc_df = (
+                raw_combined.dropna(subset=["escalation_rate"])
+                if "escalation_rate" in raw_combined.columns else pd.DataFrame()
+            )
+            if not esc_df.empty:
+                fig_esc = px.line(
+                    esc_df, x="episode", y="escalation_rate", color="experiment",
+                    title="Escalation rate over training, by experiment (escalation/debate configs only)",
+                    **_px_kwargs,
+                )
+                fig_esc.update_traces(line=dict(width=2))
+                fig_esc.update_yaxes(range=[0, 1])
+                st.plotly_chart(fig_esc, width="stretch")
+
+            acc_df = reward_combined.dropna(subset=["outcome_accuracy"]) if "outcome_accuracy" in reward_combined.columns else pd.DataFrame()
+            if not acc_df.empty:
+                fig_acc = px.line(
+                    acc_df, x="episode", y="outcome_accuracy", color="experiment",
+                    title="Outcome accuracy over training, by experiment", **_px_kwargs,
+                )
+                fig_acc.update_traces(line=dict(width=2))
+                st.plotly_chart(fig_acc, width="stretch")
 
 # tab3: Episode Drilldown
 with tab3:

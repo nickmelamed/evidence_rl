@@ -15,6 +15,13 @@ _BASELINE_TABLE_ORDER = [
     "fewshot_k3", "fewshot_k5", "best_of_5", "imitation",
 ]
 
+# fewshot_k3/fewshot_k5 each pay a one-time full train-set sweep to build
+# their example bank, and best_of_5 makes up to 5x actor+judge calls per
+# step — gated to expensive_baseline_every eval rounds instead of every
+# round. random/majority/greedy_llm/imitation are free or cheap (and
+# greedy_llm is the CI-gate reference) so they always run.
+_EXPENSIVE_BASELINES = {"fewshot_k3", "fewshot_k5", "best_of_5"}
+
 _CSV_COLUMNS = [
     "episode", "rl_mean", "rl_std",
     "random_mean", "majority_mean", "greedy_llm_mean",
@@ -47,6 +54,13 @@ class EvalMixin:
             np.random.set_state(_np_rng_state)
 
     def _run_eval_round_inner(self, ep: int) -> None:
+        # Single shared counter for every cadence-gated eval-round feature
+
+        self._eval_round_count = getattr(self, "_eval_round_count", 0) + 1
+        run_expensive_baselines = (
+            self._eval_round_count % getattr(self, "expensive_baseline_every", 5) == 0
+        )
+
         rl_metrics = self.evaluator.evaluate()
         rl_raw = rl_metrics["eval/mean_reward_raw"]
         rl_raw_std = rl_metrics["eval/std_reward_raw"]
@@ -55,6 +69,8 @@ class EvalMixin:
 
         baseline_results = {}
         for name, bl in self.baselines.items():
+            if name in _EXPENSIVE_BASELINES and not run_expensive_baselines:
+                continue
             baseline_results[name] = bl.run(self.baseline_n_episodes)
 
         ref = baseline_results.get("greedy_llm", {}).get("mean_reward", 0.0)
@@ -85,6 +101,33 @@ class EvalMixin:
             for name, r in baseline_results.items():
                 combined[f"baseline/{name}/mean_reward"] = r["mean_reward"]
             wandb.log(combined, step=ep)
+
+        self._maybe_run_gold_eval(ep)
+
+    def _maybe_run_gold_eval(self, ep: int) -> None:
+        """Gold eval runs on its own coarser cadence (gold_eval_every eval
+        *rounds*, not episodes) since the gold judge is typically far more
+        expensive than the training judge — see agent/gold_evaluator.py."""
+        gold_evaluator = getattr(self, "gold_evaluator", None)
+        if gold_evaluator is None:
+            return
+        if getattr(self, "_eval_round_count", 0) % getattr(self, "gold_eval_every", 5) != 0:
+            return
+
+        summary = gold_evaluator.evaluate()
+        print(
+            f"[Gold eval ep {ep + 1}] proxy={summary['proxy_reward_mean']} "
+            f"gold={summary['gold_reward_mean']} "
+            f"corr={summary['proxy_gold_correlation']} "
+            f"accuracy={summary['outcome_accuracy']}"
+        )
+        self.tracker.log_gold_eval(ep + 1, summary)
+        if self.use_wandb:
+            wandb_summary = {"gold_eval/" + k: v for k, v in summary.items() if k != "dimensions"}
+            for dim, vals in summary.get("dimensions", {}).items():
+                for vk, vv in vals.items():
+                    wandb_summary[f"gold_eval/{dim}/{vk}"] = vv
+            wandb.log(wandb_summary, step=ep)
 
     def _append_eval_csv(
         self,

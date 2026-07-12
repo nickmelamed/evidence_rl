@@ -25,6 +25,13 @@ def test_precision_mixed():
     assert compute_precision([SUPPORT, NEUTRAL]) == 0.5
 
 
+def test_precision_counts_contradict_as_relevant():
+    """Contradiction-acknowledgment shouldn't be taxed by precision: selecting
+    a contradicting document is exactly what compute_contradiction_acknowledgment
+    rewards, so it must not also lower precision."""
+    assert compute_precision([SUPPORT, CONTRADICT]) == 1.0
+
+
 def test_recall_no_support_available_is_vacuously_perfect():
     assert compute_recall([], [NEUTRAL, CONTRADICT]) == 1.0
 

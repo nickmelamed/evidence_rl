@@ -95,6 +95,13 @@ class BaseTrainer(EvalMixin):
             "seed": seed,
             "state_dim": getattr(self.policy, "state_dim", None),
             "eval_every": self.eval_every,
+            # judge architecture — recorded so a run's config.json is
+            # self-describing when comparing single/ensemble/escalation
+            "judge_model": getattr(config, "judge_model", None),
+            "judge_ensemble_models": getattr(config, "judge_ensemble_models", None),
+            "judge_escalation": getattr(config, "judge_escalation", False),
+            "judge_escalation_target": getattr(config, "judge_escalation_target", "ensemble"),
+            "gold_judge_model": getattr(config, "gold_judge_model", None),
         }
         if extra_wandb_config:
             wandb_config.update(extra_wandb_config)
@@ -106,10 +113,19 @@ class BaseTrainer(EvalMixin):
         self.evaluator = None
         self.baselines = {}
         self.llm_client = getattr(self.policy, "llm", None)
+        self.gold_evaluator = None
+        self.gold_eval_every = getattr(config, "gold_eval_every", 5)
+        self.expensive_baseline_every = getattr(config, "expensive_baseline_every", 5)
+        self._eval_round_count = 0
 
         if eval_dataset is not None:
             from evid_rl_env.environment.environment import ClaimEnv
-            eval_env = ClaimEnv(eval_dataset, judge_model=getattr(config, "judge_model", None))
+            eval_env = ClaimEnv(
+                eval_dataset, judge_model=getattr(config, "judge_model", None),
+                judge_ensemble_models=getattr(config, "judge_ensemble_models", None),
+                judge_escalation=getattr(config, "judge_escalation", False),
+                judge_escalation_target=getattr(config, "judge_escalation_target", "ensemble"),
+            )
             self.evaluator = Evaluator(
                 eval_env, policy, reward_normalizer=self.reward_rms
             )
@@ -120,6 +136,15 @@ class BaseTrainer(EvalMixin):
                     fewshot_selection_mode=getattr(config, "fewshot_selection_mode", "random"),
                 )
 
+            gold_judge_model = getattr(config, "gold_judge_model", None)
+            if gold_judge_model:
+                self.gold_evaluator = self._build_gold_evaluator(
+                    eval_dataset, gold_judge_model,
+                    getattr(config, "judge_model", None),
+                    getattr(config, "gold_eval_n_episodes", 20),
+                    seed,
+                )
+
         print(
             f"Train: {len(env.dataset)} samples | "
             f"Eval: {len(eval_dataset) if eval_dataset else 0} samples | "
@@ -128,6 +153,31 @@ class BaseTrainer(EvalMixin):
 
         if self.use_wandb:
             wandb.init(project="evid-rl", name=exp_name, config=wandb_config)
+
+    def _build_gold_evaluator(self, eval_dataset, gold_judge_model, judge_model, n_episodes, seed):
+        """Held-out judge (different model family, never used in training
+        reward) plus a fixed-size seeded subsample of eval_dataset, wrapped
+        in a GoldEvaluator — see agent/gold_evaluator.py. Kept a small
+        subsample regardless of eval_dataset size since gold_judge_model is
+        typically 5-10x larger than judge_model and this runs on its own,
+        coarser cadence (self.gold_eval_every)."""
+        from evid_rl_env.agent.gold_evaluator import GoldEvaluator
+        from evid_rl_env.agent.llm_client import JudgeLLMClient
+        from evid_rl_env.environment.environment import ClaimEnv
+        from evid_rl_env.judge.llm_judge import LLMJudge
+
+        gold_llm_client = JudgeLLMClient(model_name=gold_judge_model, seed=seed)
+        gold_judge = LLMJudge(
+            gold_llm_client, cache_path="artifacts/cache/gold_judge_cache.sqlite3",
+        )
+
+        _rng_state = random.getstate()
+        random.seed(seed)
+        gold_subset = random.sample(eval_dataset, min(n_episodes, len(eval_dataset)))
+        random.setstate(_rng_state)
+
+        gold_env = ClaimEnv(gold_subset, judge_model=judge_model, seed=seed)
+        return GoldEvaluator(gold_env, self.policy, [gold_judge], n_episodes=len(gold_subset))
 
     def _update_curriculum(self, claim_id, task_success) -> None:
         """Feed the episode's task-success signal to the curriculum, keyed by

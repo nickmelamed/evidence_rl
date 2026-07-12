@@ -81,6 +81,16 @@ class ExperimentTracker:
             writer = csv.DictWriter(f, fieldnames=FIXED_FIELDS)
             writer.writerow(row)
 
+    def log_gold_eval(self, episode: int, summary: dict):
+        """Appends one JSON line per gold-eval round to gold_eval.jsonl —
+        kept separate from the fixed-schema metrics.csv since the summary
+        (per-dimension proxy/gold/disagreement, correlation, accuracy) is
+        richer and shouldn't force FIXED_FIELDS to grow."""
+        path = os.path.join(self.base_dir, "gold_eval.jsonl")
+        row = {"episode": episode, **summary}
+        with open(path, "a") as f:
+            f.write(json.dumps(row) + "\n")
+
     def save_trajectory(self, episode: int, trajectory: list):
         path = os.path.join(self.traj_dir, f"episode_{episode}.json")
         with open(path, "w") as f:

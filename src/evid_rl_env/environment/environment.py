@@ -14,6 +14,9 @@ from evid_rl_env.judge.reward import RewardFunction
 _judge_llm_cache: dict = {}       # model_name -> JudgeLLMClient
 _llm_judge_cache: dict = {}       # model_name -> LLMJudge
 _evidence_labeler_cache: dict = {}  # model_name -> EvidenceLabeler
+_ensemble_judge_cache: dict = {}  # tuple(model_names) -> EnsembleJudge
+_escalating_judge_cache: dict = {}  # (judge_model_name, tuple(ensemble_models), escalation_target) -> EscalatingJudge
+_debate_judge_cache: dict = {}    # seed -> DebateJudge
 
 
 def _get_llm_judge(model_name: str, seed: int) -> LLMJudge:
@@ -24,6 +27,44 @@ def _get_llm_judge(model_name: str, seed: int) -> LLMJudge:
     if model_name not in _llm_judge_cache:
         _llm_judge_cache[model_name] = LLMJudge(_judge_llm_cache[model_name])
     return _llm_judge_cache[model_name]
+
+
+def _get_ensemble_judge(model_names: tuple, seed: int):
+    # Keyed by the full tuple of model names so distinct ensembles
+    # (e.g. different configs) don't collide, mirroring _get_llm_judge above —
+    # this is also how the training env and eval env end up sharing the same
+    # EnsembleJudge instance (and loaded models) without passing one between
+    # cli/train.py and base_trainer.py explicitly.
+    from evid_rl_env.judge.ensemble_judge import build_ensemble_judge
+    if model_names not in _ensemble_judge_cache:
+        _ensemble_judge_cache[model_names] = build_ensemble_judge(list(model_names), seed)
+    return _ensemble_judge_cache[model_names]
+
+
+def _get_debate_judge(seed: int):
+    # Keyed by seed only — DebateJudge's model choices are fixed defaults
+    # (see judge/debate_judge.py), not config-driven, so there's only ever
+    # one debate judge per seed.
+    if seed not in _debate_judge_cache:
+        from evid_rl_env.judge.debate_judge import build_debate_judge
+        _debate_judge_cache[seed] = build_debate_judge(seed)
+    return _debate_judge_cache[seed]
+
+
+def _get_escalating_judge(judge_model_name: str, ensemble_models: tuple, seed: int,
+                           escalation_target: str = "ensemble"):
+    # Composes the already-cached _get_llm_judge (tier 1) and either
+    # _get_ensemble_judge or _get_debate_judge (tier 2) directly
+    key = (judge_model_name, ensemble_models, escalation_target)
+    if key not in _escalating_judge_cache:
+        from evid_rl_env.judge.escalating_judge import EscalatingJudge
+        cheap = _get_llm_judge(judge_model_name, seed)
+        if escalation_target == "debate":
+            escalated = _get_debate_judge(seed)
+        else:
+            escalated = _get_ensemble_judge(ensemble_models, seed)
+        _escalating_judge_cache[key] = EscalatingJudge(cheap, escalated)
+    return _escalating_judge_cache[key]
 
 
 def _get_evidence_labeler(model_name: str, seed: int) -> EvidenceLabeler:
@@ -47,7 +88,8 @@ class ClaimEnv:
     _SELECT_LABEL_REWARD = {"support": 0.15, "contradict": 0.10, "neutral": 0.0, "adversarial": -0.15}
 
     def __init__(self, dataset, judge_model=None, seed: int = 42, llm_judge=None,
-                 embedder=None, evidence_labeler=None):
+                 embedder=None, evidence_labeler=None, judge_ensemble_models=None,
+                 judge_escalation=False, judge_escalation_target="ensemble"):
         self.dataset = dataset
         self.state = None
         self.current_sample = None
@@ -60,6 +102,13 @@ class ClaimEnv:
             # so callers (e.g. tests) can supply a lightweight mock judge without
             # ever importing transformers/torch via agent.llm_client.
             self.llm_judge = llm_judge
+        elif judge_ensemble_models and judge_escalation:
+            self.llm_judge = _get_escalating_judge(
+                judge_model_name, tuple(judge_ensemble_models), seed,
+                escalation_target=judge_escalation_target,
+            )
+        elif judge_ensemble_models:
+            self.llm_judge = _get_ensemble_judge(tuple(judge_ensemble_models), seed)
         else:
             self.llm_judge = _get_llm_judge(judge_model_name, seed)
         self._last_judge_step = -1

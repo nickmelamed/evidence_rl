@@ -1,0 +1,21 @@
+algo: ppo
+rl:
+  lr: 0.001
+  clip: 0.2
+  entropy_coef: 0.05
+  value_coef: 0.05
+  gamma: 0.99
+  ppo_epochs: 2
+  gae_lambda: 0.95
+  actor_model: "google/gemma-2-2b-it"
+  judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
+  # judge_ensemble_models must stay set even in debate mode: it's what gates
+  # "escalation is enabled" in ClaimEnv's dispatch (judge_ensemble_models
+  # and judge_escalation). DebateJudge itself doesn't read this list — its
+  # three models (advocate-for/advocate-against/arbiter) are fixed defaults
+  # in judge/debate_judge.py, not config-driven.
+  judge_ensemble_models:
+    - "Qwen/Qwen2.5-1.5B-Instruct"
+    - "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+  judge_escalation: true
+  judge_escalation_target: "debate"

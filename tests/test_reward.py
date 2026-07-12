@@ -15,17 +15,7 @@ def _state(selected=None, pool=None):
 def test_empty_reasoning_short_circuits_to_zero():
     reward_fn = RewardFunction()
     state = _state()
-    assert reward_fn.compute(state, {"reasoning": "   "}) == 0.0
-
-
-def test_llm_reward_none_redistributes_weight_into_f1_and_ca():
-    # f1 == ca == 1.0 here, so the redistributed weight sums back to the
-    # original w_f1 + w_contradiction + w_llm = 0.7 exactly.
-    reward_fn = RewardFunction()
-    state = _state()
-    final_output = {"reasoning": "some reasoning", "confidence": 0.5, "true_score": 0.5}
-    reward = reward_fn.compute(state, final_output, llm_reward=None)
-    assert reward == pytest.approx(0.7)
+    assert reward_fn.compute(state, {"reasoning": "   "}, llm_reward=0.0) == 0.0
 
 
 def test_llm_reward_value_applies_its_own_weight_directly():

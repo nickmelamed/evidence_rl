@@ -14,9 +14,19 @@ class BaseConfig:
         self.seed = 42
         self.default_annotator_model = "claude-opus-4-5"
         self.eval_every = 10
+        # Held-out judge (different model family than actor/judge_model) used
+        # only for periodic gold_eval — never in the training reward path.
+        self.gold_judge_model = "mistralai/Mistral-7B-Instruct-v0.2"
+        self.gold_eval_every = 5   # in eval *rounds*, not episodes
+        self.gold_eval_n_episodes = 20
+        self.expensive_baseline_every = 5  
+        self.judge_ensemble_models = None
+
+        self.judge_escalation = False
+
+        self.judge_escalation_target = "ensemble"
         self.max_grad_norm = 0.5
-        # "random" or "similarity" (sentence-transformers embedding lookup) —
-        # selects FewShotLLMBaseline's few-shot example retrieval strategy.
+
         self.fewshot_selection_mode = "random"
 
 class PPOConfig(BaseConfig):
