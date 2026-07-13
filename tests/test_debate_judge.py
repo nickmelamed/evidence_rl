@@ -9,6 +9,7 @@ import pytest
 
 from evid_rl_env.environment.state import Evidence
 from evid_rl_env.judge.debate_judge import DebateJudge
+from evid_rl_env.judge.llm_judge import LLMJudge
 
 CLAIM = "The Earth orbits the Sun."
 REASONING = "Well-established heliocentric astronomy confirms this."
@@ -107,3 +108,33 @@ def test_final_reward_and_scores_are_the_arbiters_pass_through():
 
     assert reward == 0.15
     assert scores == arbiter_scores
+
+
+def test_build_debate_judge_uses_reuse_client(monkeypatch, tmp_path):
+    """A role whose model name is present in `reuse` must reuse that
+    LLMJudge's underlying client (saving a duplicate model load) instead
+    of building a fresh one."""
+    from evid_rl_env.judge.debate_judge import build_debate_judge
+
+    built_clients = []
+
+    class _FakeJudgeLLMClient:
+        def __init__(self, model_name, seed):
+            built_clients.append(model_name)
+            self.model_name = model_name
+
+    monkeypatch.setattr("evid_rl_env.agent.llm_client.JudgeLLMClient", _FakeJudgeLLMClient)
+
+    reused_client = _StubCritic()
+    reused_judge = LLMJudge(reused_client, cache_path=str(tmp_path / "reused.sqlite3"))
+
+    debate = build_debate_judge(
+        seed=1,
+        advocate_for_model="model-for",
+        advocate_against_model="model-against",
+        arbiter_model="model-arbiter",
+        reuse={"model-for": reused_judge},
+    )
+
+    assert debate.advocate_for is reused_client
+    assert built_clients == ["model-against", "model-arbiter"]  # model-for never built fresh

@@ -118,3 +118,27 @@ def test_scores_dict_has_all_dimensions_and_confidence(tmp_path):
 
     for key in ("LCS", "ESS", "GRS", "COMP", "BIAS", "confidence"):
         assert key in scores
+
+
+def test_build_ensemble_judge_uses_reuse_instance(monkeypatch, tmp_path):
+    """A model name present in `reuse` must become that exact instance
+    instead of a freshly-built one — this is what lets a shared instance
+    between EscalatingJudge's tier-1 and a matching ensemble member turn
+    into a genuine cache hit on escalation, not just a saved model load."""
+    from evid_rl_env.judge.ensemble_judge import build_ensemble_judge
+
+    built_clients = []
+
+    class _FakeJudgeLLMClient:
+        def __init__(self, model_name, seed):
+            built_clients.append(model_name)
+            self.model_name = model_name
+
+    monkeypatch.setattr("evid_rl_env.agent.llm_client.JudgeLLMClient", _FakeJudgeLLMClient)
+
+    reused_judge = _judge(_scores_json(0.8), tmp_path, "reused")
+
+    ensemble = build_ensemble_judge(["model-a", "model-b"], seed=1, reuse={"model-a": reused_judge})
+
+    assert ensemble.judges[0] is reused_judge
+    assert built_clients == ["model-b"]  # model-a never built fresh

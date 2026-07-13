@@ -47,6 +47,7 @@ from evid_rl_env.agent.baseline import (
     ImitationBaseline,
     MajorityBaseline,
     RandomBaseline,
+    _SharedFewShotExamples,
 )
 from evid_rl_env.agent.evaluator import Evaluator
 from evid_rl_env.agent.policy import ActorCriticPolicy, BanditPolicyWrapper
@@ -99,6 +100,9 @@ def _build_baselines(
     baselines = {}
     llm_baselines = {"greedy_llm", "fewshot_k3", "fewshot_k5", "best_of_5"}
     fewshot_baselines = {"fewshot_k3", "fewshot_k5"}
+    # Shared (and still fully lazy) example bank when both fewshot_k3 and
+    # fewshot_k5 are requested
+    fewshot_bank = _SharedFewShotExamples(train_dataset) if train_dataset is not None else None
 
     for name in requested:
         if name not in _AVAILABLE:
@@ -125,11 +129,13 @@ def _build_baselines(
             baselines[name] = GreedyLLMBaseline(eval_dataset, llm_client)
         elif name == "fewshot_k3":
             baselines[name] = FewShotLLMBaseline(
-                eval_dataset, train_dataset, llm_client, k=3, selection_mode=fewshot_selection_mode
+                eval_dataset, train_dataset, llm_client, k=3, selection_mode=fewshot_selection_mode,
+                example_bank=fewshot_bank,
             )
         elif name == "fewshot_k5":
             baselines[name] = FewShotLLMBaseline(
-                eval_dataset, train_dataset, llm_client, k=5, selection_mode=fewshot_selection_mode
+                eval_dataset, train_dataset, llm_client, k=5, selection_mode=fewshot_selection_mode,
+                example_bank=fewshot_bank,
             )
         elif name == "best_of_5":
             baselines[name] = BestOfNBaseline(eval_dataset, llm_client, n=5)

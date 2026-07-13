@@ -20,6 +20,58 @@ def test_reset_builds_evidence_pool_from_fetch(make_env, fake_evidence_docs):
     assert [e.id for e in state.evidence_pool] == list(range(len(fake_evidence_docs)))
 
 
+def test_reset_prefers_gold_evidence_over_tavily(make_env, monkeypatch):
+    """A dataset entry with an 'evidence' field (e.g. backfilled SciFact
+    claims, see data/ATTRIBUTION.md) must be used directly at reset() — no
+    Tavily fetch, no EvidenceLabeler call, since the label is already
+    human-annotated and more trustworthy than an LLM re-labeling it."""
+    fetch_calls = {"count": 0}
+
+    def _counting_fetch(claim, search_query, max_results=5):
+        fetch_calls["count"] += 1
+        return []
+
+    monkeypatch.setattr("evid_rl_env.environment.environment.fetch_evidence", _counting_fetch)
+
+    class _CountingLabeler:
+        def __init__(self):
+            self.call_count = 0
+
+        def label(self, claim, text):
+            self.call_count += 1
+            return "neutral"
+
+    labeler = _CountingLabeler()
+    dataset = [{
+        "claim": "Test claim.",
+        "search_query": "test claim",
+        "evidence": [
+            {"text": "Supporting abstract text.", "label": "support"},
+            {"text": "Contradicting abstract text.", "label": "contradict"},
+        ],
+    }]
+
+    env = make_env(dataset=dataset, evidence_labeler=labeler)
+    state = env.reset()
+
+    assert len(state.evidence_pool) == 2
+    assert state.evidence_pool[0].text == "Supporting abstract text."
+    assert state.evidence_pool[0].label == "support"
+    assert state.evidence_pool[1].label == "contradict"
+    assert fetch_calls["count"] == 0
+    assert labeler.call_count == 0
+
+
+def test_reset_falls_back_to_tavily_when_no_gold_evidence(make_env, fake_evidence_docs):
+    """Regression: a dataset entry without an 'evidence' field (e.g. a
+    non-SciFact claim) must still use the existing Tavily+EvidenceLabeler
+    path unchanged."""
+    dataset = [{"claim": "Test claim.", "search_query": "test claim"}]
+    env = make_env(dataset=dataset)
+    state = env.reset()
+    assert len(state.evidence_pool) == len(fake_evidence_docs)
+
+
 def test_select_new_evidence_gives_positive_reward(make_env):
     env = make_env()
     env.reset()
@@ -78,8 +130,6 @@ def test_query_over_budget_is_penalized(make_env):
 
 def test_rerank_sorts_selected_evidence_by_claim_similarity(make_env, fake_evidence_docs):
     claim = "Test claim for the episode."
-    # Deliberately NOT ranked by text length, so a passing test proves the sort
-    # is driven by the (fake) embedder rather than the old length heuristic.
     vectors = {
         claim: np.array([1.0, 0.0]),
         fake_evidence_docs[0]["content"]: np.array([0.9, 0.1]),  # highest similarity
@@ -463,9 +513,11 @@ def test_non_finalize_steps_have_no_task_success(make_env):
 # ---------------------------------------------------------------------------
 
 def test_judge_ensemble_models_dispatches_to_ensemble_judge(monkeypatch):
-    """ClaimEnv(judge_ensemble_models=[...]) must use _get_ensemble_judge,
-    not the single-judge _get_llm_judge path — monkeypatched so this never
-    loads a real model."""
+    """ClaimEnv(judge_ensemble_models=[...]) must end up with self.llm_judge
+    as the ensemble, not the single judge_model's LLMJudge — even though
+    _get_llm_judge is now also called, to prime _llm_judge_cache so
+    _get_ensemble_judge's reuse can see it (see the fix's comment in
+    ClaimEnv.__init__). Monkeypatched so nothing loads a real model."""
     from evid_rl_env.environment import environment as env_module
 
     sentinel = object()
@@ -476,11 +528,12 @@ def test_judge_ensemble_models_dispatches_to_ensemble_judge(monkeypatch):
         captured["seed"] = seed
         return sentinel
 
-    def _fail_get_llm_judge(model_name, seed):
-        raise AssertionError("single-judge path should not be used when judge_ensemble_models is set")
+    def _fake_get_llm_judge(model_name, seed):
+        captured["primed_model_name"] = model_name
+        return object()
 
     monkeypatch.setattr(env_module, "_get_ensemble_judge", _fake_get_ensemble_judge)
-    monkeypatch.setattr(env_module, "_get_llm_judge", _fail_get_llm_judge)
+    monkeypatch.setattr(env_module, "_get_llm_judge", _fake_get_llm_judge)
 
     env = env_module.ClaimEnv(
         [{"id": "c1", "claim": "test claim", "label": 1.0}],
@@ -489,9 +542,10 @@ def test_judge_ensemble_models_dispatches_to_ensemble_judge(monkeypatch):
         evidence_labeler=object(),  # avoid _get_evidence_labeler's model load too
     )
 
-    assert env.llm_judge is sentinel
+    assert env.llm_judge is sentinel  # ensemble wins, not the primed single judge
     assert captured["model_names"] == ("model-a", "model-b")
     assert captured["seed"] == 7
+    assert captured["primed_model_name"] == "Qwen/Qwen2.5-1.5B-Instruct"  # default judge_model, primed
 
 
 def test_judge_escalation_dispatches_to_escalating_judge(monkeypatch):
@@ -515,6 +569,9 @@ def test_judge_escalation_dispatches_to_escalating_judge(monkeypatch):
 
     monkeypatch.setattr(env_module, "_get_escalating_judge", _fake_get_escalating_judge)
     monkeypatch.setattr(env_module, "_get_ensemble_judge", _fail_get_ensemble_judge)
+    # priming call ahead of the (mocked) _get_escalating_judge dispatch —
+    # see the fix's comment in ClaimEnv.__init__
+    monkeypatch.setattr(env_module, "_get_llm_judge", lambda model_name, seed: object())
 
     env = env_module.ClaimEnv(
         [{"id": "c1", "claim": "test claim", "label": 1.0}],
@@ -604,6 +661,136 @@ def test_get_escalating_judge_ensemble_target_still_uses_ensemble_judge(monkeypa
 
     assert result.cheap_judge is cheap_sentinel
     assert result.escalated_judge is ensemble_sentinel
+
+
+def test_get_ensemble_judge_passes_llm_judge_cache_as_reuse(monkeypatch):
+    """_get_ensemble_judge must hand its current _llm_judge_cache snapshot
+    to build_ensemble_judge as `reuse` — this is what lets a member sharing
+    a model name with an already-loaded judge (e.g. tier-1, when called
+    from _get_escalating_judge) become the same instance instead of a
+    fresh one."""
+    from evid_rl_env.environment import environment as env_module
+
+    sentinel_reuse = {"model-cheap": object()}
+    captured = {}
+
+    monkeypatch.setattr(env_module, "_llm_judge_cache", sentinel_reuse)
+    monkeypatch.setattr(env_module, "_ensemble_judge_cache", {})
+
+    def _fake_build_ensemble_judge(model_names, seed, reuse=None):
+        captured["reuse"] = reuse
+        return object()
+
+    monkeypatch.setattr("evid_rl_env.judge.ensemble_judge.build_ensemble_judge", _fake_build_ensemble_judge)
+
+    env_module._get_ensemble_judge(("model-a", "model-b"), seed=1)
+
+    assert captured["reuse"] == sentinel_reuse
+
+
+def test_get_debate_judge_passes_llm_judge_cache_as_reuse(monkeypatch):
+    from evid_rl_env.environment import environment as env_module
+
+    sentinel_reuse = {"model-cheap": object()}
+    captured = {}
+
+    monkeypatch.setattr(env_module, "_llm_judge_cache", sentinel_reuse)
+    monkeypatch.setattr(env_module, "_debate_judge_cache", {})
+
+    def _fake_build_debate_judge(seed, reuse=None):
+        captured["reuse"] = reuse
+        return object()
+
+    monkeypatch.setattr("evid_rl_env.judge.debate_judge.build_debate_judge", _fake_build_debate_judge)
+
+    env_module._get_debate_judge(seed=1)
+
+    assert captured["reuse"] == sentinel_reuse
+
+
+def test_get_evidence_labeler_routes_through_get_llm_judge(monkeypatch):
+    """_get_evidence_labeler must go through _get_llm_judge (not cache its
+    own separate client, as it used to) so _llm_judge_cache is always
+    populated for any model loaded via any path — this is what lets
+    _get_ensemble_judge's reuse catch a pure always-on-ensemble config's
+    overlap with EvidenceLabeler's already-loaded model."""
+    from types import SimpleNamespace
+
+    from evid_rl_env.environment import environment as env_module
+
+    fake_client = object()
+    fake_llm_judge = SimpleNamespace(llm=fake_client)
+    captured = {}
+
+    def _fake_get_llm_judge(model_name, seed):
+        captured["model_name"] = model_name
+        captured["seed"] = seed
+        return fake_llm_judge
+
+    monkeypatch.setattr(env_module, "_get_llm_judge", _fake_get_llm_judge)
+    monkeypatch.setattr(env_module, "_evidence_labeler_cache", {})
+
+    labeler = env_module._get_evidence_labeler("model-x", seed=5)
+
+    assert captured == {"model_name": "model-x", "seed": 5}
+    assert labeler.llm is fake_client
+
+
+def test_get_evidence_labeler_is_cached(monkeypatch):
+    from evid_rl_env.environment import environment as env_module
+
+    call_count = {"n": 0}
+
+    def _fake_get_llm_judge(model_name, seed):
+        call_count["n"] += 1
+        return type("_FakeLLMJudge", (), {"llm": object()})()
+
+    monkeypatch.setattr(env_module, "_get_llm_judge", _fake_get_llm_judge)
+    monkeypatch.setattr(env_module, "_evidence_labeler_cache", {})
+
+    l1 = env_module._get_evidence_labeler("model-y", seed=1)
+    l2 = env_module._get_evidence_labeler("model-y", seed=1)
+
+    assert l1 is l2
+    assert call_count["n"] == 1
+
+
+def test_evidence_labeler_then_ensemble_share_llm_judge_cache(monkeypatch):
+    """End-to-end proof the gap is actually closed: EvidenceLabeler loading
+    a model (a path that never touches _get_llm_judge on its own) must
+    still populate _llm_judge_cache so a *later*, independently-triggered
+    _get_ensemble_judge call picks it up as a reuse candidate — this is
+    exactly the pure always-on-ensemble-config scenario that used to load
+    the same model twice."""
+    from evid_rl_env.environment import environment as env_module
+
+    monkeypatch.setattr(env_module, "_llm_judge_cache", {})
+    monkeypatch.setattr(env_module, "_judge_llm_cache", {})
+    monkeypatch.setattr(env_module, "_evidence_labeler_cache", {})
+    monkeypatch.setattr(env_module, "_ensemble_judge_cache", {})
+
+    class _FakeJudgeLLMClient:
+        def __init__(self, model_name, seed):
+            self.model_name = model_name
+
+    monkeypatch.setattr("evid_rl_env.agent.llm_client.JudgeLLMClient", _FakeJudgeLLMClient)
+
+    # EvidenceLabeler loads "model-a", independent of any ensemble/escalation
+    # construction — exactly what ClaimEnv.__init__ does unconditionally.
+    env_module._get_evidence_labeler("model-a", seed=1)
+    assert "model-a" in env_module._llm_judge_cache
+
+    captured = {}
+
+    def _fake_build_ensemble_judge(model_names, seed, reuse=None):
+        captured["reuse_keys"] = set(reuse.keys()) if reuse else set()
+        return object()
+
+    monkeypatch.setattr("evid_rl_env.judge.ensemble_judge.build_ensemble_judge", _fake_build_ensemble_judge)
+
+    env_module._get_ensemble_judge(("model-a", "model-b"), seed=1)
+
+    assert "model-a" in captured["reuse_keys"]
 
 
 def test_claim_env_forwards_judge_escalation_target(monkeypatch):

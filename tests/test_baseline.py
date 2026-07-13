@@ -45,9 +45,8 @@ def _state(claim="Test claim"):
     return State(claim=claim, evidence_pool=[Evidence(id=0, text="some evidence", label="neutral")])
 
 
-# ---------------------------------------------------------------------------
 # Random / Majority
-# ---------------------------------------------------------------------------
+
 
 def test_random_baseline_is_deterministic_under_a_seeded_rng(patch_baseline_env):
     patch_baseline_env()
@@ -75,9 +74,9 @@ def test_majority_baseline_caches_and_reuses_the_majority_action(patch_baseline_
     assert baseline._majority_idx == cached
 
 
-# ---------------------------------------------------------------------------
+
 # GreedyLLMBaseline
-# ---------------------------------------------------------------------------
+
 
 def test_greedy_llm_baseline_parses_a_valid_action_index(mock_llm):
     baseline = GreedyLLMBaseline(EVAL_DATASET, mock_llm(response="2"))
@@ -122,9 +121,64 @@ def test_fewshot_baseline_similarity_mode_is_selectable(mock_llm, patch_baseline
     assert idx == 1
 
 
-# ---------------------------------------------------------------------------
+def test_shared_example_bank_builds_once_across_k3_and_k5(mock_llm, monkeypatch):
+    """The actual fix: fewshot_k3 and fewshot_k5 sharing one
+    _SharedFewShotExamples must only run the expensive random-policy sweep
+    once between them, not once each."""
+    import evid_rl_env.agent.baseline as baseline_module
+
+    call_count = {"n": 0}
+
+    def _fake_collect(train_dataset):
+        call_count["n"] += 1
+        return [{"observation": "obs", "action_idx": 0, "claim": "c"}]
+
+    monkeypatch.setattr(baseline_module, "_collect_fewshot_examples", _fake_collect)
+
+    bank = baseline_module._SharedFewShotExamples(EVAL_DATASET)
+    k3 = FewShotLLMBaseline(EVAL_DATASET, EVAL_DATASET, mock_llm(response="0"), k=3, example_bank=bank)
+    k5 = FewShotLLMBaseline(EVAL_DATASET, EVAL_DATASET, mock_llm(response="0"), k=5, example_bank=bank)
+
+    k3._action_fn(_state(), k=3)
+    k5._action_fn(_state(), k=5)
+
+    assert call_count["n"] == 1
+
+
+def test_without_shared_bank_each_instance_builds_independently(mock_llm, monkeypatch):
+    """Regression: constructing FewShotLLMBaseline without an example_bank
+    (e.g. standalone/test usage) must keep today's behavior — each instance
+    builds and owns its own bank."""
+    import evid_rl_env.agent.baseline as baseline_module
+
+    call_count = {"n": 0}
+
+    def _fake_collect(train_dataset):
+        call_count["n"] += 1
+        return [{"observation": "obs", "action_idx": 0, "claim": "c"}]
+
+    monkeypatch.setattr(baseline_module, "_collect_fewshot_examples", _fake_collect)
+
+    k3 = FewShotLLMBaseline(EVAL_DATASET, EVAL_DATASET, mock_llm(response="0"), k=3)
+    k5 = FewShotLLMBaseline(EVAL_DATASET, EVAL_DATASET, mock_llm(response="0"), k=5)
+
+    k3._action_fn(_state(), k=3)
+    k5._action_fn(_state(), k=5)
+
+    assert call_count["n"] == 2
+
+
+def test_build_standard_baselines_shares_one_bank_between_k3_and_k5(mock_llm):
+    from evid_rl_env.agent.base_trainer import build_standard_baselines
+
+    baselines = build_standard_baselines(EVAL_DATASET, EVAL_DATASET, mock_llm(response="0"))
+
+    assert baselines["fewshot_k3"]._example_bank is baselines["fewshot_k5"]._example_bank
+
+
+
 # BestOfNBaseline
-# ---------------------------------------------------------------------------
+
 
 def test_best_of_n_suggest_action_falls_back_to_random_and_logs_on_exception(mock_llm, caplog):
     """Regression test: _suggest_action used to swallow exceptions silently,
@@ -136,9 +190,53 @@ def test_best_of_n_suggest_action_falls_back_to_random_and_logs_on_exception(moc
     assert any("LLM call failed" in r.message for r in caplog.records)
 
 
-# ---------------------------------------------------------------------------
+def test_best_of_n_falls_back_to_sequential_calls_without_batched_method(mock_llm):
+    """A client without generate_structured_n (e.g. this codebase's own
+    duck-typed mock) must keep using n sequential _suggest_action() calls —
+    today's exact behavior, unchanged."""
+    baseline = BestOfNBaseline(EVAL_DATASET, mock_llm(response="2"), n=3)
+    candidates = baseline._suggest_actions_batch(_state(), 3)
+    assert candidates == [2, 2, 2]
+
+
+def test_best_of_n_uses_batched_call_when_client_supports_it():
+    """The actual fix: a client with generate_structured_n must be called
+    once with n, not n times."""
+    call_log = []
+
+    class _BatchingLLM:
+        model_name = "batching-mock"
+
+        def generate_structured_n(self, prompt, n, temperature=0.1):
+            call_log.append(n)
+            return [(str(i % N_ACTIONS), 1) for i in range(n)]
+
+    baseline = BestOfNBaseline(EVAL_DATASET, _BatchingLLM(), n=4)
+    candidates = baseline._suggest_actions_batch(_state(), 4)
+
+    assert call_log == [4]  # one call, not four
+    assert candidates == [0, 1, 2, 3]
+
+
+def test_best_of_n_batched_call_failure_falls_back_to_random_for_all(caplog):
+    class _FailingBatchingLLM:
+        model_name = "failing-batching-mock"
+
+        def generate_structured_n(self, prompt, n, temperature=0.1):
+            raise RuntimeError("boom")
+
+    baseline = BestOfNBaseline(EVAL_DATASET, _FailingBatchingLLM(), n=3)
+    with caplog.at_level(logging.WARNING):
+        candidates = baseline._suggest_actions_batch(_state(), 3)
+
+    assert len(candidates) == 3
+    assert all(0 <= idx < N_ACTIONS for idx in candidates)
+    assert any("batched LLM call failed" in r.message for r in caplog.records)
+
+
+
 # ImitationBaseline
-# ---------------------------------------------------------------------------
+
 
 def _write_trajectories(path, records):
     with open(path, "w") as f:

@@ -31,23 +31,20 @@ def _get_llm_judge(model_name: str, seed: int) -> LLMJudge:
 
 def _get_ensemble_judge(model_names: tuple, seed: int):
     # Keyed by the full tuple of model names so distinct ensembles
-    # (e.g. different configs) don't collide, mirroring _get_llm_judge above —
-    # this is also how the training env and eval env end up sharing the same
-    # EnsembleJudge instance (and loaded models) without passing one between
-    # cli/train.py and base_trainer.py explicitly.
+    # (e.g. different configs) don't collide
     from evid_rl_env.judge.ensemble_judge import build_ensemble_judge
     if model_names not in _ensemble_judge_cache:
-        _ensemble_judge_cache[model_names] = build_ensemble_judge(list(model_names), seed)
+        _ensemble_judge_cache[model_names] = build_ensemble_judge(
+            list(model_names), seed, reuse=dict(_llm_judge_cache),
+        )
     return _ensemble_judge_cache[model_names]
 
 
 def _get_debate_judge(seed: int):
-    # Keyed by seed only — DebateJudge's model choices are fixed defaults
-    # (see judge/debate_judge.py), not config-driven, so there's only ever
-    # one debate judge per seed.
+    # Keyed by seed only 
     if seed not in _debate_judge_cache:
         from evid_rl_env.judge.debate_judge import build_debate_judge
-        _debate_judge_cache[seed] = build_debate_judge(seed)
+        _debate_judge_cache[seed] = build_debate_judge(seed, reuse=dict(_llm_judge_cache))
     return _debate_judge_cache[seed]
 
 
@@ -68,12 +65,9 @@ def _get_escalating_judge(judge_model_name: str, ensemble_models: tuple, seed: i
 
 
 def _get_evidence_labeler(model_name: str, seed: int) -> EvidenceLabeler:
-    # Reuses the same cached JudgeLLMClient as _get_llm_judge 
-    from evid_rl_env.agent.llm_client import JudgeLLMClient
-    if model_name not in _judge_llm_cache:
-        _judge_llm_cache[model_name] = JudgeLLMClient(model_name=model_name, seed=seed)
+    # Routed through _get_llm_judge 
     if model_name not in _evidence_labeler_cache:
-        _evidence_labeler_cache[model_name] = EvidenceLabeler(_judge_llm_cache[model_name])
+        _evidence_labeler_cache[model_name] = EvidenceLabeler(_get_llm_judge(model_name, seed).llm)
     return _evidence_labeler_cache[model_name]
 
 
@@ -103,11 +97,23 @@ class ClaimEnv:
             # ever importing transformers/torch via agent.llm_client.
             self.llm_judge = llm_judge
         elif judge_ensemble_models and judge_escalation:
+            # Prime judge_model_name's LLMJudge before dispatching to the
+            # ensemble/debate builders below — evidence_labeler needs this
+            # exact model regardless of which self.llm_judge path is taken
+            # (see the bottom of this method), and self.llm_judge is built
+            # *before* self.evidence_labeler here, so without priming first
+            # a pure ensemble/debate config would build its own fresh copy
+            # of this model with nothing yet in the cache to reuse — this
+            # doesn't add a new load, just moves an already-inevitable one
+            # earlier so _get_ensemble_judge/_get_debate_judge's
+            # reuse=dict(_llm_judge_cache) can actually see it.
+            _get_llm_judge(judge_model_name, seed)
             self.llm_judge = _get_escalating_judge(
                 judge_model_name, tuple(judge_ensemble_models), seed,
                 escalation_target=judge_escalation_target,
             )
         elif judge_ensemble_models:
+            _get_llm_judge(judge_model_name, seed)
             self.llm_judge = _get_ensemble_judge(tuple(judge_ensemble_models), seed)
         else:
             self.llm_judge = _get_llm_judge(judge_model_name, seed)
@@ -136,21 +142,25 @@ class ClaimEnv:
         claim = self.current_sample["claim"]
         search_query = self.current_sample.get("search_query", claim)
 
-        try:
-            raw_evidence = fetch_evidence(claim, search_query)
-            evidence_pool = [
-                Evidence(id=i, text=e["content"], label=self.evidence_labeler.label(claim, e["content"]))
-                for i, e in enumerate(raw_evidence)
-            ]
-        except Exception as exc:
-            print(f"[WARNING] Tavily fetch failed, falling back to seed_claims.json data: {exc}")
-            evidence_pool = []
-
-        if not evidence_pool and "evidence" in self.current_sample:
+        gold_evidence = self.current_sample.get("evidence")
+        if gold_evidence:
+            # Real evidentiary basis (e.g. SciFact abstracts, see
+            # ATTRIBUTION.md) — already human-labeled, so used directly with
+            # no Tavily call or EvidenceLabeler re-labeling.
             evidence_pool = [
                 Evidence(id=i, text=e["text"], label=e.get("label", "neutral"))
-                for i, e in enumerate(self.current_sample["evidence"])
+                for i, e in enumerate(gold_evidence)
             ]
+        else:
+            try:
+                raw_evidence = fetch_evidence(claim, search_query)
+                evidence_pool = [
+                    Evidence(id=i, text=e["content"], label=self.evidence_labeler.label(claim, e["content"]))
+                    for i, e in enumerate(raw_evidence)
+                ]
+            except Exception as exc:
+                print(f"[WARNING] Tavily fetch failed: {exc}")
+                evidence_pool = []
 
         self.state = State(claim=claim, evidence_pool=evidence_pool)
         return self.state

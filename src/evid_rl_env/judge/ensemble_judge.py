@@ -13,14 +13,27 @@ def _sanitize(model_name: str) -> str:
     return model_name.replace("/", "__")
 
 
-def build_ensemble_judge(model_names: list, seed: int) -> "EnsembleJudge":
+def build_ensemble_judge(model_names: list, seed: int, reuse: dict = None) -> "EnsembleJudge":
     """One JudgeLLMClient + LLMJudge per model name, each with its own
     sanitized cache path so members never collide (see LLMJudge.cache_path,
-    added for exactly this reason in the gold-eval harness)."""
+    added for exactly this reason in the gold-eval harness).
+
+    `reuse` (model_name -> already-built LLMJudge) lets a caller hand in an
+    instance it already has for a given model name instead of building a
+    fresh one — used by environment.py to share the same LLMJudge between
+    EscalatingJudge's tier-1 and a matching ensemble member, which also
+    means a genuine cache hit (not just a saved model load) on escalation:
+    tier-1 already scored this exact (claim, reasoning, evidence) and wrote
+    it to the shared instance's cache moments earlier, so the "duplicate"
+    member call returns instantly instead of re-querying the model."""
     from evid_rl_env.agent.llm_client import JudgeLLMClient
 
+    reuse = reuse or {}
     judges = []
     for name in model_names:
+        if name in reuse:
+            judges.append(reuse[name])
+            continue
         client = JudgeLLMClient(model_name=name, seed=seed)
         judges.append(LLMJudge(client, cache_path=f"artifacts/cache/judge_cache_{_sanitize(name)}.sqlite3"))
     return EnsembleJudge(judges)

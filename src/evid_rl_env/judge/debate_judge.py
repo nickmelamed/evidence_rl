@@ -15,13 +15,32 @@ def build_debate_judge(
     advocate_for_model: str = _DEFAULT_ADVOCATE_FOR_MODEL,
     advocate_against_model: str = _DEFAULT_ADVOCATE_AGAINST_MODEL,
     arbiter_model: str = _DEFAULT_ARBITER_MODEL,
+    reuse: dict = None,
 ) -> "DebateJudge":
+    """`reuse` (model_name -> already-built LLMJudge) lets a caller hand in
+    an instance it already has for a given model name instead of loading a
+    fresh one — used by environment.py to share the underlying model client
+    between EscalatingJudge's tier-1 and a matching advocate/arbiter role.
+    Unlike EnsembleJudge's reuse, this only saves a duplicate model *load*,
+    not a duplicate call: the advocate prompts ask for a persuasive
+    argument, a genuinely different task from tier-1's JSON-scoring prompt
+    even on the same model, so there's no real cache hit to gain here —
+    only the arbiter is wrapped in an LLMJudge, and it uses its own
+    debate-specific cache path (its input is the augmented reasoning plus
+    both critiques, a different cache key space than tier-1's)."""
     from evid_rl_env.agent.llm_client import JudgeLLMClient
 
-    advocate_for = JudgeLLMClient(model_name=advocate_for_model, seed=seed)
-    advocate_against = JudgeLLMClient(model_name=advocate_against_model, seed=seed)
+    reuse = reuse or {}
+
+    def _client_for(model_name):
+        if model_name in reuse:
+            return reuse[model_name].llm
+        return JudgeLLMClient(model_name=model_name, seed=seed)
+
+    advocate_for = _client_for(advocate_for_model)
+    advocate_against = _client_for(advocate_against_model)
     arbiter = LLMJudge(
-        JudgeLLMClient(model_name=arbiter_model, seed=seed),
+        _client_for(arbiter_model),
         cache_path=f"artifacts/cache/judge_cache_debate_arbiter_{_sanitize(arbiter_model)}.sqlite3",
     )
     return DebateJudge(advocate_for, advocate_against, arbiter)

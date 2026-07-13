@@ -32,6 +32,20 @@ def _extract_text(output):
     return result
 
 
+def _extract_texts(output):
+    """Same as _extract_text, but for a num_return_sequences>1 pipeline
+    call — output is a list of one generated_text entry per sequence
+    (a single input prompt, not a batch of different prompts)."""
+    texts = []
+    for item in output:
+        result = item["generated_text"]
+        if isinstance(result, list):
+            texts.append(result[-1].get("content", ""))
+        else:
+            texts.append(result)
+    return texts
+
+
 class LLMClient:
     """
     Instruction-tuned generation model for producing arguments, summaries,
@@ -81,6 +95,23 @@ class LLMClient:
         text = _extract_text(out)
         tokens = len(text.split())
         return text, tokens
+
+    def generate_structured_n(self, prompt, n: int, temperature=0.1):
+        """Batched sibling of generate_structured: samples n completions of
+        the *same* prompt in one forward pass (num_return_sequences=n)
+        instead of n sequential pipeline calls — used by BestOfNBaseline,
+        which otherwise called generate_structured n times for a literally
+        identical input."""
+        out = self._pipe(
+            self._chat(prompt),
+            max_new_tokens=32,
+            do_sample=True,
+            temperature=temperature,
+            return_full_text=False,
+            num_return_sequences=n,
+        )
+        texts = _extract_texts(out)
+        return [(text, len(text.split())) for text in texts]
 
 
 class JudgeLLMClient:

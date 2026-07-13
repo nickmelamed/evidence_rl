@@ -269,7 +269,49 @@ class GreedyLLMBaseline(BaseEvaluator):
         return self._aggregate(rewards, all_scores)
 
 
-# few-shot LLM baseline 
+# few-shot LLM baseline
+
+def _collect_fewshot_examples(train_dataset: list) -> list:
+    """One random-action pass over train_dataset to collect (observation, action)
+    pairs. Doesn't depend on k (k only affects how many examples get drawn
+    per query at selection time), so this is shared across every k value
+    via _SharedFewShotExamples below rather than repeated per instance."""
+    env = ClaimEnv(train_dataset)
+    examples = []
+
+    def action_fn(state):
+        idx = random.randint(0, N_ACTIONS - 1)
+        examples.append({
+            "observation": _state_summary(state),
+            "action_idx": idx,
+            "claim": state.claim,
+        })
+        return idx
+
+    for _ in range(len(train_dataset)):
+        run_episode(env, action_fn)
+
+    logger.info("Collected %d few-shot training examples.", len(examples))
+    return examples
+
+
+class _SharedFewShotExamples:
+    """Lazily builds the example bank once and shares it across every
+    FewShotLLMBaseline instance passed the same bank object — e.g.
+    fewshot_k3 and fewshot_k5, which otherwise each independently repeat
+    the full len(train_dataset)-episode random sweep for an identical
+    bank. Still fully lazy: nothing is built until whichever instance
+    calls run() first actually needs it."""
+
+    def __init__(self, train_dataset: list):
+        self.train_dataset = train_dataset
+        self._examples: list | None = None
+
+    def get(self) -> list:
+        if self._examples is None:
+            self._examples = _collect_fewshot_examples(self.train_dataset)
+        return self._examples
+
 
 class FewShotLLMBaseline(BaseEvaluator):
     """LLM action selection augmented with few-shot examples from train_dataset."""
@@ -281,36 +323,24 @@ class FewShotLLMBaseline(BaseEvaluator):
         llm_client,
         k: int = 3,
         selection_mode: str = "random",
+        example_bank: _SharedFewShotExamples = None,
     ):
         self.eval_dataset = eval_dataset
         self.train_dataset = train_dataset
         self.llm = llm_client
         self.k = k
         self.selection_mode = selection_mode
+        # Shared across instances when provided (see build_standard_baselines/
+        # cli/eval.py's _build_baselines); falls back to a private,
+        # single-instance bank otherwise, e.g. when constructed standalone.
+        self._example_bank = example_bank or _SharedFewShotExamples(train_dataset)
 
         self._examples: list | None = None  # built lazily on first use
         self._st_model = None
         self._train_embeddings = None
 
     def _build_examples(self) -> list:
-        """One random-action pass over train_dataset to collect (observation, action) pairs."""
-        env = ClaimEnv(self.train_dataset)
-        examples = []
-
-        def action_fn(state):
-            idx = random.randint(0, N_ACTIONS - 1)
-            examples.append({
-                "observation": _state_summary(state),
-                "action_idx": idx,
-                "claim": state.claim,
-            })
-            return idx
-
-        for _ in range(len(self.train_dataset)):
-            run_episode(env, action_fn)
-
-        logger.info("FewShotLLMBaseline: collected %d training examples.", len(examples))
-        return examples
+        return self._example_bank.get()
 
     def _embed(self, texts: list):
         try:
@@ -419,6 +449,27 @@ class BestOfNBaseline(BaseEvaluator):
             )
             return random.randint(0, N_ACTIONS - 1)
 
+    def _suggest_actions_batch(self, state, n: int) -> list:
+        """n suggestions for the *same* prompt — batched into one call via
+        generate_structured_n when the client supports it, instead of n
+        sequential _suggest_action() calls for an identical input. Falls
+        back to the sequential path for any client that doesn't implement
+        the batched method (e.g. duck-typed test mocks)."""
+        if not hasattr(self.llm, "generate_structured_n"):
+            return [self._suggest_action(state) for _ in range(n)]
+
+        prompt = _greedy_llm_prompt(state)
+        try:
+            results = self.llm.generate_structured_n(prompt, n)
+            return [_parse_action_idx(text, "BestOfNBaseline") for text, _ in results]
+        except Exception as exc:
+            logger.warning(
+                "[BestOfNBaseline] batched LLM call failed: %s | model=%s | obs='%.80s' "
+                "— falling back to random for all %d candidates.",
+                exc, getattr(self.llm, "model_name", "unknown"), _state_summary(state), n,
+            )
+            return [random.randint(0, N_ACTIONS - 1) for _ in range(n)]
+
     def _snapshot(self, env: ClaimEnv) -> dict:
         return {
             "state": copy.deepcopy(env.state),
@@ -434,7 +485,7 @@ class BestOfNBaseline(BaseEvaluator):
     def _action_fn(self, state) -> int:
         """Try n LLM suggestions; return the one with the highest immediate reward."""
         env = self._current_env
-        candidates = [self._suggest_action(state) for _ in range(self.n)]
+        candidates = self._suggest_actions_batch(state, self.n)
 
         snap = self._snapshot(env)
         best_idx = candidates[0]

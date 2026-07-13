@@ -16,6 +16,7 @@ from evid_rl_env.agent.baseline import (
     ImitationBaseline,
     MajorityBaseline,
     RandomBaseline,
+    _SharedFewShotExamples,
 )
 from evid_rl_env.agent.eval_mixin import EvalMixin
 from evid_rl_env.agent.evaluator import Evaluator
@@ -28,15 +29,19 @@ _EVAL_CSV_PATH = "logs/eval_metrics.csv"
 
 def build_standard_baselines(eval_dataset, train_dataset, llm_client, fewshot_selection_mode="random"):
     """The fixed set of baselines every trainer evaluates against during training."""
+    # Shared (and still fully lazy) example bank: fewshot_k3/fewshot_k5 only
+    fewshot_bank = _SharedFewShotExamples(train_dataset)
     baselines = {
         "random":     RandomBaseline(eval_dataset),
         "majority":   MajorityBaseline(eval_dataset),
         "greedy_llm": GreedyLLMBaseline(eval_dataset, llm_client),
         "fewshot_k3": FewShotLLMBaseline(
-            eval_dataset, train_dataset, llm_client, k=3, selection_mode=fewshot_selection_mode
+            eval_dataset, train_dataset, llm_client, k=3, selection_mode=fewshot_selection_mode,
+            example_bank=fewshot_bank,
         ),
         "fewshot_k5": FewShotLLMBaseline(
-            eval_dataset, train_dataset, llm_client, k=5, selection_mode=fewshot_selection_mode
+            eval_dataset, train_dataset, llm_client, k=5, selection_mode=fewshot_selection_mode,
+            example_bank=fewshot_bank,
         ),
         "best_of_5":  BestOfNBaseline(eval_dataset, llm_client, n=5),
     }
@@ -121,7 +126,7 @@ class BaseTrainer(EvalMixin):
         if eval_dataset is not None:
             from evid_rl_env.environment.environment import ClaimEnv
             eval_env = ClaimEnv(
-                eval_dataset, judge_model=getattr(config, "judge_model", None),
+                eval_dataset, judge_model=getattr(config, "judge_model", None), seed=seed,
                 judge_ensemble_models=getattr(config, "judge_ensemble_models", None),
                 judge_escalation=getattr(config, "judge_escalation", False),
                 judge_escalation_target=getattr(config, "judge_escalation_target", "ensemble"),
