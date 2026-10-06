@@ -5,5 +5,4 @@
 # Start with only the style check in an empty repo, since a check whose tool
 # is not installed yet fails every turn. Switch to `make agent-check` once
 # the Makefile's tools are installed.
-python3 scripts/agent/check_style.py --changed .
-# make agent-check
+make agent-check
