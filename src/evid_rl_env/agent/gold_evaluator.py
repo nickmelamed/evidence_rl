@@ -51,7 +51,7 @@ class GoldEvaluator:
                 state, _reward, done, info = self.env.step(action, payload)
 
             # task_success is only set on the FINALIZE step (see
-            # environment.py), so None means the episode was cut off by the
+            # environment.py). None means the episode was cut off by the
             # step/token limit before reaching a judged final answer.
             proxy = info.get("llm_scores")
             if info.get("task_success") is None or not proxy:
@@ -87,8 +87,8 @@ class GoldEvaluator:
             accuracies.append(1.0 - abs(confidence - true_label))
             hard_correct.append(1.0 if (confidence >= 0.5) == (true_label >= 0.5) else 0.0)
             # only architectures with an escalation tier (EscalatingJudge)
-            # set this key at all, so its absence, not False, is what means
-            # "not applicable" (see result["escalation_rate"] below)
+            # set this key at all. A missing key means "not applicable", and
+            # False would be a real result (see result["escalation_rate"] below)
             if "escalated" in proxy:
                 escalated_flags.append(bool(proxy["escalated"]))
 

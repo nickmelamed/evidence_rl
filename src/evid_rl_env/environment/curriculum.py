@@ -20,7 +20,7 @@ class Curriculum:
       which expose a directly comparable value-error signal.
     - staleness = how long it's been since a claim was last sampled,
       normalised to [0, 1]. This is PLR's mechanism for preventing claims
-      with a low historical score from being starved forever, it forces
+      with a low historical score from being starved forever. It forces
       periodic revisits so a claim's score can be re-evaluated under the
       current policy.
     - min_weight is a constant floor so every claim keeps some sampling

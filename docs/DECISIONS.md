@@ -1,8 +1,7 @@
 # Decisions
 
 One entry per decision that someone might later question. Newest last.
-These entries are drafts written from the code. Edit them into your own words.
-Where the reason is a guess, the text says "probably".
+Entries are drafts from the code. Where the reason is a guess, the text says "probably".
 
 ## D-001: Claims carry gold evidence and Tavily is the fallback
 
@@ -10,7 +9,7 @@ SciFact claims carry human-labeled abstracts, so the environment uses them direc
 
 ## D-002: One seed-42 80/20 split, shared by train, eval and collect
 
-The split is a shuffled index cut at 80%, with global RNG state saved and restored so it does not disturb training seeds. The fix is commented as an audit fix after a leakage bug (commit "fixed data leakage"). It is copied into three files rather than shared.
+The split is a shuffled index cut at 80%, with global RNG state saved and restored so it does not disturb training seeds. A leakage bug (commit "fixed data leakage") led to seeding it separately. The logic is copied into three files rather than shared, and the `evid-collect` copy only started restoring RNG state in commit 1d98db8.
 
 ## D-003: Gold judges are separate from the training judge
 
@@ -26,11 +25,11 @@ This limits inference cost. Between calls the last score is reused, so the delta
 
 ## D-006: Potential-based shaping with the judge score as potential
 
-`0.1 * (0.99 * phi_next - phi_prev)`, with phi set to 0 at terminal states so the shaping telescopes. It follows Ng et al. 1999 and was added after the "reward hacking" fix.
+`0.1 * (0.99 * phi_next - phi_prev)`, with phi set to 0 at terminal states so the shaping telescopes. It follows Ng et al. 1999.
 
 ## D-007: Final reward is mostly heuristic, with a small judge weight
 
-The judge weight is 0.10 in `RewardFunction`, and the older extra re-blend was removed so the documented weight is the real one. The README still describes a 0.7/0.3 blend. This is a known mismatch.
+The judge weight is 0.10 in `RewardFunction` and there is no further blend. The README still describes a 0.7/0.3 blend, which is stale.
 
 ## D-008: Judge scores blend toward neutral by confidence
 
@@ -46,7 +45,7 @@ Ensemble, debate and escalating judges wrap the single judge and are selected by
 
 ## D-011: Per-claim Prioritized Level Replay for the curriculum
 
-It scores each claim by learning progress, staleness and a floor weight, using `task_success` rather than value loss, so it works across bandit, PG and PPO.
+The curriculum scores each claim by learning progress, staleness and a floor weight, using `task_success` rather than value loss, so it works across bandit, PG and PPO.
 
 ## D-012: Hyperparameters live in YAML, not in Python config classes
 

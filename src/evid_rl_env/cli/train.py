@@ -18,9 +18,8 @@ from evid_rl_env.environment.curriculum import Curriculum
 from evid_rl_env.environment.environment import ClaimEnv
 
 # configs/*_baseline.yaml is the single source of truth for RL hyperparameters
-# (see agent/config.py), even the no-"--config" default path goes through
-# load_config() against these files rather than bare-constructing a Config
-# class, so a run never silently ends up with unset (None) tuning values.
+# (see agent/config.py). The default path with no --config also goes through
+# load_config(), so a run never ends up with unset (None) tuning values.
 _DEFAULT_CONFIG_PATHS = {
     "ppo": "configs/ppo_baseline.yaml",
     "pg": "configs/pg_baseline.yaml",
@@ -35,9 +34,8 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
 
     dataset = load_dataset()
 
-    # AUDIT FIX: isolate the split seed from training randomness, seed 42 must always
-    # match eval.py's _deterministic_split so train/eval sets are identical across runs;
-    # save/restore so this doesn't pollute the seed that Trainer uses for weight init
+    # Seed the split separately so it matches eval.py's _deterministic_split on every
+    # run, and restore the state so the Trainer's weight-init seed is unaffected.
     _saved_state = random.getstate()
     random.seed(42)
     indices = list(range(len(dataset)))

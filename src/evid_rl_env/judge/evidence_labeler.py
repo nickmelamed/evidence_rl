@@ -18,7 +18,7 @@ class EvidenceLabeler:
 
     Structurally a sibling of judge.llm_judge.LLMJudge: same llm/cache_scores
     shape, same cache-by-content-hash pattern, same safe-fallback-on-failure
-    behavior, labeling failures fall back to "neutral", which is exactly
+    behavior. Labeling failures fall back to "neutral", which is exactly
     today's permanent default, so an outage never makes things worse than the
     pre-labeling baseline.
 

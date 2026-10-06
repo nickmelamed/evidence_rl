@@ -104,7 +104,7 @@ The pipeline is intentionally lightweight:
 4. Evidence pool is passed to `ClaimEnv`
 5. Agent interacts with live-retrieved, labeled evidence for the full episode
 
-This design keeps retrieval infrastructure minimal (no pre-indexed corpus, no vector DB). The tradeoff is that a fresh checkout with a cold cache sees different evidence than a previous run (web content changes). The fetch cache (`artifacts/cache/fetch_cache.sqlite3`) makes results stable *within* a machine once warmed, but not portable across machines. For results you need to reproduce exactly (e.g. in a report), use `evid-snapshot` to export a portable JSON snapshot, and pass `--evidence-snapshot` to `evid-train`/`evid-eval` to load it, this bypasses both the live Tavily call and the local sqlite cache for any claim it covers.
+This design keeps retrieval infrastructure minimal (no pre-indexed corpus, no vector DB). The tradeoff is that a fresh checkout with a cold cache sees different evidence than a previous run (web content changes). The fetch cache (`artifacts/cache/fetch_cache.sqlite3`) makes results stable on one machine once warmed. They are not portable across machines. For results you need to reproduce exactly (e.g. in a report), use `evid-snapshot` to export a portable JSON snapshot, and pass `--evidence-snapshot` to `evid-train`/`evid-eval` to load it. The snapshot bypasses both the live Tavily call and the local sqlite cache for any claim it covers.
 
 ---
 
@@ -193,7 +193,7 @@ rl:
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
 ```
 
-`src/evid_rl_env/agent/config.py`'s `BaseConfig`/`PPOConfig`/`PGConfig`/`BanditConfig` classes define the config *schema* and hold real defaults only for cross-cutting fields that aren't per-run tuning knobs (model choices, seed). Algorithm-specific RL hyperparameters (`lr`, `clip`, `entropy_coef`, `gamma`, `alpha`, ...) are intentionally left unset there, `configs/*_baseline.yaml` is the single source of truth for those, so edit the YAML (or point `--config` at a new file) rather than the Python class to tune a run.
+`src/evid_rl_env/agent/config.py`'s `BaseConfig`/`PPOConfig`/`PGConfig`/`BanditConfig` classes define the config *schema* and hold real defaults only for cross-cutting fields that aren't per-run tuning knobs (model choices, seed). Algorithm-specific RL hyperparameters (`lr`, `clip`, `entropy_coef`, `gamma`, `alpha`, ...) are left unset there. Set them in `configs/*_baseline.yaml` (or point `--config` at a new file) rather than in the Python class.
 
 ---
 
@@ -399,7 +399,7 @@ Score-to-reward conversion: `0.30 × LCS + 0.25 × ESS + 0.20 × COMP − 0.25 �
 
 ## Future Work
 
-- Learned reward models: replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less dependent on the `EvidenceLabeler`'s own LLM-based stance/reliability judgments (an improvement over the old static `"neutral"` default, but still a heuristic proxy, not ground truth)
+- Learned reward models: replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less dependent on the `EvidenceLabeler`'s own LLM-based stance/reliability labels, which are still a heuristic proxy and not ground truth
 - Re-annotation pipeline: `evid-collect --annotator-model` is wired for labeling trajectories with a strong LLM but not yet connected to a re-scoring workflow for *existing* imitation trajectories. Completing this would enable iterative dataset improvement without full recollection
 - Multi-agent debate: pit two independent agents against each other, one constrained to support, one to contradiction, with a separate arbiter issuing the final reward signal. This separates role from policy and eliminates the need for a single agent to self-regulate debate balance
 - Domain expansion: extend beyond scientific claims to regulatory filings, clinical trial reports, and policy documents, with domain-specific evidence retrievers and reward calibration for each domain's ground-truth structure

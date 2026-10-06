@@ -264,7 +264,6 @@ def main():
     )
     args = parser.parse_args()
 
-
     random.seed(args.seed)
     np.random.seed(args.seed)
 

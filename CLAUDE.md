@@ -1,6 +1,6 @@
 # EvidenceRL
 
-EvidenceRL trains agents to verify scientific claims. The agent works in a Gym-style environment (`ClaimEnv`), gathers and argues over evidence, and is rewarded by heuristic evidence metrics plus an LLM judge. The repo has two parts: the RL framework (bandit, REINFORCE, PPO) and a study of whether judge architectures (single, debate, ensemble, escalating) track an independent gold judge. Good means results that are honest, reproducible, and traceable to a real run.
+EvidenceRL trains agents to verify scientific claims. The agent works in a Gym-style environment (`ClaimEnv`), gathers and argues over evidence, and is rewarded by heuristic evidence metrics plus an LLM judge. The repo has two parts: the RL framework (bandit, REINFORCE, PPO) and a study of whether judge architectures (single, debate, ensemble, escalating) track an independent gold judge. Results must come from a real run and be reproducible.
 
 The full design lives in docs/SPEC.md. Read the relevant section before changing anything it covers. Current status and next steps are in PROGRESS.md. Design decisions and their reasons are in docs/DECISIONS.md. The README is older than the code, so trust the code and SPEC where they differ.
 

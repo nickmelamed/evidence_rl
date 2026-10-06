@@ -99,7 +99,7 @@ class LLMClient:
     def generate_structured_n(self, prompt, n: int, temperature=0.1):
         """Batched sibling of generate_structured: samples n completions of
         the *same* prompt in one forward pass (num_return_sequences=n)
-        instead of n sequential pipeline calls, used by BestOfNBaseline,
+        instead of n sequential pipeline calls. Used by BestOfNBaseline,
         which otherwise called generate_structured n times for a literally
         identical input."""
         out = self._pipe(

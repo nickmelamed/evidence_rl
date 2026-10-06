@@ -651,10 +651,9 @@ def test_get_escalating_judge_ensemble_target_still_uses_ensemble_judge(monkeypa
 
 def test_get_ensemble_judge_passes_llm_judge_cache_as_reuse(monkeypatch):
     """_get_ensemble_judge must hand its current _llm_judge_cache snapshot
-    to build_ensemble_judge as `reuse`, this is what lets a member sharing
-    a model name with an already-loaded judge (e.g. tier-1, when called
-    from _get_escalating_judge) become the same instance instead of a
-    fresh one."""
+    to build_ensemble_judge as `reuse`. A member sharing a model name with an already-loaded judge
+    (e.g. tier-1, when called from _get_escalating_judge) then becomes the
+    same instance instead of a fresh one."""
     from evid_rl_env.environment import environment as env_module
 
     sentinel_reuse = {"model-cheap": object()}
@@ -697,9 +696,9 @@ def test_get_debate_judge_passes_llm_judge_cache_as_reuse(monkeypatch):
 def test_get_evidence_labeler_routes_through_get_llm_judge(monkeypatch):
     """_get_evidence_labeler must go through _get_llm_judge (not cache its
     own separate client, as it used to) so _llm_judge_cache is always
-    populated for any model loaded via any path, this is what lets
-    _get_ensemble_judge's reuse catch a pure always-on-ensemble config's
-    overlap with EvidenceLabeler's already-loaded model."""
+    populated for any model loaded via any path. _get_ensemble_judge's reuse
+    can then catch a pure always-on-ensemble config's overlap with
+    EvidenceLabeler's already-loaded model."""
     from types import SimpleNamespace
 
     from evid_rl_env.environment import environment as env_module
@@ -762,7 +761,7 @@ def test_evidence_labeler_then_ensemble_share_llm_judge_cache(monkeypatch):
     monkeypatch.setattr("evid_rl_env.agent.llm_client.JudgeLLMClient", _FakeJudgeLLMClient)
 
     # EvidenceLabeler loads "model-a", independent of any ensemble/escalation
-    # construction, exactly what ClaimEnv.__init__ does unconditionally.
+    # construction.
     env_module._get_evidence_labeler("model-a", seed=1)
     assert "model-a" in env_module._llm_judge_cache
 

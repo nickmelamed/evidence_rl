@@ -54,7 +54,7 @@ class BaseTrainer(EvalMixin):
     """Shared setup and per-episode helpers for Trainer (PPO/PG) and BanditTrainer.
 
     The two subclasses genuinely differ in action-selection and RL-update
-    mechanics, so `train()` stays subclass-specific, this holds only the
+    mechanics, so `train()` stays subclass-specific. This holds only the
     byte-identical (or near-identical) scaffolding around it.
     """
 
@@ -162,8 +162,8 @@ class BaseTrainer(EvalMixin):
     def _build_gold_evaluator(self, eval_dataset, gold_judge_model, judge_model, n_episodes, seed):
         """Held-out judge (different model family, never used in training
         reward) plus a fixed-size seeded subsample of eval_dataset, wrapped
-        in a GoldEvaluator, see agent/gold_evaluator.py. Kept a small
-        subsample regardless of eval_dataset size since gold_judge_model is
+        in a GoldEvaluator (see agent/gold_evaluator.py). The subsample is small
+        regardless of eval_dataset size, since gold_judge_model is
         typically 5-10x larger than judge_model and this runs on its own,
         coarser cadence (self.gold_eval_every)."""
         from evid_rl_env.agent.gold_evaluator import GoldEvaluator

@@ -1,6 +1,6 @@
 # EvidenceRL spec (DRAFT)
 
-Marks: **[confirmed]** you told me. **[inferred]** I read it from the code or README and you have not confirmed it. Correct anything marked inferred.
+Marks: **[confirmed]** means the owner stated it. **[inferred]** means it was read from the code or README and has not been confirmed. Correct anything marked inferred.
 
 ## 1. Purpose
 
@@ -38,7 +38,7 @@ EvidenceRL treats claim verification as a sequential decision problem. An agent 
 - Step rewards are defined in `ClaimEnv.step`.
 - Final reward is `RewardFunction.compute`: `0.40*F1 + 0.20*CA - 0.15*AC - 0.15*|confidence - label| + 0.10*llm_reward - 0.04*max(0, n_selected - 5)`, clipped to [-1, 1]. Empty reasoning gives 0.0. Then `-0.3` if the debate history is empty, and `+min(0.3, 0.1 * useful_selected)`. **[inferred]**
 - Judge score to reward: `0.30*LCS + 0.25*ESS + 0.20*COMP - 0.25*GRS - 0.15*BIAS`, blended toward 0.5 by `(1 - confidence)`, clipped to [0, 1]. An all-0.5 score is treated as parse failure and returns 0.5. **[inferred]**
-- Metrics (`judge/metrics.py`): precision, recall, F1, contradiction acknowledgment (CA), and adversarial contamination (AC). Their definitions are in the code and are the integrity-critical part of the reward. **[inferred]**
+- Metrics (`judge/metrics.py`): precision, recall, F1, contradiction acknowledgment (CA), and adversarial contamination (AC). **[inferred]**
 
 ## 6. Judges
 
@@ -52,10 +52,10 @@ EvidenceRL treats claim verification as a sequential decision problem. An agent 
 - Gold eval (`evid-gold-eval`) re-scores final reasoning with held-out judges (default `mistralai/Mistral-7B-Instruct-v0.2`). It reports `proxy_gold_correlation`, `outcome_accuracy` and per-dimension disagreement. **[inferred]**
 - Results are reported through the Streamlit dashboard over `artifacts/experiments/`. A committed results table is not set up yet. **[confirmed, open question]**
 
-## 8. Known gaps between README and code (to resolve in the docs, not in Phase 3)
+## 8. Known gaps between README and code
 
 - The README says nine actions. The code has thirteen.
 - The README's per-action step reward table does not match `ClaimEnv.step`. `SELECT` is `_SELECT_LABEL_REWARD` plus a diversity bonus with no claim-similarity term, and `QUERY` is `min(0.15, 0.05*useful)`.
 - The README says `base_reward` is clipped to [0, 1] and puts the final guards before a `0.7/0.3` blend. The code clips to [-1, 1] and has no `0.7/0.3` blend.
-- The seed-42 split is implemented three times (`cli/train.py`, `cli/eval.py`, `cli/collect_trajectories.py`). The third copy does not restore global RNG state.
+- The seed-42 split is implemented three times (`cli/train.py`, `cli/eval.py`, `cli/collect_trajectories.py`). All three restore global RNG state. The collect copy did not until commit 1d98db8, which made `evid-collect --seed` ineffective before then.
 - `ClaimEnv.reset` samples with the global `random.choice`, so reproducibility depends on the caller's seeding.

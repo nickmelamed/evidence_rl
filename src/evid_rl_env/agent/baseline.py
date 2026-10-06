@@ -531,7 +531,7 @@ class ImitationBaseline(BaseEvaluator):
     Behavioral cloning at inference time: look up the closest recorded action
     for the current observation, keyed by claim then hashed observation.
 
-    No gradient updates occur, this is pure lookup-based imitation.
+    Pure lookup-based imitation, with no gradient updates.
     """
 
     def __init__(self, eval_dataset: list, trajectories_path: str, hamming_threshold: int = 3):

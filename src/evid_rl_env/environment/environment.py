@@ -145,7 +145,7 @@ class ClaimEnv:
         gold_evidence = self.current_sample.get("evidence")
         if gold_evidence:
             # Real evidentiary basis (e.g. SciFact abstracts, see
-            # ATTRIBUTION.md), already human-labeled, so used directly with
+            # ATTRIBUTION.md). It is already human-labeled, so use it as is with
             # no Tavily call or EvidenceLabeler re-labeling.
             evidence_pool = [
                 Evidence(id=i, text=e["text"], label=e.get("label", "neutral"))
@@ -183,7 +183,7 @@ class ClaimEnv:
                 s.selected_evidence_ids.add(payload)
                 reward = self._SELECT_LABEL_REWARD.get(doc.label, 0.0) + diversity
             elif doc is not None:
-                # doc is in the pool but already selected, so penalise redundancy
+                # already selected, so penalise the redundant pick
                 reward = -0.1
 
         elif action == Actions.REMOVE:
@@ -238,8 +238,7 @@ class ClaimEnv:
                 reward = -1.0
                 done = True
 
-            # penalty for not taking enough steps (episode continues, this
-            # only blocks *premature* finalization, it doesn't end the episode)
+            # early FINALIZE is penalised but the episode continues
             elif s.steps_taken <= 2:
                 reward = -0.5
 

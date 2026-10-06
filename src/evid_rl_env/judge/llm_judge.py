@@ -137,8 +137,8 @@ class LLMJudge:
         conf = float(scores.get("confidence", 0.5))
 
         if lcs == ess == grs == comp == bias == 0.5:
-            # fallback/parse-failure sentinel: no usable judge signal, so
-            # treat it as neutral rather than running it through the asymmetric
+            # All-0.5 scores mean the parse failed, so there is no usable signal.
+            # Treat it as neutral rather than running it through the asymmetric
             # weight formula below (which maps all-0.5 to 0.175, not 0.5)
             return 0.5
 

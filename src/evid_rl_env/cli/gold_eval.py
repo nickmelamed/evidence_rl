@@ -2,8 +2,8 @@
 evid-gold-eval: Standalone gold-judge evaluation of a trained RL policy.
 
 Re-scores a saved checkpoint's held-out-split trajectories with a held-out
-gold judge (never used in training reward, see agent/gold_evaluator.py),
-independent of a live training run. Appends its result to the checkpoint's
+gold judge. That judge is never used in training reward (see
+agent/gold_evaluator.py). The run is independent of a live training run. Appends its result to the checkpoint's
 experiment dir as gold_eval.jsonl, same shape as the rows base_trainer.py's
 EvalMixin writes during training, so both sources feed the same dashboard
 chart.
