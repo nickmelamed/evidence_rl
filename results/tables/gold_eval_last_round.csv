@@ -1,0 +1,10 @@
+run,algo,judge_architecture,rounds,last_round_episode,n_episodes,n_scored,proxy_reward_mean,gold_reward_mean,proxy_gold_correlation,outcome_accuracy_hard,escalation_rate
+comparison_baseline_20260711_205815,ppo,single,5,100,10,1,0.2413,0.5765,,1.0,
+comparison_debate_20260712_013849,ppo,escalating_debate,5,100,10,0,,,,,
+comparison_ensemble_20260711_224815,ppo,ensemble,5,100,10,0,,,,,
+comparison_escalation_20260712_001008,ppo,escalating_ensemble,7,,25,5,0.4632,0.4784,0.7298,0.8,0.8
+full_baseline_20260713_090013,ppo,single,6,300,20,1,0.4172,0.7375,,1.0,
+full_ensemble_20260714_073018,ppo,ensemble,6,300,20,2,0.75,0.7375,,0.0,
+full_escalation_20260715_204020,ppo,escalating_ensemble,6,300,20,0,,,,,
+pilot_baseline_20260711_191731,ppo,single,4,,10,1,0.262,0.446,,0.0,
+pilot_ensemble_20260711_203252,ppo,ensemble,1,10,5,0,,,,,

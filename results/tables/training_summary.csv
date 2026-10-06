@@ -1,0 +1,13 @@
+run,algo,judge_architecture,seed,episodes_logged,mean_reward_all,mean_reward_last_50
+bandit_run_20260531_171748,bandit,single,42,300,0.7663,0.6375
+comparison_baseline_20260711_205815,ppo,single,42,100,-0.0057,-0.5453
+comparison_debate_20260712_013849,ppo,escalating_debate,42,100,-0.0269,-0.2872
+comparison_ensemble_20260711_224815,ppo,ensemble,42,100,0.2579,0.1522
+comparison_escalation_20260712_001008,ppo,escalating_ensemble,42,100,0.1053,-0.3703
+full_baseline_20260713_090013,ppo,single,42,300,-0.0915,0.1337
+full_ensemble_20260714_073018,ppo,ensemble,42,300,-0.2374,-0.0153
+full_escalation_20260715_204020,ppo,escalating_ensemble,42,300,0.1156,0.6731
+pg_run_20260531_164320,pg,single,42,300,-0.0277,0.0943
+pilot_baseline_20260711_191731,ppo,single,42,30,0.367,0.367
+pilot_ensemble_20260711_203252,ppo,ensemble,42,17,0.1088,0.1088
+ppo_run_20260531_155047,ppo,single,42,300,-0.0035,0.5999
