@@ -13,8 +13,6 @@ is shown to Claude at the start of each session and after compaction.
 
 - [ ] Rerun the PPO, PG and bandit evaluations. The three runs in `results/tables/eval_baselines.csv` predate the reward and judge changes of July 2026.
 - [ ] Raise `gold_eval_n_episodes`, since most logged gold rounds scored 0 to 5 episodes and say little about judge agreement.
-- [ ] Turn on mypy's `check_untyped_defs` and work down what it finds. The current check skips the bodies of untyped functions.
-- [ ] Enable the project-checks step in `.github/workflows/agent-checks.yml` once `make ci` should run in CI.
 - [ ] Add `ruff format --check` only if you want the repo reformatted.
 
 ## Done
@@ -25,7 +23,8 @@ is shown to Claude at the start of each session and after compaction.
 - [x] Duplicate claim text (`scifact_85`, `scifact_86`) kept, with a test that it never straddles the split.
 - [x] `results/tables/` built by `make results`, README quotes only those numbers, `make numbers` checks it and runs in `make ci`.
 - [x] README matches the code (13 actions, real step and final rewards).
-- [x] mypy passes and is in `make agent-check` and `make ci`.
+- [x] mypy passes with `check_untyped_defs` and is in `make agent-check` and `make ci`.
+- [x] CI runs `make install-dev && make ci` in `agent-checks.yml`.
 
 ## Open questions for the owner
 

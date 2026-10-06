@@ -24,7 +24,7 @@ class Evaluator:
         rewards_raw = []
         steps_list = []
         action_counts = {a: 0 for a in ACTIONS}
-        llm_score_totals = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+        llm_score_totals: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         try:
             for _ in range(self.n_eval_episodes):
