@@ -1,4 +1,8 @@
+from typing import Any
+
 import numpy as np
+
+_MODEL: Any
 
 try:
     from sentence_transformers import SentenceTransformer
