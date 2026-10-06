@@ -84,3 +84,20 @@ def test_collect_main_seed_controls_randomness_after_split_load(monkeypatch, tmp
         collect.main()
 
     assert draws[0] != draws[1]
+
+
+def test_split_matches_the_pre_refactor_split_exactly():
+    import hashlib
+
+    train, held_out = _deterministic_split(load_dataset())
+
+    def digest(samples):
+        return hashlib.sha256("\n".join(s["id"] for s in samples).encode()).hexdigest()
+
+    assert digest(train) == "b6de7c191640b2de3d2479f65e1833b15b4a0f382805c61c65427fc85dc9024d"
+    assert digest(held_out) == "7be553929f321cf8eac656da177f39511f30c576e36ce588ec91823c3fd440c4"
+
+
+def test_duplicate_claim_texts_never_straddle_the_split():
+    train, held_out = _deterministic_split(load_dataset())
+    assert {s["claim"] for s in train}.isdisjoint({s["claim"] for s in held_out})

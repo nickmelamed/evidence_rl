@@ -57,5 +57,5 @@ EvidenceRL treats claim verification as a sequential decision problem. An agent 
 - The README says nine actions. The code has thirteen.
 - The README's per-action step reward table does not match `ClaimEnv.step`. `SELECT` is `_SELECT_LABEL_REWARD` plus a diversity bonus with no claim-similarity term, and `QUERY` is `min(0.15, 0.05*useful)`.
 - The README says `base_reward` is clipped to [0, 1] and puts the final guards before a `0.7/0.3` blend. The code clips to [-1, 1] and has no `0.7/0.3` blend.
-- The seed-42 split is implemented three times (`cli/train.py`, `cli/eval.py`, `cli/collect_trajectories.py`). All three restore global RNG state. The collect copy did not until commit 1d98db8, which made `evid-collect --seed` ineffective before then.
+- The seed-42 split lives in `data/dataset.py` (`split_dataset`) and is used by train, eval and collect. The collect copy failed to restore global RNG state until commit 1d98db8, which made `evid-collect --seed` ineffective before then.
 - `ClaimEnv.reset` samples with the global `random.choice`, so reproducibility depends on the caller's seeding.

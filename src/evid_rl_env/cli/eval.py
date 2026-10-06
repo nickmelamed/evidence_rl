@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 from evid_rl_env.agent.config_loader import load_base_config
-from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.data.dataset import load_dataset, split_dataset
 from evid_rl_env.data.evidence_fetcher import use_snapshot
 
 
@@ -65,16 +65,7 @@ _AVAILABLE = frozenset(_TABLE_ORDER)
 
 def _deterministic_split(dataset: list) -> tuple[list, list]:
     """Apply the same seed-42 80/20 split used during training."""
-
-    _saved = random.getstate()
-    random.seed(42)
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
-    cut = int(0.8 * len(dataset))
-    train = [dataset[i] for i in indices[:cut]]
-    eval_ = [dataset[i] for i in indices[cut:]]
-    random.setstate(_saved)
-    return train, eval_
+    return split_dataset(dataset)
 
 
 def _load_datasets(eval_data_path: str | None) -> tuple[list, list | None]:
