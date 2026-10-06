@@ -22,7 +22,7 @@ def test_unseen_claims_are_maximally_stale():
 def test_staleness_is_near_zero_right_after_recording():
     # record() ticks the shared episode counter as part of the same call, so
     # staleness immediately after being recorded is 1/long_window, not
-    # exactly 0 — it climbs from there as other claims get recorded.
+    # exactly 0. It climbs from there as other claims get recorded.
     curriculum = Curriculum(long_window=10)
     curriculum.record("c_a", 0.5)
     assert curriculum.staleness("c_a") == pytest.approx(0.1)

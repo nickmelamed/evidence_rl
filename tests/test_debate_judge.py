@@ -1,11 +1,10 @@
 """
 Unit tests for DebateJudge (judge/debate_judge.py): augmented-reasoning
 composition, empty-reasoning short-circuit, graceful degradation on a
-failed critique, and pass-through of the arbiter's (reward, scores) —
+failed critique, and pass-through of the arbiter's (reward, scores),
 all against mocked clients, no real model loads.
 """
 
-import pytest
 
 from evid_rl_env.environment.state import Evidence
 from evid_rl_env.judge.debate_judge import DebateJudge

@@ -18,14 +18,14 @@ class EvidenceLabeler:
 
     Structurally a sibling of judge.llm_judge.LLMJudge: same llm/cache_scores
     shape, same cache-by-content-hash pattern, same safe-fallback-on-failure
-    behavior — labeling failures fall back to "neutral", which is exactly
+    behavior. Labeling failures fall back to "neutral", which is exactly
     today's permanent default, so an outage never makes things worse than the
     pre-labeling baseline.
 
     `adversarial: true` overrides the stance label in the returned string,
     since judge.metrics's compute_precision/recall/contradiction_acknowledgment/
     adversarial_contamination all check a single categorical Evidence.label
-    field for exact string equality — a document can't be both "support" and
+    field for exact string equality, a document can't be both "support" and
     "adversarial" under that existing single-field taxonomy.
     """
 

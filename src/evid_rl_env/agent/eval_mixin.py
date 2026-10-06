@@ -17,7 +17,7 @@ _BASELINE_TABLE_ORDER = [
 
 # fewshot_k3/fewshot_k5 each pay a one-time full train-set sweep to build
 # their example bank, and best_of_5 makes up to 5x actor+judge calls per
-# step — gated to expensive_baseline_every eval rounds instead of every
+# step, so they are gated to expensive_baseline_every eval rounds instead of every
 # round. random/majority/greedy_llm/imitation are free or cheap (and
 # greedy_llm is the CI-gate reference) so they always run.
 _EXPENSIVE_BASELINES = {"fewshot_k3", "fewshot_k5", "best_of_5"}
@@ -107,7 +107,7 @@ class EvalMixin:
     def _maybe_run_gold_eval(self, ep: int) -> None:
         """Gold eval runs on its own coarser cadence (gold_eval_every eval
         *rounds*, not episodes) since the gold judge is typically far more
-        expensive than the training judge — see agent/gold_evaluator.py."""
+        expensive than the training judge (see agent/gold_evaluator.py)."""
         gold_evaluator = getattr(self, "gold_evaluator", None)
         if gold_evaluator is None:
             return

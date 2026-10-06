@@ -98,12 +98,12 @@ class ClaimEnv:
             self.llm_judge = llm_judge
         elif judge_ensemble_models and judge_escalation:
             # Prime judge_model_name's LLMJudge before dispatching to the
-            # ensemble/debate builders below — evidence_labeler needs this
+            # ensemble/debate builders below. evidence_labeler needs this
             # exact model regardless of which self.llm_judge path is taken
             # (see the bottom of this method), and self.llm_judge is built
             # *before* self.evidence_labeler here, so without priming first
             # a pure ensemble/debate config would build its own fresh copy
-            # of this model with nothing yet in the cache to reuse — this
+            # of this model with nothing yet in the cache to reuse. This
             # doesn't add a new load, just moves an already-inevitable one
             # earlier so _get_ensemble_judge/_get_debate_judge's
             # reuse=dict(_llm_judge_cache) can actually see it.
@@ -145,7 +145,7 @@ class ClaimEnv:
         gold_evidence = self.current_sample.get("evidence")
         if gold_evidence:
             # Real evidentiary basis (e.g. SciFact abstracts, see
-            # ATTRIBUTION.md) — already human-labeled, so used directly with
+            # ATTRIBUTION.md). It is already human-labeled, so use it as is with
             # no Tavily call or EvidenceLabeler re-labeling.
             evidence_pool = [
                 Evidence(id=i, text=e["text"], label=e.get("label", "neutral"))
@@ -183,7 +183,7 @@ class ClaimEnv:
                 s.selected_evidence_ids.add(payload)
                 reward = self._SELECT_LABEL_REWARD.get(doc.label, 0.0) + diversity
             elif doc is not None:
-                # doc is in the pool but already selected — penalise redundancy
+                # already selected, so penalise the redundant pick
                 reward = -0.1
 
         elif action == Actions.REMOVE:
@@ -238,8 +238,7 @@ class ClaimEnv:
                 reward = -1.0
                 done = True
 
-            # penalty for not taking enough steps (episode continues — this
-            # only blocks *premature* finalization, it doesn't end the episode)
+            # early FINALIZE is penalised but the episode continues
             elif s.steps_taken <= 2:
                 reward = -0.5
 
@@ -326,7 +325,7 @@ class ClaimEnv:
             # Reorder selected_evidence by descending cosine similarity to the
             # claim. Falls back to a text-length sort if the embedder is
             # unavailable (sentence-transformers not installed, or an injected
-            # test embedder returns None) — never a hard failure.
+            # test embedder returns None), never a hard failure.
             if s.selected_evidence:
                 claim_emb = self.embedder(s.claim)
                 if claim_emb is not None:

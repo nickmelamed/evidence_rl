@@ -45,6 +45,7 @@ logs/
 .env
 .env.*
 *.env
+!.env.example
 
 # data/artifacts
 
@@ -79,3 +80,7 @@ hf_cache/
 # jupyter
 
 .ipynb_checkpoints/
+
+# Claude Code agent tooling
+.claude/.gate-state.json
+.claude/settings.local.json

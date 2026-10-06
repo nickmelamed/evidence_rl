@@ -3,12 +3,12 @@ One-time (but idempotent/re-runnable) data migration: backfills real
 SciFact evidence into seed_claims.json.
 
 seed_claims.json's claims were originally extracted from SciFact (Wadden et
-al. 2020) outside this repo, carrying over only claim text and label — the
+al. 2020) outside this repo, carrying over only claim text and label, the
 actual evidence abstracts SciFact's human annotators labeled each claim
 against were never included, leaving evidence sourced entirely from live
 Tavily web search at runtime (see environment/environment.py's ClaimEnv.reset).
 This script re-downloads the original SciFact release directly (the same
-URL allenai/scifact's own HuggingFace loading script fetches — no `datasets`
+URL allenai/scifact's own HuggingFace loading script fetches, no `datasets`
 package dependency needed) and attaches each claim's real cited-document
 evidence, matched by the numeric SciFact claim ID already preserved in each
 entry's `notes` field.
@@ -27,7 +27,7 @@ _SEED_CLAIMS_PATH = Path(__file__).parent / "seed_claims.json"
 
 
 def _scifact_id(claim_id: str) -> int | None:
-    """'scifact_306' -> 306; returns None for non-SciFact-shaped ids
+    """'scifact_306' -> 306, and returns None for non-SciFact-shaped ids
     (so this script is safe to re-run against a dataset that later mixes
     in claims from other sources)."""
     if not claim_id.startswith("scifact_"):
@@ -57,7 +57,7 @@ def _load_scifact_claims_and_corpus(data_dir: Path) -> tuple[dict, dict]:
 
 def _build_evidence(scifact_claim: dict, corpus: dict) -> list[dict]:
     """One Evidence-shaped dict per cited document (title + full abstract,
-    not just the human-highlighted rationale sentences — the agent should
+    not just the human-highlighted rationale sentences, the agent should
     still have to find the relevant part itself, same as with a real
     fetched article)."""
     evidence = []

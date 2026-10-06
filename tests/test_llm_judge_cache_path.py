@@ -2,7 +2,7 @@
 Verifies LLMJudge.cache_path keeps separate judge instances from colliding.
 
 Before this parameter existed, every LLMJudge shared the single hardcoded
-"artifacts/cache/judge_cache.sqlite3" path — since the cache key is a content
+"artifacts/cache/judge_cache.sqlite3" path, since the cache key is a content
 hash of (claim, reasoning, evidence) and doesn't include the model name, a
 second judge (e.g. a gold-eval judge pointed at a different model) scoring
 the same trajectory would silently read back the first judge's cached

@@ -7,7 +7,7 @@ GOOD_SCORES_JSON = (
     '{"LCS": 0.8, "ESS": 0.8, "GRS": 0.2, "COMP": 0.8, "BIAS": 0.2, "confidence": 0.9}'
 )
 # Distinct score set so tests can tell "judge was called again" apart from
-# "cached score was reused" — the two must never look identical.
+# "cached score was reused", the two must never look identical.
 OTHER_SCORES_JSON = (
     '{"LCS": 0.1, "ESS": 0.1, "GRS": 0.1, "COMP": 0.1, "BIAS": 0.1, "confidence": 0.9}'
 )
@@ -22,7 +22,7 @@ def test_reset_builds_evidence_pool_from_fetch(make_env, fake_evidence_docs):
 
 def test_reset_prefers_gold_evidence_over_tavily(make_env, monkeypatch):
     """A dataset entry with an 'evidence' field (e.g. backfilled SciFact
-    claims, see data/ATTRIBUTION.md) must be used directly at reset() — no
+    claims, see data/ATTRIBUTION.md) must be used directly at reset(), no
     Tavily fetch, no EvidenceLabeler call, since the label is already
     human-annotated and more trustworthy than an LLM re-labeling it."""
     fetch_calls = {"count": 0}
@@ -174,9 +174,7 @@ def test_step_limit_terminates_episode(make_env):
     assert steps == 10  # State.max_steps default
 
 
-# ---------------------------------------------------------------------------
 # Judge-call cadence
-# ---------------------------------------------------------------------------
 
 def test_first_debate_action_at_step_one_reaches_the_judge(make_env):
     """Regression test: _last_judge_step used to start at 0, so steps_taken==1
@@ -208,9 +206,7 @@ def test_judge_is_called_again_after_two_steps(make_env):
     assert info["llm_reward"] == pytest.approx(0.0815)  # OTHER_SCORES_JSON's reward
 
 
-# ---------------------------------------------------------------------------
 # FINALIZE guards
-# ---------------------------------------------------------------------------
 
 def test_finalize_with_no_evidence_is_terminal_and_heavily_penalized(make_env):
     env = make_env()
@@ -277,9 +273,7 @@ def test_finalize_with_empty_debate_history_scores_worse_than_with_debate(make_e
     assert reward_with_debate > reward_no_debate
 
 
-# ---------------------------------------------------------------------------
 # Potential-based shaping: terminal Phi(s) = 0 convention
-# ---------------------------------------------------------------------------
 
 def test_shaping_uses_terminal_potential_zero_on_finalize(make_env):
     env = make_env(mock_response=GOOD_SCORES_JSON)
@@ -305,9 +299,7 @@ def test_shaping_uses_terminal_potential_zero_on_step_limit(make_env):
     assert env._prev_phi == 0.0
 
 
-# ---------------------------------------------------------------------------
 # Evidence labeling
-# ---------------------------------------------------------------------------
 
 def test_reset_labels_evidence_via_injected_labeler(make_env, fake_evidence_docs, fake_evidence_labeler):
     labels = {
@@ -336,7 +328,7 @@ def test_finalize_reward_reflects_injected_evidence_labels(make_env, fake_eviden
     """Root-cause regression test: before evidence labeling existed, every
     document defaulted to "neutral" forever, which made base_reward's F1
     always 0, contradiction-acknowledgment always the vacuous 1.0, and
-    adversarial-contamination always 0 — three of five terms were frozen
+    adversarial-contamination always 0, three of five terms were frozen
     constants regardless of what the agent actually selected. With real
     per-evidence labels, the same selection now produces a different reward."""
     labels = {
@@ -360,9 +352,7 @@ def test_finalize_reward_reflects_injected_evidence_labels(make_env, fake_eviden
     assert reward_with_labels != pytest.approx(reward_all_neutral)
 
 
-# ---------------------------------------------------------------------------
 # New actions: ASSIGN_CONFIDENCE, CHALLENGE_EVIDENCE, REQUEST_CLARIFICATION, HEDGE
-# ---------------------------------------------------------------------------
 
 def test_assign_confidence_sets_state_and_is_rewarded(make_env):
     env = make_env()
@@ -486,9 +476,7 @@ def test_hedge_triggers_judge_and_reward_like_concede(make_env):
     assert "HEDGE: partially true" in env.state.debate_history
 
 
-# ---------------------------------------------------------------------------
 # task_success info signal (curriculum performance signal)
-# ---------------------------------------------------------------------------
 
 def test_finalize_includes_bounded_task_success_in_info(make_env):
     env = make_env()
@@ -508,13 +496,11 @@ def test_non_finalize_steps_have_no_task_success(make_env):
     assert info["task_success"] is None
 
 
-# ---------------------------------------------------------------------------
 # judge_ensemble_models dispatch (Phase 2: multi-judge ensemble)
-# ---------------------------------------------------------------------------
 
 def test_judge_ensemble_models_dispatches_to_ensemble_judge(monkeypatch):
     """ClaimEnv(judge_ensemble_models=[...]) must end up with self.llm_judge
-    as the ensemble, not the single judge_model's LLMJudge — even though
+    as the ensemble, not the single judge_model's LLMJudge, even though
     _get_llm_judge is now also called, to prime _llm_judge_cache so
     _get_ensemble_judge's reuse can see it (see the fix's comment in
     ClaimEnv.__init__). Monkeypatched so nothing loads a real model."""
@@ -550,7 +536,7 @@ def test_judge_ensemble_models_dispatches_to_ensemble_judge(monkeypatch):
 
 def test_judge_escalation_dispatches_to_escalating_judge(monkeypatch):
     """ClaimEnv(judge_ensemble_models=[...], judge_escalation=True) must use
-    _get_escalating_judge, not the always-on _get_ensemble_judge path —
+    _get_escalating_judge, not the always-on _get_ensemble_judge path,
     monkeypatched so this never loads a real model."""
     from evid_rl_env.environment import environment as env_module
 
@@ -569,7 +555,7 @@ def test_judge_escalation_dispatches_to_escalating_judge(monkeypatch):
 
     monkeypatch.setattr(env_module, "_get_escalating_judge", _fake_get_escalating_judge)
     monkeypatch.setattr(env_module, "_get_ensemble_judge", _fail_get_ensemble_judge)
-    # priming call ahead of the (mocked) _get_escalating_judge dispatch —
+    # priming call ahead of the (mocked) _get_escalating_judge dispatch,
     # see the fix's comment in ClaimEnv.__init__
     monkeypatch.setattr(env_module, "_get_llm_judge", lambda model_name, seed: object())
 
@@ -616,7 +602,7 @@ def test_judge_escalation_false_still_uses_always_on_ensemble(monkeypatch):
 
 def test_get_escalating_judge_debate_target_uses_debate_judge(monkeypatch):
     """_get_escalating_judge(..., escalation_target="debate") must call
-    _get_debate_judge, not _get_ensemble_judge — monkeypatched so this
+    _get_debate_judge, not _get_ensemble_judge, monkeypatched so this
     never loads a real model."""
     from evid_rl_env.environment import environment as env_module
 
@@ -665,10 +651,9 @@ def test_get_escalating_judge_ensemble_target_still_uses_ensemble_judge(monkeypa
 
 def test_get_ensemble_judge_passes_llm_judge_cache_as_reuse(monkeypatch):
     """_get_ensemble_judge must hand its current _llm_judge_cache snapshot
-    to build_ensemble_judge as `reuse` — this is what lets a member sharing
-    a model name with an already-loaded judge (e.g. tier-1, when called
-    from _get_escalating_judge) become the same instance instead of a
-    fresh one."""
+    to build_ensemble_judge as `reuse`. A member sharing a model name with an already-loaded judge
+    (e.g. tier-1, when called from _get_escalating_judge) then becomes the
+    same instance instead of a fresh one."""
     from evid_rl_env.environment import environment as env_module
 
     sentinel_reuse = {"model-cheap": object()}
@@ -711,9 +696,9 @@ def test_get_debate_judge_passes_llm_judge_cache_as_reuse(monkeypatch):
 def test_get_evidence_labeler_routes_through_get_llm_judge(monkeypatch):
     """_get_evidence_labeler must go through _get_llm_judge (not cache its
     own separate client, as it used to) so _llm_judge_cache is always
-    populated for any model loaded via any path — this is what lets
-    _get_ensemble_judge's reuse catch a pure always-on-ensemble config's
-    overlap with EvidenceLabeler's already-loaded model."""
+    populated for any model loaded via any path. _get_ensemble_judge's reuse
+    can then catch a pure always-on-ensemble config's overlap with
+    EvidenceLabeler's already-loaded model."""
     from types import SimpleNamespace
 
     from evid_rl_env.environment import environment as env_module
@@ -759,7 +744,7 @@ def test_evidence_labeler_then_ensemble_share_llm_judge_cache(monkeypatch):
     """End-to-end proof the gap is actually closed: EvidenceLabeler loading
     a model (a path that never touches _get_llm_judge on its own) must
     still populate _llm_judge_cache so a *later*, independently-triggered
-    _get_ensemble_judge call picks it up as a reuse candidate — this is
+    _get_ensemble_judge call picks it up as a reuse candidate, this is
     exactly the pure always-on-ensemble-config scenario that used to load
     the same model twice."""
     from evid_rl_env.environment import environment as env_module
@@ -776,7 +761,7 @@ def test_evidence_labeler_then_ensemble_share_llm_judge_cache(monkeypatch):
     monkeypatch.setattr("evid_rl_env.agent.llm_client.JudgeLLMClient", _FakeJudgeLLMClient)
 
     # EvidenceLabeler loads "model-a", independent of any ensemble/escalation
-    # construction — exactly what ClaimEnv.__init__ does unconditionally.
+    # construction.
     env_module._get_evidence_labeler("model-a", seed=1)
     assert "model-a" in env_module._llm_judge_cache
 

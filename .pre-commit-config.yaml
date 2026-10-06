@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: check-style
+        name: comment and doc style (changed lines)
+        entry: python3 scripts/agent/check_style.py --changed
+        language: system
+        pass_filenames: false
+        always_run: true

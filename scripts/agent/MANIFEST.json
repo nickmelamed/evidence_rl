@@ -1,0 +1,16 @@
+{
+  "version": "2.0.1",
+  "files": {
+    "scripts/agent/VERSION": "fe840f52fb5578d3f77eb497115eb02c6036601c3a53e60df7995c7276baa77a",
+    "scripts/agent/_common.py": "6fe025790c8793ba6655415c804c9a5a0321ab4fc03b8e03c2dee506dbe110a5",
+    "scripts/agent/check_numbers.py": "3f3484c34e41787033f58a3fb93116ac7a41effa7aad0d805aa117c475c16fb9",
+    "scripts/agent/check_style.py": "494a171ccb95e487beea1d2277b21a8a2c0ff0803afec1ab5a4a791e80849471",
+    "scripts/agent/check_tests.py": "dd8c3dbd66fd5292e688437caed711944caa7f9d5230b9d700c4dd8d8f065488",
+    "scripts/agent/guard_bash.py": "3b10ea9ddf65ff7cdb61244551f2fa35889ceb249d9bf83e120d34385253416f",
+    "scripts/agent/guard_edit.py": "2602d80c34983116c2e7e34d0221d8290125af4826a09aad627890f0df296d44",
+    "scripts/agent/guard_read.py": "f13bbac4c350a4ee7cd2d42a589418f89fd4110aebcd15c77f7adf6e4e09f93e",
+    "scripts/agent/session_context.py": "c950b3acdb4f7ebb43806854619fdd72c4de99f3b11b83c43bff8c385464ffa4",
+    "scripts/agent/smoke_test.py": "8b88fb17e9b283e7bf1f7f6970053b23b07cb32681de93830cbf5bdad024c633",
+    "scripts/agent/stop_gate.py": "4d7b2245ab6572b8544840dd7ac4603182c024582e051494ca8a368a4158b0e6"
+  }
+}

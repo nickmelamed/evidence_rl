@@ -15,9 +15,9 @@ all cited evidence documents were kept (693 of 1,109 train+dev claims).
 
 Each claim's `evidence` field was backfilled from the same SciFact release
 (`corpus.jsonl` + `claims_{train,dev}.jsonl`) via `backfill_scifact_evidence.py`
-— one entry per cited document (title + full abstract text), with `label`
+with one entry per cited document (title + full abstract text), with `label`
 set to that document's SUPPORT/CONTRADICT rationale, lowercased. This is
 the real evidentiary basis SciFact's human annotators labeled each claim
-against, used to seed `ClaimEnv.reset()`'s initial evidence pool; live
+against, used to seed `ClaimEnv.reset()`'s initial evidence pool. Live
 Tavily search remains available for the agent's own `QUERY`/
 `REQUEST_CLARIFICATION` follow-up searches mid-episode.

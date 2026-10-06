@@ -82,7 +82,7 @@ class ExperimentTracker:
             writer.writerow(row)
 
     def log_gold_eval(self, episode: int, summary: dict):
-        """Appends one JSON line per gold-eval round to gold_eval.jsonl —
+        """Appends one JSON line per gold-eval round to gold_eval.jsonl,
         kept separate from the fixed-schema metrics.csv since the summary
         (per-dimension proxy/gold/disagreement, correlation, accuracy) is
         richer and shouldn't force FIXED_FIELDS to grow."""

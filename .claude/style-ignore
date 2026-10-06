@@ -1,0 +1,3 @@
+# Files the style checker skips (globs relative to the repo root).
+# CLAUDE.md, AGENTS.md, PROGRESS.md, CHANGELOG.md, LICENSE*, vendor/,
+# third_party/, handoff files, and .claude/* are skipped by default.

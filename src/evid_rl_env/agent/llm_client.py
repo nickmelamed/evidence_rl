@@ -27,14 +27,14 @@ def _extract_text(output):
     """Safely extract generated text from pipeline output regardless of format."""
     result = output[0]["generated_text"]
     if isinstance(result, list):
-        # chat template format — last message is assistant turn
+        # chat template format, last message is assistant turn
         return result[-1].get("content", "")
     return result
 
 
 def _extract_texts(output):
     """Same as _extract_text, but for a num_return_sequences>1 pipeline
-    call — output is a list of one generated_text entry per sequence
+    call, output is a list of one generated_text entry per sequence
     (a single input prompt, not a batch of different prompts)."""
     texts = []
     for item in output:
@@ -99,7 +99,7 @@ class LLMClient:
     def generate_structured_n(self, prompt, n: int, temperature=0.1):
         """Batched sibling of generate_structured: samples n completions of
         the *same* prompt in one forward pass (num_return_sequences=n)
-        instead of n sequential pipeline calls — used by BestOfNBaseline,
+        instead of n sequential pipeline calls. Used by BestOfNBaseline,
         which otherwise called generate_structured n times for a literally
         identical input."""
         out = self._pipe(

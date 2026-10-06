@@ -72,9 +72,9 @@ def run_episode(env: ClaimEnv, action_fn) -> tuple:
     action_fn(state) -> int   (action index)
 
     Returns:
-        trajectory   — list of per-step dicts
-        total_reward — scalar float
-        llm_scores   — {LCS, ESS, GRS, COMP} lists for metric aggregation
+        trajectory: list of per-step dicts
+        total_reward: scalar float
+        llm_scores: {LCS, ESS, GRS, COMP} lists for metric aggregation
     """
     state = env.reset()
     done = False
@@ -119,7 +119,7 @@ class BaseEvaluator(ABC):
         Evaluate for n_episodes and return aggregate metrics.
 
         Keys: mean_reward, std_reward, lcs, ess, hrs, comp
-        (hrs maps to the judge's GRS — grounding risk score)
+        (hrs maps to the judge's GRS, grounding risk score)
         """
 
     def _aggregate(self, rewards: list, score_lists: dict) -> dict:
@@ -297,7 +297,7 @@ def _collect_fewshot_examples(train_dataset: list) -> list:
 
 class _SharedFewShotExamples:
     """Lazily builds the example bank once and shares it across every
-    FewShotLLMBaseline instance passed the same bank object — e.g.
+    FewShotLLMBaseline instance passed the same bank object, e.g.
     fewshot_k3 and fewshot_k5, which otherwise each independently repeat
     the full len(train_dataset)-episode random sweep for an identical
     bank. Still fully lazy: nothing is built until whichever instance
@@ -450,7 +450,7 @@ class BestOfNBaseline(BaseEvaluator):
             return random.randint(0, N_ACTIONS - 1)
 
     def _suggest_actions_batch(self, state, n: int) -> list:
-        """n suggestions for the *same* prompt — batched into one call via
+        """n suggestions for the *same* prompt, batched into one call via
         generate_structured_n when the client supports it, instead of n
         sequential _suggest_action() calls for an identical input. Falls
         back to the sequential path for any client that doesn't implement
@@ -483,7 +483,7 @@ class BestOfNBaseline(BaseEvaluator):
         env._last_judge_step = snap["last_judge_step"]
 
     def _action_fn(self, state) -> int:
-        """Try n LLM suggestions; return the one with the highest immediate reward."""
+        """Try n LLM suggestions and return the one with the highest immediate reward."""
         env = self._current_env
         candidates = self._suggest_actions_batch(state, self.n)
 
@@ -531,7 +531,7 @@ class ImitationBaseline(BaseEvaluator):
     Behavioral cloning at inference time: look up the closest recorded action
     for the current observation, keyed by claim then hashed observation.
 
-    No gradient updates occur — this is pure lookup-based imitation.
+    Pure lookup-based imitation, with no gradient updates.
     """
 
     def __init__(self, eval_dataset: list, trajectories_path: str, hamming_threshold: int = 3):

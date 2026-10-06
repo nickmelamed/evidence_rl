@@ -12,7 +12,7 @@ class SQLiteCache:
     mode so the file is always internally consistent even after a hard crash.
 
     Shared by LLMJudge (judge_cache.sqlite3) and EvidenceLabeler
-    (evidence_label_cache.sqlite3) — same cache shape, different content.
+    (evidence_label_cache.sqlite3), same cache shape, different content.
     """
 
     def __init__(self, path: str):

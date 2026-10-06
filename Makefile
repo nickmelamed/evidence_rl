@@ -35,6 +35,18 @@ test:
 lint:
 	ruff check .
 
+test-fast:
+	pytest -x -q
+
+style:
+	$(PYTHON) scripts/agent/check_style.py --changed .
+
+# the fast checks the Stop hook runs
+agent-check: lint test-fast style
+
+ci: lint test style
+	$(PYTHON) scripts/agent/check_tests.py --warn
+
 # evaluation
 
 eval:
@@ -96,6 +108,8 @@ help:
 	@echo "  make episode        Run single episode"
 	@echo "  make test           Run tests"
 	@echo "  make lint           Run ruff"
+	@echo "  make agent-check    Lint, fast tests, style check"
+	@echo "  make ci             Exactly what CI runs"
 	@echo "  make clean          Remove cache files"
 	@echo "  make reset          Full cleanup"
 	@echo ""

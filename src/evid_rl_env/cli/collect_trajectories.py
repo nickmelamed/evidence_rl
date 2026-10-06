@@ -3,9 +3,9 @@ CLI entry point: evid-collect
 
 Collects labeled trajectories for imitation learning / offline RL.
 Three modes:
-  llm_annotator   — strong LLM selects actions (AnnotatorClient)
-  reward_filtered — random rollouts, keep top-k% by reward
-  best_rollouts   — load existing JSONL files from logs/, filter by min-reward
+  llm_annotator: strong LLM selects actions (AnnotatorClient)
+  reward_filtered: random rollouts, keep top-k% by reward
+  best_rollouts: load existing JSONL files from logs/, filter by min-reward
 
 Output: newline-delimited JSON, one trajectory object per line.
 """
@@ -50,9 +50,11 @@ def _load_train_split(dataset_path: str | None) -> list:
             return json.load(f)
 
     dataset = load_dataset()
+    saved_state = random.getstate()
     random.seed(42)
     indices = list(range(len(dataset)))
     random.shuffle(indices)
+    random.setstate(saved_state)
     split = int(0.8 * len(dataset))
     return [dataset[i] for i in indices[:split]]
 
@@ -261,7 +263,6 @@ def main():
              "Does not affect the train/eval split (always seed 42).",
     )
     args = parser.parse_args()
-
 
     random.seed(args.seed)
     np.random.seed(args.seed)

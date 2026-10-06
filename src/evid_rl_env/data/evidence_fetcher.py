@@ -21,7 +21,7 @@ _conn.commit()
 
 _TAVILY_TIMEOUT = 8  # seconds; fail fast and fall back to seed data
 
-# Set via use_snapshot() — {claim: {"search_query": ..., "results": [...]}}.
+# Set via use_snapshot(), {claim: {"search_query": ..., "results": [...]}}.
 # Keyed on (claim, search_query) together (not claim alone) so a loaded
 # snapshot only intercepts the deterministic reset()-time fetch (dataset's
 # own search_query) and never QUERY's agent-generated follow-up searches,
@@ -30,7 +30,7 @@ _snapshot: dict | None = None
 
 
 def use_snapshot(path: str) -> None:
-    """Load a snapshot written by export_snapshot() — fetch_evidence() then
+    """Load a snapshot written by export_snapshot(), fetch_evidence() then
     prefers it over the sqlite cache/live Tavily call for matching claims."""
     global _snapshot
     with open(path) as f:
@@ -95,7 +95,7 @@ def warm_cache(dataset: list) -> None:
 
     Called once at training startup so that env.reset() and _build_examples()
     never block on a cold Tavily call mid-training. Claims already cached are
-    skipped. Failures are silently ignored — the env falls back to seed data.
+    skipped. Failures are silently ignored, the env falls back to seed data.
     """
     missing = []
     for sample in dataset:

@@ -25,7 +25,7 @@ EVAL_DATASET = [{"claim": "Baselines claim.", "search_query": "baselines claim"}
 @pytest.fixture
 def patch_baseline_env(monkeypatch, make_llm_judge, fake_evidence_labeler):
     """RandomBaseline/MajorityBaseline/etc. each construct their own ClaimEnv
-    with no way to inject a judge from outside — patch the name baseline.py
+    with no way to inject a judge from outside, patch the name baseline.py
     itself uses so tests never need a real generation/judge model."""
     from evid_rl_env.environment.environment import ClaimEnv as RealClaimEnv
 
@@ -100,9 +100,7 @@ def test_greedy_llm_baseline_falls_back_to_random_and_logs_on_exception(mock_llm
     assert any("LLM call failed" in r.message for r in caplog.records)
 
 
-# ---------------------------------------------------------------------------
 # FewShotLLMBaseline
-# ---------------------------------------------------------------------------
 
 def test_fewshot_baseline_parses_a_valid_action_index(mock_llm, patch_baseline_env):
     patch_baseline_env()
@@ -147,7 +145,7 @@ def test_shared_example_bank_builds_once_across_k3_and_k5(mock_llm, monkeypatch)
 
 def test_without_shared_bank_each_instance_builds_independently(mock_llm, monkeypatch):
     """Regression: constructing FewShotLLMBaseline without an example_bank
-    (e.g. standalone/test usage) must keep today's behavior — each instance
+    (e.g. standalone/test usage) must keep today's behavior, each instance
     builds and owns its own bank."""
     import evid_rl_env.agent.baseline as baseline_module
 
@@ -192,7 +190,7 @@ def test_best_of_n_suggest_action_falls_back_to_random_and_logs_on_exception(moc
 
 def test_best_of_n_falls_back_to_sequential_calls_without_batched_method(mock_llm):
     """A client without generate_structured_n (e.g. this codebase's own
-    duck-typed mock) must keep using n sequential _suggest_action() calls —
+    duck-typed mock) must keep using n sequential _suggest_action() calls,
     today's exact behavior, unchanged."""
     baseline = BestOfNBaseline(EVAL_DATASET, mock_llm(response="2"), n=3)
     candidates = baseline._suggest_actions_batch(_state(), 3)

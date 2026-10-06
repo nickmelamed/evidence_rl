@@ -2,8 +2,8 @@
 evid-gold-eval: Standalone gold-judge evaluation of a trained RL policy.
 
 Re-scores a saved checkpoint's held-out-split trajectories with a held-out
-gold judge (never used in training reward — see agent/gold_evaluator.py),
-independent of a live training run. Appends its result to the checkpoint's
+gold judge. That judge is never used in training reward (see
+agent/gold_evaluator.py). The run is independent of a live training run. Appends its result to the checkpoint's
 experiment dir as gold_eval.jsonl, same shape as the rows base_trainer.py's
 EvalMixin writes during training, so both sources feed the same dashboard
 chart.
@@ -82,9 +82,10 @@ def main() -> None:
         print("No checkpoint found under artifacts/experiments/. Run evid-train first or pass --checkpoint.")
         raise SystemExit(1)
 
+    import numpy as np
+
     from evid_rl_env.agent.bandit import LinUCBBandit
     from evid_rl_env.agent.policy import ActorCriticPolicy, BanditPolicyWrapper
-    import numpy as np
 
     _peek = np.load(checkpoint, allow_pickle=False)
     ckpt_type = str(_peek.get("type", ["actor_critic"])[0])
@@ -109,11 +110,12 @@ def main() -> None:
     print(f"Gold judge: {gold_judge_model} | training judge: {judge_desc}")
     print(f"Eval split: {len(eval_dataset)} samples | gold subsample: {n_episodes}")
 
+    import random as _random
+
     from evid_rl_env.agent.gold_evaluator import GoldEvaluator
     from evid_rl_env.agent.llm_client import JudgeLLMClient
     from evid_rl_env.environment.environment import ClaimEnv
     from evid_rl_env.judge.llm_judge import LLMJudge
-    import random as _random
 
     _rng_state = _random.getstate()
     _random.seed(seed)

@@ -1,7 +1,7 @@
 """
 Unit tests for EnsembleJudge (judge/ensemble_judge.py): median aggregation
 across members, measured-disagreement confidence, empty-reasoning
-short-circuit, and interface compatibility with LLMJudge — all against
+short-circuit, and interface compatibility with LLMJudge, all against
 mocked LLM clients, no real model loads (same style as
 tests/test_llm_judge_smoke.py).
 """
@@ -122,9 +122,9 @@ def test_scores_dict_has_all_dimensions_and_confidence(tmp_path):
 
 def test_build_ensemble_judge_uses_reuse_instance(monkeypatch, tmp_path):
     """A model name present in `reuse` must become that exact instance
-    instead of a freshly-built one — this is what lets a shared instance
-    between EscalatingJudge's tier-1 and a matching ensemble member turn
-    into a genuine cache hit on escalation, not just a saved model load."""
+    instead of a freshly-built one. A shared instance between
+    EscalatingJudge's tier-1 and a matching ensemble member then gives a
+    genuine cache hit on escalation, not just a saved model load."""
     from evid_rl_env.judge.ensemble_judge import build_ensemble_judge
 
     built_clients = []

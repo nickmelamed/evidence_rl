@@ -2,9 +2,9 @@ from evid_rl_env.judge.llm_judge import LLMJudge
 
 
 class EscalatingJudge:
-    """Cheap tier-1 judge for the common case; escalates to a tier-2
+    """Cheap tier-1 judge for the common case, and escalates to a tier-2
     EnsembleJudge only when the cheap judge's own signals suggest it might
-    be wrong or gaming-prone — low self-reported confidence, high grounding-
+    be wrong or gaming-prone, low self-reported confidence, high grounding-
     risk/bias scores, or adversarial-labeled evidence in the pool (already
     flagged by EvidenceLabeler on Evidence.label, so this check costs no
     extra model call). Same (claim, reasoning, evidence) -> (reward, scores)
@@ -13,7 +13,7 @@ class EscalatingJudge:
 
     Note: trigger (1) still depends on the cheap judge's self-reported
     confidence, which isn't fully trustworthy on its own (see
-    EnsembleJudge) — a sufficiently adversarial policy could in principle
+    EnsembleJudge), a sufficiently adversarial policy could in principle
     learn to keep that number high specifically to dodge escalation.
     Triggers (2) and (3) don't share that weakness, so this is still
     strictly more robust than a single judge, just not a complete fix for

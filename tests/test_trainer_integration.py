@@ -12,7 +12,7 @@ from evid_rl_env.environment.curriculum import Curriculum
 DATASET = [{"claim": "Integration test claim.", "search_query": "integration test claim"}]
 
 # Absolute path so this still resolves after _sandbox_cwd below chdir's into a
-# tmp_path — configs/*_baseline.yaml is the single source of truth for RL
+# tmp_path, configs/*_baseline.yaml is the single source of truth for RL
 # hyperparameters (PPOConfig()/PGConfig()/BanditConfig() alone leave the
 # tuning fields as None), so these tests load the real config files rather
 # than bare-constructing a Config class.
@@ -22,7 +22,7 @@ _CONFIGS_DIR = Path(__file__).parent.parent / "configs"
 @pytest.fixture(autouse=True)
 def _sandbox_cwd(tmp_path, monkeypatch):
     """Trainer/BanditTrainer write metrics.csv/config.json/policy.npz under
-    artifacts/experiments/<run> relative to cwd — sandbox it per test so the
+    artifacts/experiments/<run> relative to cwd, sandbox it per test so the
     suite never touches the real repo's artifacts/ directory."""
     monkeypatch.chdir(tmp_path)
 

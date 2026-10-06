@@ -4,7 +4,7 @@ from evid_rl_env.judge.llm_judge import LLMJudge
 
 _DIMENSIONS = ("LCS", "ESS", "GRS", "COMP", "BIAS")
 # Maximum possible std for two values bounded in [0,1] is 0.5 (one member at
-# 0, the other at 1) — this normalization is calibrated for exactly 2
+# 0, the other at 1). The normalization assumes exactly 2
 # members and would need revisiting if the ensemble grows past that.
 _MAX_PAIRWISE_STD = 0.5
 
@@ -20,7 +20,7 @@ def build_ensemble_judge(model_names: list, seed: int, reuse: dict = None) -> "E
 
     `reuse` (model_name -> already-built LLMJudge) lets a caller hand in an
     instance it already has for a given model name instead of building a
-    fresh one — used by environment.py to share the same LLMJudge between
+    fresh one. environment.py uses this to share the same LLMJudge between
     EscalatingJudge's tier-1 and a matching ensemble member, which also
     means a genuine cache hit (not just a saved model load) on escalation:
     tier-1 already scored this exact (claim, reasoning, evidence) and wrote
@@ -42,7 +42,7 @@ def build_ensemble_judge(model_names: list, seed: int, reuse: dict = None) -> "E
 class EnsembleJudge:
     """Aggregates multiple LLMJudge members' scores (median per dimension)
     and replaces each member's self-reported confidence with *measured*
-    inter-judge agreement — a policy can't inflate reward by learning
+    inter-judge agreement, a policy can't inflate reward by learning
     reasoning that makes a single judge simply claim high confidence,
     since this confidence is derived from actual cross-model agreement
     instead. Same (claim, reasoning, evidence) -> (reward, scores)

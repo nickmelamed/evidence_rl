@@ -140,7 +140,7 @@ def test_skipped_round_still_produces_valid_csv_row_and_ref(tmp_path):
     expensive = _CountingStubBaseline()
     dummy = _make_dummy_with_baselines(tmp_path, cheap, expensive, expensive_baseline_every=5)
 
-    dummy._run_eval_round(0)  # round 1 — expensive baseline skipped
+    dummy._run_eval_round(0)  # round 1, expensive baseline skipped
 
     with open(dummy._eval_csv_path) as f:
         rows = list(csv.DictReader(f))
