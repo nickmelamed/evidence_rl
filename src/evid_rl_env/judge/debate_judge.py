@@ -15,7 +15,7 @@ def build_debate_judge(
     advocate_for_model: str = _DEFAULT_ADVOCATE_FOR_MODEL,
     advocate_against_model: str = _DEFAULT_ADVOCATE_AGAINST_MODEL,
     arbiter_model: str = _DEFAULT_ARBITER_MODEL,
-    reuse: dict = None,
+    reuse: dict | None = None,
 ) -> "DebateJudge":
     """`reuse` (model_name -> already-built LLMJudge) lets a caller hand in
     an instance it already has for a given model name instead of loading a

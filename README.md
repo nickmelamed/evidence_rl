@@ -8,7 +8,7 @@
 
 ### RL Environment (`ClaimEnv`)
 
-Each episode initializes with a claim and an evidence pool. The agent navigates a nine-action space:
+Each episode samples a claim and an evidence pool. The agent chooses from thirteen actions (`environment/actions.py`):
 
 | Action | Description |
 |---|---|
@@ -17,12 +17,16 @@ Each episode initializes with a claim and an evidence pool. The agent navigates 
 | `SUPPORT` | Generate an argument in favor of the claim |
 | `CONTRADICT` | Generate a counter-argument against the claim |
 | `CONCEDE` | Acknowledge a weakness in the current argument |
-| `QUERY` | Issue a follow-up Tavily search to expand the evidence pool (budget: 2 per episode) |
-| `RERANK` | Reorder selected evidence by relevance |
+| `HEDGE` | Add a qualified statement to the debate history |
+| `CHALLENGE_EVIDENCE` | Argue that a specific evidence item is unreliable |
+| `QUERY` | Issue a follow-up Tavily search to expand the evidence pool |
+| `REQUEST_CLARIFICATION` | Like `QUERY`, and also records the question in the debate history |
+| `RERANK` | Reorder selected evidence by similarity to the claim |
 | `SUMMARIZE` | Compress selected evidence into a summary appended to the debate history |
-| `FINALIZE` | Commit to a final credibility judgment |
+| `ASSIGN_CONFIDENCE` | Set the confidence used when the episode is scored |
+| `FINALIZE` | Commit to a final judgment |
 
-State at each step includes the claim, the full evidence pool, the currently selected evidence, the debate history accumulated via `SUPPORT`/`CONTRADICT`/`CONCEDE`/`SUMMARIZE` actions, and a running LLM judge score. Episodes terminate on `FINALIZE` or after 10 steps.
+`QUERY` and `REQUEST_CLARIFICATION` share a budget of two per episode. State includes the claim, the evidence pool, the selected evidence, the debate history and the last judge score. Episodes end on `FINALIZE` (with at least one selected item) or after 10 steps.
 
 ### Debate Loop
 
@@ -40,36 +44,30 @@ Issued at each action to shape the learning signal mid-episode:
 
 | Action | Reward |
 |---|---|
-| `SELECT` (new evidence) | +0.10 + 0.05 diversity bonus + 0.1 × claim-similarity |
-| `SELECT` (duplicate) | −0.1 |
-| `REMOVE` | −0.05 |
-| `SUPPORT` | +0.05 + 0.15 × ΔLLM |
-| `CONTRADICT` | +0.05 + 0.15 × ΔLLM |
-| `CONCEDE` | +0.05 + 0.10 × ΔLLM |
-| `QUERY` (within budget) | +0.05 × new documents retrieved |
-| `QUERY` (over budget) | −0.10 |
-| `RERANK` | +0.02 |
-| `SUMMARIZE` (non-empty) | +0.05 |
-| Step-limit termination | −0.20 |
+| `SELECT` (new evidence) | +0.15 support, +0.10 contradict, 0 neutral, −0.15 adversarial, plus a 0.05 bonus for evidence not selected before | <!-- numbers: ok -->
+| `SELECT` (duplicate) | −0.1 | <!-- numbers: ok -->
+| `REMOVE` | −0.05 | <!-- numbers: ok -->
+| `SUPPORT`, `CONTRADICT`, `CHALLENGE_EVIDENCE` | +0.05 + 0.15 × ΔLLM | <!-- numbers: ok -->
+| `CONCEDE`, `HEDGE` | +0.05 + 0.10 × ΔLLM | <!-- numbers: ok -->
+| `CHALLENGE_EVIDENCE` extra | +0.10 for an adversarial target, −0.05 for a supporting one | <!-- numbers: ok -->
+| `QUERY`, `REQUEST_CLARIFICATION` (within budget) | min(0.15, 0.05 × useful new documents) | <!-- numbers: ok -->
+| `QUERY`, `REQUEST_CLARIFICATION` (over budget) | −0.10 | <!-- numbers: ok -->
+| `RERANK` | +0.02 | <!-- numbers: ok -->
+| `SUMMARIZE` (non-empty) | +0.05 | <!-- numbers: ok -->
+| `ASSIGN_CONFIDENCE` | +0.05 | <!-- numbers: ok -->
+| Step-limit termination | −0.20 | <!-- numbers: ok -->
 
-ΔLLM is the change in LLM judge score relative to the previous judged step. The judge is called at most once every two steps to limit inference cost. Between calls the previous score is reused. A potential-based shaping term, `0.1 × (0.99 × Φ(s') − Φ(s))`, where Φ is the current judge score, is added to every step reward, grounding dense shaping in actual argument quality.
+ΔLLM is the change in LLM judge score relative to the previous judged step. The judge is called at most once every two steps to limit inference cost, and between calls the previous score is reused. A potential-based shaping term, `0.1 × (0.99 × Φ(s') − Φ(s))`, is added to every step reward. Φ is the current judge score and is 0 at terminal states.
 
 ### Final Reward
 
-Issued on `FINALIZE` as a weighted blend of a heuristic base reward and the LLM judge reward:
+Issued on `FINALIZE`:
 
-```
-reward = 0.70 × base_reward + 0.30 × llm_reward
-```
+- **−1.0** and the episode ends if no evidence has been selected.
+- **−0.5** and the episode continues if fewer than 3 steps were taken.
+- Otherwise `reward = base_reward − 0.3 (if the debate history is empty) + min(0.3, 0.1 × useful selected evidence)`.
 
-Guards applied before the blend:
-
-- **−1.0** if no evidence has been selected
-- **−0.5** if fewer than 3 steps were taken (premature finalization)
-- **−0.3** if the debate history is empty (no arguments generated)
-- **+0.2 × |selected_evidence|** evidence utilization bonus
-
-**`base_reward`** is a weighted sum of evidence quality metrics (clipped to [0, 1]):
+`base_reward` is a weighted sum of evidence quality metrics, clipped to [−1, 1], and is 0 when the reasoning is empty:
 
 ```
 base_reward = 0.40 × F1
@@ -88,23 +86,24 @@ base_reward = 0.40 × F1
 | Uncertainty penalty | `|confidence − true_score|` |
 | Overselection penalty | `0.04 × max(0, |selected| − 5)` |
 
+Confidence is the agent's `ASSIGN_CONFIDENCE` value, or `min(1, selected / 3)` if it never assigned one. `true_score` is the claim's label.
+
 **`llm_reward`** is produced by the LLM judge (see LLM Judge Metrics below).
 
 ---
 
 ## Evidence Pipeline
 
-Each episode's evidence pool is grounded in real retrieved documents via **Tavily** search, with no vector database and no pre-indexed corpus. At episode initialization, EvidenceRL issues a live Tavily query keyed to the claim, retrieves a set of documents, and constructs the evidence pool from those results. This means every episode reflects the current state of the web: the agent never reasons over stale embeddings or cached corpora.
+Claims in `seed_claims.json` carry gold SciFact evidence with human labels, and the environment uses it directly. For claims without it, the evidence pool is built from live **Tavily** search results, with no vector database and no pre-indexed corpus.
 
-The pipeline is intentionally lightweight:
+For a live-search claim the pipeline is:
 
-1. Claim arrives at episode reset
-2. Tavily query fires. Top-k results are fetched and structured as `Evidence` objects
-3. Each document is labeled by `judge.evidence_labeler.EvidenceLabeler`, a cached LLM call (reusing the judge model) classifying its stance toward the claim (`support`/`contradict`/`neutral`) and whether it looks adversarial (unreliable/low-quality), which feeds directly into `base_reward`'s F1/CA/AC terms
-4. Evidence pool is passed to `ClaimEnv`
-5. Agent interacts with live-retrieved, labeled evidence for the full episode
+1. The claim arrives at episode reset.
+2. A Tavily query fires and the top-k results are structured as `Evidence` objects.
+3. Each document is labeled by `judge.evidence_labeler.EvidenceLabeler`, a cached LLM call that reuses the judge model. It records the document's stance (`support`, `contradict` or `neutral`) and whether it looks adversarial. These labels feed the F1, CA and AC terms of `base_reward`.
+4. The pool is passed to `ClaimEnv` and the agent works with it for the episode.
 
-This design keeps retrieval infrastructure minimal (no pre-indexed corpus, no vector DB). The tradeoff is that a fresh checkout with a cold cache sees different evidence than a previous run (web content changes). The fetch cache (`artifacts/cache/fetch_cache.sqlite3`) makes results stable on one machine once warmed. They are not portable across machines. For results you need to reproduce exactly (e.g. in a report), use `evid-snapshot` to export a portable JSON snapshot, and pass `--evidence-snapshot` to `evid-train`/`evid-eval` to load it. The snapshot bypasses both the live Tavily call and the local sqlite cache for any claim it covers.
+Live search keeps retrieval infrastructure minimal. The tradeoff is that a fresh checkout with a cold cache sees different evidence than a previous run (web content changes). The fetch cache (`artifacts/cache/fetch_cache.sqlite3`) makes results stable on one machine once warmed. They are not portable across machines. For results you need to reproduce exactly (e.g. in a report), use `evid-snapshot` to export a portable JSON snapshot, and pass `--evidence-snapshot` to `evid-train`/`evid-eval` to load it. The snapshot bypasses both the live Tavily call and the local sqlite cache for any claim it covers.
 
 ---
 
@@ -282,18 +281,33 @@ The available baselines are:
 | `best_of_5` | Best of 5 independent LLM samples |
 | `imitation` | Policy cloned from collected expert trajectories (requires `--trajectories`) |
 
-The table printed to stdout lists each baseline's mean ± std reward relative to `greedy_llm`, followed by the RL policy result:
+`evid-eval` prints a table of mean ± std reward for each baseline and the RL policy, and writes `eval_results.json` to the run folder. The exit code is 0 if the RL policy beats `greedy_llm` and 1 if it does not.
 
-```
-[Eval — 50 episodes | checkpoint: artifacts/experiments/ppo_run/policy.npz]
-  random          0.21 ± 0.08  Δ -0.31
-  greedy_llm      0.52 ± 0.11  (baseline)
-  fewshot_k3      0.58 ± 0.09  Δ +0.06
-  best_of_5       0.61 ± 0.10  Δ +0.09
-  RL (greedy)     0.67 ± 0.08  Δ +0.15  ← target
+---
 
-PASS: RL (0.670) > greedy_llm (0.520)
-```
+## Results
+
+The tables in `results/tables/` are generated from the run folders in `artifacts/experiments/` by `make results`. Every row names its source run, and `make numbers` checks that the numbers quoted in this README match them. Nothing here is typed in by hand.
+
+### RL policy against baselines (`eval_baselines.csv`)
+
+Three runs from 2026-05-31 were evaluated on the held-out split for 50 episodes each. Rewards are mean ± std per episode.
+
+| Run | RL policy | `random` | `greedy_llm` |
+|---|---|---|---|
+| `bandit_run_20260531_171748` | 0.781 ± 0.4906 | −0.1769 ± 0.7856 | 0.6284 ± 0.5036 |
+| `pg_run_20260531_164320` | 0.072 ± 0.1808 | −0.1769 ± 0.7856 | 0.69 ± 0.5684 |
+| `ppo_run_20260531_155047` | 0.16 ± 0.3303 | −0.1769 ± 0.7856 | 0.6203 ± 0.5161 |
+
+Only the bandit run beat `greedy_llm`. These runs predate several reward and judge changes, so they should be rerun before drawing conclusions.
+
+### Gold judge agreement (`gold_eval_last_round.csv`)
+
+`evid-gold-eval` re-scores each run's final reasoning with a held-out judge. The table lists the last logged round for each run. `n_scored` is the number of episodes that reached `FINALIZE` and could be scored, out of `n_episodes`. Correlations from one to five scored episodes say very little, and an empty cell means there were too few scored episodes to compute one.
+
+The one run with a usable sample is `comparison_escalation_20260712_001008`, with 5 scored episodes out of 25, a proxy-gold correlation of 0.7298, and an escalation rate of 0.8.
+
+Training reward per run is in `training_summary.csv`.
 
 ---
 

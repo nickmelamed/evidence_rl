@@ -41,10 +41,20 @@ test-fast:
 style:
 	$(PYTHON) scripts/agent/check_style.py --changed .
 
-# the fast checks the Stop hook runs
-agent-check: lint test-fast style
+# rebuild results/tables from artifacts/experiments, then check the README against them
+results:
+	$(PYTHON) scripts/build_results_tables.py
 
-ci: lint test style
+numbers:
+	$(PYTHON) scripts/agent/check_numbers.py README.md --sources results/tables
+
+# the fast checks the Stop hook runs
+agent-check: lint typecheck test-fast style
+
+typecheck:
+	mypy
+
+ci: lint typecheck test style numbers
 	$(PYTHON) scripts/agent/check_tests.py --warn
 
 # evaluation

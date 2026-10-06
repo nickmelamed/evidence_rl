@@ -24,7 +24,7 @@ EvidenceRL treats claim verification as a sequential decision problem. An agent 
 
 ## 4. Environment (`ClaimEnv`)
 
-- Thirteen actions (`environment/actions.py`): `SELECT`, `REMOVE`, `SUPPORT`, `CONTRADICT`, `FINALIZE`, `QUERY`, `RERANK`, `SUMMARIZE`, `CONCEDE`, `ASSIGN_CONFIDENCE`, `CHALLENGE_EVIDENCE`, `REQUEST_CLARIFICATION`, `HEDGE`. The README lists nine. **[inferred]**
+- Thirteen actions (`environment/actions.py`): `SELECT`, `REMOVE`, `SUPPORT`, `CONTRADICT`, `FINALIZE`, `QUERY`, `RERANK`, `SUMMARIZE`, `CONCEDE`, `ASSIGN_CONFIDENCE`, `CHALLENGE_EVIDENCE`, `REQUEST_CLARIFICATION`, `HEDGE`. **[inferred]**
 - `QUERY` and `REQUEST_CLARIFICATION` share a budget of `max_queries` per episode (README says 2). **[inferred]**
 - The judge is called at most once every two steps. In between, the previous score is reused. **[inferred]**
 - Episodes end on `FINALIZE` with at least one selected evidence item, or at the step limit. The README says 10 and the limit lives in `State.is_done`. **[inferred]**
@@ -50,12 +50,9 @@ EvidenceRL treats claim verification as a sequential decision problem. An agent 
 - The curriculum is per-claim Prioritized Level Replay over the train split. **[inferred]**
 - Evaluation (`evid-eval`): the RL policy against `random`, `majority`, `greedy_llm`, `fewshot_k3`, `fewshot_k5`, `best_of_5` and `imitation`, on the held-out split. The README shows mean ± std reward with the delta against `greedy_llm`. **[confirmed]**
 - Gold eval (`evid-gold-eval`) re-scores final reasoning with held-out judges (default `mistralai/Mistral-7B-Instruct-v0.2`). It reports `proxy_gold_correlation`, `outcome_accuracy` and per-dimension disagreement. **[inferred]**
-- Results are reported through the Streamlit dashboard over `artifacts/experiments/`. A committed results table is not set up yet. **[confirmed, open question]**
+- Results are committed as tables in `results/tables/`, built by `scripts/build_results_tables.py` from `artifacts/experiments/`. The README quotes only those tables, and `make numbers` checks it. The Streamlit dashboard still reads the run folders directly. **[confirmed]**
 
-## 8. Known gaps between README and code
+## 8. Known gaps
 
-- The README says nine actions. The code has thirteen.
-- The README's per-action step reward table does not match `ClaimEnv.step`. `SELECT` is `_SELECT_LABEL_REWARD` plus a diversity bonus with no claim-similarity term, and `QUERY` is `min(0.15, 0.05*useful)`.
-- The README says `base_reward` is clipped to [0, 1] and puts the final guards before a `0.7/0.3` blend. The code clips to [-1, 1] and has no `0.7/0.3` blend.
-- The seed-42 split is implemented three times (`cli/train.py`, `cli/eval.py`, `cli/collect_trajectories.py`). All three restore global RNG state. The collect copy did not until commit 1d98db8, which made `evid-collect --seed` ineffective before then.
+- The seed-42 split lives in `data/dataset.py` (`split_dataset`) and is used by train, eval and collect. The collect copy failed to restore global RNG state until commit 1d98db8, which made `evid-collect --seed` ineffective before then.
 - `ClaimEnv.reset` samples with the global `random.choice`, so reproducibility depends on the caller's seeding.

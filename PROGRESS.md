@@ -6,31 +6,29 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Review and merge `chore/agent-standards` (nothing pushed yet).
+- [ ] Review and merge `chore/open-items` (not pushed yet).
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
 ## Next
 
-- [ ] Bring the README in line with the code: 13 actions, the real step rewards, the real final reward (clip to [-1, 1], no 0.7/0.3 blend). See SPEC section 8.
-- [ ] Decide how results are reported. Proposal: `evid-eval` writes a table under `results/tables/`, the README quotes only that table, and `make numbers` runs `check_numbers.py`. The `results-table` skill does the build.
-- [ ] Replace the invented example eval table in the README with real output or label it illustrative.
-- [ ] Consolidate the three copies of the seed-42 split (`cli/train.py`, `cli/eval.py`, `cli/collect_trajectories.py`) into one helper.
-- [ ] Make `ClaimEnv.reset` use a seeded RNG instead of the global `random.choice`.
-- [ ] Work down the 140 mypy errors, then add `make typecheck` to `agent-check`.
-- [ ] Decide what to do about the duplicated claim text (`scifact_85` and `scifact_86`) before it can straddle the split.
+- [ ] Rerun the PPO, PG and bandit evaluations. The three runs in `results/tables/eval_baselines.csv` predate the reward and judge changes of July 2026.
+- [ ] Raise `gold_eval_n_episodes`, since most logged gold rounds scored 0 to 5 episodes and say little about judge agreement.
+- [ ] Turn on mypy's `check_untyped_defs` and work down what it finds. The current check skips the bodies of untyped functions.
+- [ ] Enable the project-checks step in `.github/workflows/agent-checks.yml` once `make ci` should run in CI.
 - [ ] Add `ruff format --check` only if you want the repo reformatted.
-- [ ] Enable the project-checks step in `.github/workflows/agent-checks.yml` once `make ci` is wanted in CI.
 
 ## Done
 
-- [x] Phase 0: assessment. Retrofit chosen.
-- [x] Phase 1: SPEC.md and DECISIONS.md drafted.
-- [x] Phase 2: standards v2.0.1 installed, protected paths set, four owner-only skills added.
-- [x] Phase 3: repo-wide style cleanup (`06a4f06`).
-- [x] Phase 4: fixed `evid-collect --seed` being discarded (`1d98db8`), added property and pinned-behavior tests (200 passing), fixed three ruff findings, gate is `make agent-check`.
+- [x] Phase 0 to 5: assessment, spec, standards installed, style cleanup, safety net, merged as PR #1.
+- [x] Fixed `evid-collect --seed` being discarded (`1d98db8`).
+- [x] One `split_dataset` helper in `data/dataset.py` replaces three copies, pinned to the old split by a hash test.
+- [x] Duplicate claim text (`scifact_85`, `scifact_86`) kept, with a test that it never straddles the split.
+- [x] `results/tables/` built by `make results`, README quotes only those numbers, `make numbers` checks it and runs in `make ci`.
+- [x] README matches the code (13 actions, real step and final rewards).
+- [x] mypy passes and is in `make agent-check` and `make ci`.
 
 ## Open questions for the owner
 
-- `.env` holds a Tavily key. It was never tracked or in history, so no rotation is needed, but `artifacts/cache/` holds fetched web content and stays local.
-- Collection runs made with `evid-collect` before `1d98db8` replayed the same random stream whatever `--seed` was. Decide whether any imitation data or results that depended on them need regenerating.
-- Reported results live only in `artifacts/experiments/`, which is gitignored. They cannot be reproduced from the repo until a results table is committed.
+- Trajectory and log files made by `evid-collect` before `1d98db8` replayed the same random stream whatever `--seed` was. They were not regenerated. Decide whether any imitation data or results that depended on them need recollecting.
+- `ClaimEnv.reset` still samples with the global `random.choice`. Giving it its own RNG would change which episodes each seed produces, so past runs would no longer match exactly.
+- mypy runs with `ignore_missing_imports = true`, because several dependencies ship no stubs.

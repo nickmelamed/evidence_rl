@@ -5,13 +5,12 @@ faulthandler.enable()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import argparse
-import random
 
 from evid_rl_env.agent.bandit_trainer import BanditTrainer
 from evid_rl_env.agent.config_loader import load_base_config, load_config
 from evid_rl_env.agent.policy import ActorCriticPolicy
 from evid_rl_env.agent.trainer import Trainer
-from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.data.dataset import load_dataset, split_dataset
 from evid_rl_env.data.evidence_fetcher import use_snapshot, warm_cache
 from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.environment.curriculum import Curriculum
@@ -34,16 +33,7 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
 
     dataset = load_dataset()
 
-    # Seed the split separately so it matches eval.py's _deterministic_split on every
-    # run, and restore the state so the Trainer's weight-init seed is unaffected.
-    _saved_state = random.getstate()
-    random.seed(42)
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
-    split = int(0.8 * len(dataset))
-    train_dataset = [dataset[i] for i in indices[:split]]
-    eval_dataset = [dataset[i] for i in indices[split:]]
-    random.setstate(_saved_state)
+    train_dataset, eval_dataset = split_dataset(dataset)
 
     warm_cache(train_dataset + eval_dataset)
 

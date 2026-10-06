@@ -1,6 +1,7 @@
 import csv
 import os
 import random
+from typing import Any
 
 import numpy as np
 
@@ -37,6 +38,14 @@ class EvalMixin:
     self.baseline_n_episodes, self.seed, self.tracker, self.use_wandb,
     self._eval_csv_path.
     """
+
+    seed: int
+    evaluator: Any
+    baselines: Any
+    baseline_n_episodes: int
+    tracker: Any
+    use_wandb: bool
+    _eval_csv_path: Any
 
     def _run_eval_round(self, ep: int) -> None:
         # AUDIT FIX: save and restore global RNG state so baseline evaluations

@@ -44,6 +44,7 @@ def load_config(path: str):
     d = _deep_merge(base, algo_data)
 
     algo = d.get("algo", "ppo")
+    cfg: PPOConfig | PGConfig | BanditConfig
     if algo == "ppo":
         cfg = PPOConfig()
     elif algo == "pg":

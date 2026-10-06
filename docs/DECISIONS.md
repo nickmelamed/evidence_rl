@@ -9,7 +9,7 @@ SciFact claims carry human-labeled abstracts, so the environment uses them direc
 
 ## D-002: One seed-42 80/20 split, shared by train, eval and collect
 
-The split is a shuffled index cut at 80%, with global RNG state saved and restored so it does not disturb training seeds. A leakage bug (commit "fixed data leakage") led to seeding it separately. The logic is copied into three files rather than shared, and the `evid-collect` copy only started restoring RNG state in commit 1d98db8.
+The split is a shuffled index cut at 80%, with global RNG state saved and restored so it does not disturb training seeds. A leakage bug (commit "fixed data leakage") led to seeding it separately. The logic now lives in one helper, `split_dataset` in `data/dataset.py`. Before that it was copied into three CLIs, and the `evid-collect` copy only started restoring RNG state in commit 1d98db8.
 
 ## D-003: Gold judges are separate from the training judge
 

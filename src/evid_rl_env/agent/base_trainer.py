@@ -212,7 +212,7 @@ class BaseTrainer(EvalMixin):
         steps: int,
         total_tokens: float,
         viz: list,
-        extra: dict = None,
+        extra: dict | None = None,
     ) -> dict:
         """Per-episode metrics dict, including the dotted action_dist.<action>
         keys ExperimentTracker.FIXED_FIELDS expects for the CSV."""
@@ -228,7 +228,7 @@ class BaseTrainer(EvalMixin):
         if extra:
             metrics.update(extra)
 
-        action_dist = {}
+        action_dist: dict = {}
         for t in viz:
             a = t["action"]
             action_dist[a] = action_dist.get(a, 0) + 1

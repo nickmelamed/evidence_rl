@@ -24,7 +24,7 @@ import numpy as np
 
 from evid_rl_env.agent.baseline import _build_payload, _state_summary
 from evid_rl_env.agent.config_loader import load_base_config
-from evid_rl_env.data.dataset import load_dataset
+from evid_rl_env.data.dataset import load_dataset, split_dataset
 from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.environment.environment import ClaimEnv
 
@@ -50,13 +50,7 @@ def _load_train_split(dataset_path: str | None) -> list:
             return json.load(f)
 
     dataset = load_dataset()
-    saved_state = random.getstate()
-    random.seed(42)
-    indices = list(range(len(dataset)))
-    random.shuffle(indices)
-    random.setstate(saved_state)
-    split = int(0.8 * len(dataset))
-    return [dataset[i] for i in indices[:split]]
+    return split_dataset(dataset)[0]
 
 
 # episode collection 

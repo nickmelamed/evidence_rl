@@ -72,7 +72,7 @@ class ExperimentTracker:
             writer.writerow(row)
 
     def log_eval(self, episode: int, mean_reward: float, std_reward: float):
-        row = {k: None for k in FIXED_FIELDS}
+        row: dict = {k: None for k in FIXED_FIELDS}
         row["episode"] = episode
         row["eval/mean_reward"] = mean_reward
         row["eval/std_reward"] = std_reward

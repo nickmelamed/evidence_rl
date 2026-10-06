@@ -31,5 +31,7 @@ src/evid_rl_env/data/seed_claims.json  # claims, labels, and gold evidence
 src/evid_rl_env/data/ATTRIBUTION.md  # dataset license terms
 configs/base.yaml  # seed and gold judge model
 artifacts/experiments/  # reported run results
+results/tables/  # committed results tables the README quotes
+scripts/build_results_tables.py  # builds those tables from the runs
 .env  # secrets
 .env.example  # secrets template
