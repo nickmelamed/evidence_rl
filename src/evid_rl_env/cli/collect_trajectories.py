@@ -50,9 +50,11 @@ def _load_train_split(dataset_path: str | None) -> list:
             return json.load(f)
 
     dataset = load_dataset()
+    saved_state = random.getstate()
     random.seed(42)
     indices = list(range(len(dataset)))
     random.shuffle(indices)
+    random.setstate(saved_state)
     split = int(0.8 * len(dataset))
     return [dataset[i] for i in indices[:split]]
 
