@@ -66,3 +66,52 @@ def test_generate_structured_n_passes_num_return_sequences(monkeypatch):
     assert captured["num_return_sequences"] == 5
     assert captured["temperature"] == 0.2
     assert captured["max_new_tokens"] == 32
+
+
+def test_derive_call_seed_depends_only_on_seed_prompt_and_occurrence():
+    from evid_rl_env.agent.llm_client import derive_call_seed
+
+    assert derive_call_seed(1, "p", 0) == derive_call_seed(1, "p", 0)
+    assert derive_call_seed(1, "p", 0) != derive_call_seed(2, "p", 0)
+    assert derive_call_seed(1, "p", 0) != derive_call_seed(1, "q", 0)
+    assert derive_call_seed(1, "p", 0) != derive_call_seed(1, "p", 1)
+
+
+def test_generation_seeds_torch_per_prompt_not_per_call_order(monkeypatch):
+    import torch
+
+    from evid_rl_env.agent import llm_client as module
+
+    def draws(prompts):
+        out = {}
+        client = _make_client_with_fake_pipe([{"generated_text": "0"}])
+
+        def fake_pipe(*args, **kwargs):
+            out.setdefault(current[0], []).append(torch.rand(1).item())
+            return [{"generated_text": "0"}]
+
+        client._pipe = fake_pipe
+        current = [None]
+        for p in prompts:
+            current[0] = p
+            client.generate_structured(p)
+        return out
+
+    monkeypatch.setattr(module.torch.backends.mps, "is_available", lambda: False)
+    alone = draws(["a"])
+    with_other_calls_first = draws(["b", "c", "a"])
+    assert alone["a"] == with_other_calls_first["a"]
+
+
+def test_repeating_a_prompt_gives_a_new_sample(monkeypatch):
+    import torch
+
+    from evid_rl_env.agent import llm_client as module
+
+    monkeypatch.setattr(module.torch.backends.mps, "is_available", lambda: False)
+    client = _make_client_with_fake_pipe([{"generated_text": "0"}])
+    values = []
+    client._pipe = lambda *a, **k: (values.append(torch.rand(1).item()) or [{"generated_text": "0"}])
+    client.generate_structured("same")
+    client.generate_structured("same")
+    assert values[0] != values[1]

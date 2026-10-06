@@ -20,7 +20,7 @@ from evid_rl_env.agent.baseline import (
 )
 from evid_rl_env.agent.eval_mixin import EvalMixin
 from evid_rl_env.agent.evaluator import Evaluator
-from evid_rl_env.utils.experiment import ExperimentTracker
+from evid_rl_env.utils.experiment import ExperimentTracker, runtime_environment
 from evid_rl_env.utils.running_stats import RunningMeanStd
 
 _TRAJ_PATH = "data/trajectories.jsonl"
@@ -110,6 +110,7 @@ class BaseTrainer(EvalMixin):
             "judge_escalation": getattr(config, "judge_escalation", False),
             "judge_escalation_target": getattr(config, "judge_escalation_target", "ensemble"),
             "gold_judge_model": getattr(config, "gold_judge_model", None),
+            "environment": runtime_environment(),
         }
         if extra_wandb_config:
             wandb_config.update(extra_wandb_config)
