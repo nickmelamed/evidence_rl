@@ -100,3 +100,31 @@ def test_get_scores_empty_reasoning_matches_sentinel():
     judge = _make_judge("{}")
     scores = judge.get_scores(CLAIM, "", EVIDENCE)
     assert scores == {"LCS": 0.0, "ESS": 0.0, "GRS": 0.5, "COMP": 0.0, "BIAS": 0.5, "confidence": 0.0}
+
+
+def test_parse_recovers_json_wrapped_in_prose():
+    judge = _make_judge("")
+    wrapped = (
+        'Sure! {"LCS": 0.7, "ESS": 0.6, "GRS": 0.2, "COMP": 0.5, "BIAS": 0.1, '
+        '"confidence": 0.8} hope that helps'
+    )
+    assert judge.parse(wrapped)["LCS"] == pytest.approx(0.7)
+
+
+def test_parse_unparseable_response_gives_neutral_scores():
+    judge = _make_judge("")
+    scores = judge.parse("no scores here")
+    assert scores == {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5,
+                      "confidence": 0.5}
+
+
+def test_all_neutral_scores_map_to_neutral_reward_not_the_formula_value():
+    neutral = {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.9}
+    assert LLMJudge._scores_to_reward(neutral) == 0.5
+
+
+def test_scores_to_reward_pinned_value():
+    scores = {"LCS": 0.8, "ESS": 0.8, "GRS": 0.2, "COMP": 0.8, "BIAS": 0.2, "confidence": 1.0}
+    assert LLMJudge._scores_to_reward(scores) == pytest.approx(0.30 * 0.8 + 0.25 * 0.8
+                                                               + 0.20 * 0.8 - 0.25 * 0.2
+                                                               - 0.15 * 0.2)

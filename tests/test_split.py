@@ -40,3 +40,22 @@ def test_collect_train_split_restores_global_rng_state():
     before = random.getstate()
     _load_train_split(None)
     assert random.getstate() == before
+
+
+def test_seed_claims_split_sizes_and_no_overlap():
+    dataset = load_dataset()
+    train, held_out = _deterministic_split(dataset)
+    assert len(dataset) == 693
+    assert (len(train), len(held_out)) == (554, 139)
+    assert {s["claim"] for s in train}.isdisjoint({s["claim"] for s in held_out})
+
+
+def test_seed_claims_have_binary_labels_and_unique_ids():
+    dataset = load_dataset()
+    assert {s["label"] for s in dataset} <= {0.0, 1.0}
+    assert len({s["id"] for s in dataset}) == len(dataset)
+
+
+def test_seed_claims_have_one_known_duplicate_claim_text():
+    texts = [s["claim"] for s in load_dataset()]
+    assert len(texts) - len(set(texts)) == 1
