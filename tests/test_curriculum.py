@@ -110,3 +110,25 @@ def test_mean_score_falls_as_performance_stabilizes_across_all_claims():
     stable_score = curriculum.mean_score
 
     assert stable_score < high_progress_score
+
+
+def test_sample_with_own_rng_ignores_global_random_state():
+    import random
+
+    dataset = [{"id": i, "claim": f"c{i}"} for i in range(20)]
+
+    def picks(global_seed):
+        random.seed(global_seed)
+        curriculum = Curriculum(rng=random.Random(5))
+        return [curriculum.sample(dataset)["id"] for _ in range(15)]
+
+    assert picks(1) == picks(2)
+
+
+def test_sample_with_different_rng_seeds_differ():
+    import random
+
+    dataset = [{"id": i, "claim": f"c{i}"} for i in range(20)]
+    a = Curriculum(rng=random.Random(1))
+    b = Curriculum(rng=random.Random(2))
+    assert [a.sample(dataset)["id"] for _ in range(15)] != [b.sample(dataset)["id"] for _ in range(15)]

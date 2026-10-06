@@ -27,7 +27,8 @@ _TRAJ_PATH = "data/trajectories.jsonl"
 _EVAL_CSV_PATH = "logs/eval_metrics.csv"
 
 
-def build_standard_baselines(eval_dataset, train_dataset, llm_client, fewshot_selection_mode="random"):
+def build_standard_baselines(eval_dataset, train_dataset, llm_client, fewshot_selection_mode="random",
+                             seed: int = 42):
     """The fixed set of baselines every trainer evaluates against during training."""
     # Shared (and still fully lazy) example bank: fewshot_k3/fewshot_k5 only
     fewshot_bank = _SharedFewShotExamples(train_dataset)
@@ -47,6 +48,8 @@ def build_standard_baselines(eval_dataset, train_dataset, llm_client, fewshot_se
     }
     if Path(_TRAJ_PATH).exists():
         baselines["imitation"] = ImitationBaseline(eval_dataset, _TRAJ_PATH)
+    for baseline in baselines.values():
+        baseline.seed = seed
     return baselines
 
 
@@ -139,6 +142,7 @@ class BaseTrainer(EvalMixin):
                 self.baselines = build_standard_baselines(
                     eval_dataset, env.dataset, self.llm_client,
                     fewshot_selection_mode=getattr(config, "fewshot_selection_mode", "random"),
+                    seed=seed,
                 )
 
             gold_judge_model = getattr(config, "gold_judge_model", None)

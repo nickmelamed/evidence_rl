@@ -1,5 +1,6 @@
 import random
 from collections import defaultdict, deque
+from typing import Any
 
 
 class Curriculum:
@@ -33,16 +34,20 @@ class Curriculum:
     as more episodes accumulate per claim.
     """
 
-    def __init__(self, short_window=5, long_window=20, min_weight=0.1, staleness_coef=0.1):
+    def __init__(self, short_window=5, long_window=20, min_weight=0.1, staleness_coef=0.1,
+                 rng: random.Random | None = None):
         self.short_window = short_window
         self.long_window = long_window
         self.min_weight = min_weight
         self.staleness_coef = staleness_coef
-        self._short = defaultdict(lambda: deque(maxlen=short_window))
-        self._long = defaultdict(lambda: deque(maxlen=long_window))
-        self._last_seen_episode = {}
+        # Own RNG so the sampled claim order depends on the seed alone. Without one,
+        # sampling falls back to the global random module.
+        self._rng: Any = rng if rng is not None else random
+        self._short: defaultdict = defaultdict(lambda: deque(maxlen=short_window))
+        self._long: defaultdict = defaultdict(lambda: deque(maxlen=long_window))
+        self._last_seen_episode: dict = {}
         self._episode = 0
-        self._known_ids = []
+        self._known_ids: list = []
 
     @staticmethod
     def _claim_key(claim: dict):
@@ -94,7 +99,7 @@ class Curriculum:
         # learning progress + staleness has simultaneously bottomed out),
         # fall back to uniform rather than dividing by zero.
         probs = [w / total for w in weights] if total > 0 else None
-        return random.choices(dataset, weights=probs, k=1)[0]
+        return self._rng.choices(dataset, weights=probs, k=1)[0]
 
     @property
     def mean_score(self) -> float:

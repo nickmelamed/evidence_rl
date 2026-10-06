@@ -5,6 +5,9 @@ faulthandler.enable()
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 import argparse
+import random
+
+import numpy as np
 
 from evid_rl_env.agent.bandit_trainer import BanditTrainer
 from evid_rl_env.agent.config_loader import load_base_config, load_config
@@ -43,7 +46,7 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
     method, config = load_config(resolved_config_path)
     config.seed = seed  # align config.seed with the resolved seed
 
-    curriculum = Curriculum()
+    curriculum = Curriculum(rng=random.Random(seed))
     # Config loaded first so judge_model/actor_model actually drive which
     # models get instantiated instead of falling back to hardcoded defaults.
     env = ClaimEnv(
@@ -53,6 +56,8 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
         judge_escalation_target=getattr(config, "judge_escalation_target", "ensemble"),
     )
 
+    # The policy draws its initial weights from numpy's global RNG, so seed it here.
+    np.random.seed(seed)
     policy = ActorCriticPolicy(len(list(ACTIONS)), model_name=config.actor_model, seed=seed)
 
     resolved_eval_every = eval_every if eval_every is not None else getattr(config, "eval_every", 25)
