@@ -88,7 +88,7 @@ def _build_baselines(
     trajectories_path: str | None,
     fewshot_selection_mode: str = "random",
 ) -> dict:
-    baselines = {}
+    baselines: dict = {}
     llm_baselines = {"greedy_llm", "fewshot_k3", "fewshot_k5", "best_of_5"}
     fewshot_baselines = {"fewshot_k3", "fewshot_k5"}
     # Shared (and still fully lazy) example bank when both fewshot_k3 and
@@ -119,11 +119,13 @@ def _build_baselines(
         elif name == "greedy_llm":
             baselines[name] = GreedyLLMBaseline(eval_dataset, llm_client)
         elif name == "fewshot_k3":
+            assert train_dataset is not None and fewshot_bank is not None
             baselines[name] = FewShotLLMBaseline(
                 eval_dataset, train_dataset, llm_client, k=3, selection_mode=fewshot_selection_mode,
                 example_bank=fewshot_bank,
             )
         elif name == "fewshot_k5":
+            assert train_dataset is not None and fewshot_bank is not None
             baselines[name] = FewShotLLMBaseline(
                 eval_dataset, train_dataset, llm_client, k=5, selection_mode=fewshot_selection_mode,
                 example_bank=fewshot_bank,
@@ -131,6 +133,7 @@ def _build_baselines(
         elif name == "best_of_5":
             baselines[name] = BestOfNBaseline(eval_dataset, llm_client, n=5)
         elif name == "imitation":
+            assert trajectories_path is not None
             baselines[name] = ImitationBaseline(eval_dataset, trajectories_path)
 
     return baselines
@@ -267,6 +270,7 @@ def main() -> None:
     _peek = _np.load(checkpoint, allow_pickle=False)
     _ckpt_type = str(_peek.get("type", ["actor_critic"])[0])
 
+    policy: ActorCriticPolicy | BanditPolicyWrapper
     if _ckpt_type == "bandit":
         bandit, model_name = LinUCBBandit.load(checkpoint)
         inner = ActorCriticPolicy(
@@ -295,13 +299,13 @@ def main() -> None:
     if args.greedy:
         # Wrap act to force greedy selection without modifying the policy object
         original_act = policy.act
-        policy.act = lambda state, **kw: original_act(state, greedy=True)
+        policy.act = lambda state, **kw: original_act(state, greedy=True)  # type: ignore[method-assign]
 
     evaluator = Evaluator(eval_env, policy, n_eval_episodes=args.n_episodes, reward_normalizer=None)
     rl_metrics = evaluator.evaluate()
 
     if args.greedy:
-        policy.act = original_act  # restore
+        policy.act = original_act  # type: ignore[method-assign]  # restore
 
     rl_raw = rl_metrics["eval/mean_reward_raw"]
     rl_std = rl_metrics["eval/std_reward_raw"]

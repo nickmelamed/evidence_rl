@@ -214,7 +214,7 @@ class AnnotatorClient:
                 max_tokens=16,
                 messages=[{"role": "user", "content": prompt}],
             )
-            text = msg.content[0].text.strip()
+            text = msg.content[0].text.strip()  # type: ignore[union-attr]
             match = re.search(r"\d+", text)
             if match:
                 result = int(max(0, min(int(match.group()), len(action_descriptions) - 1)))

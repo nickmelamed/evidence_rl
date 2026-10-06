@@ -89,6 +89,7 @@ def main() -> None:
 
     _peek = np.load(checkpoint, allow_pickle=False)
     ckpt_type = str(_peek.get("type", ["actor_critic"])[0])
+    policy: ActorCriticPolicy | BanditPolicyWrapper
     if ckpt_type == "bandit":
         bandit, model_name = LinUCBBandit.load(checkpoint)
         inner = ActorCriticPolicy(

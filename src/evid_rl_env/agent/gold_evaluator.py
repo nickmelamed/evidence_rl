@@ -32,8 +32,8 @@ class GoldEvaluator:
         self.n_episodes = n_episodes
 
     def evaluate(self) -> dict:
-        proxy_dim_scores = {k: [] for k in self._DIMENSIONS}
-        gold_dim_scores = {k: [] for k in self._DIMENSIONS}
+        proxy_dim_scores: dict[str, list] = {k: [] for k in self._DIMENSIONS}
+        gold_dim_scores: dict[str, list] = {k: [] for k in self._DIMENSIONS}
         proxy_rewards = []
         gold_rewards = []
         accuracies = []
@@ -68,7 +68,7 @@ class GoldEvaluator:
             )
 
             per_judge_rewards = []
-            per_judge_dims = {k: [] for k in self._DIMENSIONS}
+            per_judge_dims: dict[str, list] = {k: [] for k in self._DIMENSIONS}
             for judge in self.gold_judges:
                 reward, scores = judge.compute_reward(state.claim, reasoning, evidence)
                 per_judge_rewards.append(reward)

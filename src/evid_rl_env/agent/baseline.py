@@ -14,6 +14,7 @@ import logging
 import random
 import re
 from abc import ABC, abstractmethod
+from typing import Any
 
 import numpy as np
 
@@ -80,7 +81,7 @@ def run_episode(env: ClaimEnv, action_fn) -> tuple:
     done = False
     total_reward = 0.0
     trajectory = []
-    llm_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+    llm_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
     while not done:
         action_idx = int(np.clip(action_fn(state), 0, N_ACTIONS - 1))
@@ -152,7 +153,7 @@ class RandomBaseline(BaseEvaluator):
     def run(self, n_episodes: int) -> dict:
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+        all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(
@@ -195,7 +196,7 @@ class MajorityBaseline(BaseEvaluator):
         env = ClaimEnv(self.eval_dataset)
         majority = self._majority_idx
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+        all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(env, lambda state: majority)
@@ -259,7 +260,7 @@ class GreedyLLMBaseline(BaseEvaluator):
     def run(self, n_episodes: int) -> dict:
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+        all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(env, self._action_fn)
@@ -323,7 +324,7 @@ class FewShotLLMBaseline(BaseEvaluator):
         llm_client,
         k: int = 3,
         selection_mode: str = "random",
-        example_bank: _SharedFewShotExamples = None,
+        example_bank: _SharedFewShotExamples | None = None,
     ):
         self.eval_dataset = eval_dataset
         self.train_dataset = train_dataset
@@ -336,7 +337,7 @@ class FewShotLLMBaseline(BaseEvaluator):
         self._example_bank = example_bank or _SharedFewShotExamples(train_dataset)
 
         self._examples: list | None = None  # built lazily on first use
-        self._st_model = None
+        self._st_model: Any = None
         self._train_embeddings = None
 
     def _build_examples(self) -> list:
@@ -367,6 +368,7 @@ class FewShotLLMBaseline(BaseEvaluator):
 
     def _select_examples(self, state, k: int) -> list:
         self._ensure_examples()
+        assert self._examples is not None
         if self.selection_mode == "similarity" and self._train_embeddings is not None:
             query_emb = self._embed([_state_summary(state)])
             if query_emb is not None:
@@ -404,11 +406,11 @@ class FewShotLLMBaseline(BaseEvaluator):
             )
             return random.randint(0, N_ACTIONS - 1)
 
-    def run(self, n_episodes: int, k: int = None) -> dict:
+    def run(self, n_episodes: int, k: int | None = None) -> dict:
         k_shots = k if k is not None else self.k
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+        all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(
@@ -432,7 +434,7 @@ class BestOfNBaseline(BaseEvaluator):
         self.eval_dataset = eval_dataset
         self.llm = llm_client
         self.n = n
-        self._current_env = None
+        self._current_env: ClaimEnv | None = None
 
     def _suggest_action(self, state) -> int:
         """One LLM suggestion using the greedy prompt from Block 5."""
@@ -485,6 +487,7 @@ class BestOfNBaseline(BaseEvaluator):
     def _action_fn(self, state) -> int:
         """Try n LLM suggestions and return the one with the highest immediate reward."""
         env = self._current_env
+        assert env is not None
         candidates = self._suggest_actions_batch(state, self.n)
 
         snap = self._snapshot(env)
@@ -508,7 +511,7 @@ class BestOfNBaseline(BaseEvaluator):
         env = ClaimEnv(self.eval_dataset)
         self._current_env = env
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+        all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
         total_llm_calls = 0
 
         for _ in range(n_episodes):
@@ -649,7 +652,7 @@ class ImitationBaseline(BaseEvaluator):
     def run(self, n_episodes: int) -> dict:
         env = ClaimEnv(self.eval_dataset)
         rewards = []
-        all_scores = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
+        all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
         for _ in range(n_episodes):
             _, total_reward, ep_scores = run_episode(env, self._action_fn)

@@ -49,9 +49,12 @@ numbers:
 	$(PYTHON) scripts/agent/check_numbers.py README.md --sources results/tables
 
 # the fast checks the Stop hook runs
-agent-check: lint test-fast style
+agent-check: lint typecheck test-fast style
 
-ci: lint test style numbers
+typecheck:
+	mypy
+
+ci: lint typecheck test style numbers
 	$(PYTHON) scripts/agent/check_tests.py --warn
 
 # evaluation

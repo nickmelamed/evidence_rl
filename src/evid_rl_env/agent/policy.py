@@ -30,7 +30,7 @@ class ActorCriticPolicy:
         self.llm = LLMClient(model_name=actor_model, seed=seed)
 
     def reset_episode_cache(self):
-        self._arg_cache = {}
+        self._arg_cache: dict = {}
 
     def get_logits(self, state):
         features = encode_state(state)
@@ -46,7 +46,7 @@ class ActorCriticPolicy:
         features = encode_state(state)
         return features @ self.value_params
 
-    def act(self, state, greedy: bool = False, force_action_idx: int = None):
+    def act(self, state, greedy: bool = False, force_action_idx: int | None = None):
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
@@ -110,7 +110,7 @@ class ActorCriticPolicy:
 
         elif action in [Actions.SUPPORT, Actions.CONTRADICT]:
             texts = [e.text for e in state.selected_evidence]
-            cache_key = (str(action), frozenset(e.id for e in state.selected_evidence))
+            cache_key: tuple = (str(action), frozenset(e.id for e in state.selected_evidence))
             if cache_key in self._arg_cache:
                 argument, tokens = self._arg_cache[cache_key]
             else:

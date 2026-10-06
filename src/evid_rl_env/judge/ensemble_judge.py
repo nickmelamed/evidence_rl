@@ -13,7 +13,7 @@ def _sanitize(model_name: str) -> str:
     return model_name.replace("/", "__")
 
 
-def build_ensemble_judge(model_names: list, seed: int, reuse: dict = None) -> "EnsembleJudge":
+def build_ensemble_judge(model_names: list, seed: int, reuse: dict | None = None) -> "EnsembleJudge":
     """One JudgeLLMClient + LLMJudge per model name, each with its own
     sanitized cache path so members never collide (see LLMJudge.cache_path,
     added for exactly this reason in the gold-eval harness).
