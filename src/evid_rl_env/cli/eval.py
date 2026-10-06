@@ -87,6 +87,7 @@ def _build_baselines(
     llm_client,
     trajectories_path: str | None,
     fewshot_selection_mode: str = "random",
+    seed: int = 42,
 ) -> dict:
     baselines: dict = {}
     llm_baselines = {"greedy_llm", "fewshot_k3", "fewshot_k5", "best_of_5"}
@@ -136,6 +137,8 @@ def _build_baselines(
             assert trajectories_path is not None
             baselines[name] = ImitationBaseline(eval_dataset, trajectories_path)
 
+    for baseline in baselines.values():
+        baseline.seed = seed
     return baselines
 
 
@@ -331,7 +334,7 @@ def main() -> None:
     print("\nInstantiating and running baselines...")
     baselines = _build_baselines(
         requested, eval_dataset, train_dataset, llm_client, args.trajectories,
-        fewshot_selection_mode=fewshot_selection_mode,
+        fewshot_selection_mode=fewshot_selection_mode, seed=seed,
     )
 
     random.seed(seed)

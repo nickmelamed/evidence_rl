@@ -114,6 +114,10 @@ def run_episode(env: ClaimEnv, action_fn) -> tuple:
 class BaseEvaluator(ABC):
     """All baseline implementations inherit from this class."""
 
+    # Seed for the claim-sampling RNG of the ClaimEnv each run builds. Builders
+    # set it to the evaluation seed so every method sees the same claims.
+    seed: int = 42
+
     @abstractmethod
     def run(self, n_episodes: int) -> dict:
         """
@@ -151,7 +155,7 @@ class RandomBaseline(BaseEvaluator):
         self.eval_dataset = eval_dataset
 
     def run(self, n_episodes: int) -> dict:
-        env = ClaimEnv(self.eval_dataset)
+        env = ClaimEnv(self.eval_dataset, seed=self.seed)
         rewards = []
         all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
@@ -173,7 +177,7 @@ class MajorityBaseline(BaseEvaluator):
         self._majority_idx: int | None = None  # computed lazily on first run()
 
     def _find_majority(self) -> int:
-        env = ClaimEnv(self.eval_dataset)
+        env = ClaimEnv(self.eval_dataset, seed=self.seed)
         counts = [0] * N_ACTIONS
 
         def action_fn(state):
@@ -193,7 +197,7 @@ class MajorityBaseline(BaseEvaluator):
     def run(self, n_episodes: int) -> dict:
         if self._majority_idx is None:
             self._majority_idx = self._find_majority()
-        env = ClaimEnv(self.eval_dataset)
+        env = ClaimEnv(self.eval_dataset, seed=self.seed)
         majority = self._majority_idx
         rewards = []
         all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
@@ -258,7 +262,7 @@ class GreedyLLMBaseline(BaseEvaluator):
             return random.randint(0, N_ACTIONS - 1)
 
     def run(self, n_episodes: int) -> dict:
-        env = ClaimEnv(self.eval_dataset)
+        env = ClaimEnv(self.eval_dataset, seed=self.seed)
         rewards = []
         all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
@@ -408,7 +412,7 @@ class FewShotLLMBaseline(BaseEvaluator):
 
     def run(self, n_episodes: int, k: int | None = None) -> dict:
         k_shots = k if k is not None else self.k
-        env = ClaimEnv(self.eval_dataset)
+        env = ClaimEnv(self.eval_dataset, seed=self.seed)
         rewards = []
         all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 
@@ -508,7 +512,7 @@ class BestOfNBaseline(BaseEvaluator):
         return best_idx
 
     def run(self, n_episodes: int) -> dict:
-        env = ClaimEnv(self.eval_dataset)
+        env = ClaimEnv(self.eval_dataset, seed=self.seed)
         self._current_env = env
         rewards = []
         all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
@@ -650,7 +654,7 @@ class ImitationBaseline(BaseEvaluator):
     # Evaluation
 
     def run(self, n_episodes: int) -> dict:
-        env = ClaimEnv(self.eval_dataset)
+        env = ClaimEnv(self.eval_dataset, seed=self.seed)
         rewards = []
         all_scores: dict[str, list] = {"LCS": [], "ESS": [], "GRS": [], "COMP": [], "BIAS": []}
 

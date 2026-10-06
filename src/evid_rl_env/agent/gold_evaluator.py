@@ -32,6 +32,8 @@ class GoldEvaluator:
         self.n_episodes = n_episodes
 
     def evaluate(self) -> dict:
+        if hasattr(self.env, "reseed"):
+            self.env.reseed()
         proxy_dim_scores: dict[str, list] = {k: [] for k in self._DIMENSIONS}
         gold_dim_scores: dict[str, list] = {k: [] for k in self._DIMENSIONS}
         proxy_rewards = []

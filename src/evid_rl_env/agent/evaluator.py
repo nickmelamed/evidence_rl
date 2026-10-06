@@ -21,6 +21,10 @@ class Evaluator:
         if self.reward_normalizer is not None:
             self.reward_normalizer._locked = True
 
+        # every eval round sees the same claims, in the same order as the baselines
+        if hasattr(self.env, "reseed"):
+            self.env.reseed()
+
         rewards_raw = []
         steps_list = []
         action_counts = {a: 0 for a in ACTIONS}

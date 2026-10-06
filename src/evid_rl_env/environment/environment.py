@@ -86,6 +86,10 @@ class ClaimEnv:
                  embedder=None, evidence_labeler=None, judge_ensemble_models=None,
                  judge_escalation=False, judge_escalation_target="ensemble"):
         self.dataset = dataset
+        self.seed = seed
+        # Own RNG for claim sampling, so the claim sequence depends only on the
+        # seed and the number of resets, not on other draws from the global RNG.
+        self._claim_rng = random.Random(seed)
         self.state: State | None = None
         self.current_sample: Any = None
         self.reward_fn = RewardFunction()
@@ -134,13 +138,17 @@ class ClaimEnv:
         assert self.state is not None
         return 0.05 if new_evidence_id not in self.state.selected_evidence_ids else 0.0
 
+    def reseed(self) -> None:
+        """Restart the claim sequence from the seed this env was built with."""
+        self._claim_rng = random.Random(self.seed)
+
     def reset(self):
         self._prev_phi = 0.0
         # -1 (not 0) so the very first debate action at steps_taken==1 clears
         # the "every 2 steps" gate (1 - (-1) >= 2) instead of silently reusing
         # the initial 0.0 score.
         self._last_judge_step = -1
-        self.current_sample = random.choice(self.dataset)
+        self.current_sample = self._claim_rng.choice(self.dataset)
         claim = self.current_sample["claim"]
         search_query = self.current_sample.get("search_query", claim)
 
