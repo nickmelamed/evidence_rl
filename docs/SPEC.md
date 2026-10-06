@@ -55,4 +55,5 @@ EvidenceRL treats claim verification as a sequential decision problem. An agent 
 ## 8. Known gaps
 
 - The seed-42 split lives in `data/dataset.py` (`split_dataset`) and is used by train, eval and collect. The collect copy failed to restore global RNG state until commit 1d98db8, which made `evid-collect --seed` ineffective before then.
-- `ClaimEnv.reset` samples with the global `random.choice`, so reproducibility depends on the caller's seeding.
+- `ClaimEnv.reset` samples claims from its own `random.Random(seed)`. `Evaluator` and `GoldEvaluator` call `reseed()` at the start of each round, and baselines are built with the evaluation seed, so every method sees the same claims in the same order.
+- `Curriculum.sample` still draws from the global `random` module, so the claim sequence during curriculum training depends on global seeding.

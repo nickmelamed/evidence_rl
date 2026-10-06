@@ -58,3 +58,7 @@ Chosen over POSIX-semaphore-based caches after a semaphore leak (commit "fixed s
 ## D-014: Tests mock every model boundary
 
 `ClaimEnv` takes injected `llm_judge`, `embedder` and `evidence_labeler`, so the suite runs with no network, keys or model downloads.
+
+## D-015: ClaimEnv samples claims from its own RNG
+
+`ClaimEnv.reset` used the global `random.choice`, and the baselines drew their fallback actions from the same stream. The claim a method saw therefore depended on how many draws earlier methods had made, so two methods with the same seed could be evaluated on different episodes. Each env now owns a `random.Random(seed)`, evaluators reseed it every round, and the baselines are built with the evaluation seed. The cost is that runs made before this change cannot be replayed exactly.

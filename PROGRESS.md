@@ -6,10 +6,12 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Review and merge `chore/open-items` (not pushed yet).
+- [ ] Review the `feat/env-rng` change (not pushed yet).
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
 ## Next
+
+- [ ] Give `Curriculum.sample` its own RNG too. Training claim order with the curriculum on still depends on global seeding.
 
 - [ ] Rerun the PPO, PG and bandit evaluations. The three runs in `results/tables/eval_baselines.csv` predate the reward and judge changes of July 2026.
 - [ ] Raise `gold_eval_n_episodes`, since most logged gold rounds scored 0 to 5 episodes and say little about judge agreement.
@@ -29,5 +31,5 @@ is shown to Claude at the start of each session and after compaction.
 ## Open questions for the owner
 
 - Trajectory and log files made by `evid-collect` before `1d98db8` replayed the same random stream whatever `--seed` was. They were not regenerated. Decide whether any imitation data or results that depended on them need recollecting.
-- `ClaimEnv.reset` still samples with the global `random.choice`. Giving it its own RNG would change which episodes each seed produces, so past runs would no longer match exactly.
+- Runs made before `feat/env-rng` cannot be replayed exactly, because their claim order came from the global RNG.
 - mypy runs with `ignore_missing_imports = true`, because several dependencies ship no stubs.
