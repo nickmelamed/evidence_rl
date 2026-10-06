@@ -50,7 +50,7 @@ class ActorCriticPolicy:
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
-        probs = self.get_probs(state)  # fresh array — safe to mutate in place
+        probs = self.get_probs(state)  # fresh array, safe to mutate in place
 
         # Mask 1: QUERY / REQUEST_CLARIFICATION share the per-episode query budget
         if state.query_count >= state.max_queries:
@@ -74,7 +74,7 @@ class ActorCriticPolicy:
         # confidence first, so FINALIZE can never fall back to the
         # evidence-count heuristic (which has no relationship to whether the
         # claim is actually true). Only enforced when there's evidence to
-        # work with — if the pool is empty the agent has no path to
+        # work with, if the pool is empty the agent has no path to
         # ASSIGN_CONFIDENCE either (Mask 2 requires evidence too), so
         # FINALIZE is left available and hits the environment's
         # zero-evidence penalty instead of creating a deadlock.
@@ -240,7 +240,7 @@ Write a concise argument challenging the reliability or relevance of this eviden
 
         Saves actor_params, value_params, and enough metadata to reconstruct
         the policy without the original config.  The LLM pipeline is not
-        serialised — it is re-instantiated from model_name on load.
+        serialised, it is re-instantiated from model_name on load.
         """
         np.savez_compressed(
             path,

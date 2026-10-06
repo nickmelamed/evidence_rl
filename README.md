@@ -1,6 +1,6 @@
 # EvidenceRL
 
-**EvidenceRL** is a reinforcement learning framework that trains agents to verify scientific and factual claims through iterative evidence gathering and debate-style reasoning. The agent operates in a custom Gym-style environment where each episode presents a claim, a pool of evidence, and a structured action space for building arguments — then receives shaped rewards based on the quality of its reasoning process and the accuracy of its final judgment. The core contribution is the RL training loop itself: a principled formulation of claim verification as a sequential decision-making problem, with support for multi-armed bandits, policy gradient, and PPO out of the box.
+**EvidenceRL** is a reinforcement learning framework that trains agents to verify scientific and factual claims through iterative evidence gathering and debate-style reasoning. The agent operates in a custom Gym-style environment where each episode presents a claim, a pool of evidence, and a structured action space for building arguments, then receives shaped rewards based on the quality of its reasoning process and the accuracy of its final judgment. The core contribution is the RL training loop itself: a principled formulation of claim verification as a sequential decision-making problem, with support for multi-armed bandits, policy gradient, and PPO out of the box.
 
 ---
 
@@ -26,7 +26,7 @@ State at each step includes the claim, the full evidence pool, the currently sel
 
 ### Debate Loop
 
-The `SUPPORT`/`CONTRADICT` cycle is the central reasoning mechanism. Rather than issuing a single judgment from a static context, the agent constructs an explicit argument trace — alternating between building the case for and against the claim — before calling `FINALIZE`. This debate history is passed to the LLM judge at evaluation time, making the agent's reasoning process legible and directly optimizable via reward shaping.
+The `SUPPORT`/`CONTRADICT` cycle is the central reasoning mechanism. Rather than issuing a single judgment from a static context, the agent constructs an explicit argument trace, alternating between building the case for and against the claim, before calling `FINALIZE`. This debate history is passed to the LLM judge at evaluation time, making the agent's reasoning process legible and directly optimizable via reward shaping.
 
 ---
 
@@ -52,7 +52,7 @@ Issued at each action to shape the learning signal mid-episode:
 | `SUMMARIZE` (non-empty) | +0.05 |
 | Step-limit termination | −0.20 |
 
-ΔLLM is the change in LLM judge score relative to the previous judged step. The judge is called at most once every two steps to limit inference cost; between calls the previous score is reused. A potential-based shaping term — `0.1 × (0.99 × Φ(s') − Φ(s))`, where Φ is the current judge score — is added to every step reward, grounding dense shaping in actual argument quality.
+ΔLLM is the change in LLM judge score relative to the previous judged step. The judge is called at most once every two steps to limit inference cost. Between calls the previous score is reused. A potential-based shaping term, `0.1 × (0.99 × Φ(s') − Φ(s))`, where Φ is the current judge score, is added to every step reward, grounding dense shaping in actual argument quality.
 
 ### Final Reward
 
@@ -94,17 +94,17 @@ base_reward = 0.40 × F1
 
 ## Evidence Pipeline
 
-Each episode's evidence pool is grounded in real retrieved documents via **Tavily** search — no vector database, no pre-indexed corpus. At episode initialization, EvidenceRL issues a live Tavily query keyed to the claim, retrieves a set of documents, and constructs the evidence pool from those results. This means every episode reflects the current state of the web: the agent never reasons over stale embeddings or cached corpora.
+Each episode's evidence pool is grounded in real retrieved documents via **Tavily** search, with no vector database and no pre-indexed corpus. At episode initialization, EvidenceRL issues a live Tavily query keyed to the claim, retrieves a set of documents, and constructs the evidence pool from those results. This means every episode reflects the current state of the web: the agent never reasons over stale embeddings or cached corpora.
 
 The pipeline is intentionally lightweight:
 
 1. Claim arrives at episode reset
-2. Tavily query fires; top-k results are fetched and structured as `Evidence` objects
-3. Each document is labeled by `judge.evidence_labeler.EvidenceLabeler` — a cached LLM call (reusing the judge model) classifying its stance toward the claim (`support`/`contradict`/`neutral`) and whether it looks adversarial (unreliable/low-quality), which feeds directly into `base_reward`'s F1/CA/AC terms
+2. Tavily query fires. Top-k results are fetched and structured as `Evidence` objects
+3. Each document is labeled by `judge.evidence_labeler.EvidenceLabeler`, a cached LLM call (reusing the judge model) classifying its stance toward the claim (`support`/`contradict`/`neutral`) and whether it looks adversarial (unreliable/low-quality), which feeds directly into `base_reward`'s F1/CA/AC terms
 4. Evidence pool is passed to `ClaimEnv`
 5. Agent interacts with live-retrieved, labeled evidence for the full episode
 
-This design keeps retrieval infrastructure minimal (no pre-indexed corpus, no vector DB). The tradeoff is that a fresh checkout with a cold cache sees different evidence than a previous run (web content changes) — the fetch cache (`artifacts/cache/fetch_cache.sqlite3`) makes results stable *within* a machine once warmed, but not portable across machines. For results you need to reproduce exactly (e.g. in a report), use `evid-snapshot` to export a portable JSON snapshot, and pass `--evidence-snapshot` to `evid-train`/`evid-eval` to load it — this bypasses both the live Tavily call and the local sqlite cache for any claim it covers.
+This design keeps retrieval infrastructure minimal (no pre-indexed corpus, no vector DB). The tradeoff is that a fresh checkout with a cold cache sees different evidence than a previous run (web content changes). The fetch cache (`artifacts/cache/fetch_cache.sqlite3`) makes results stable *within* a machine once warmed, but not portable across machines. For results you need to reproduce exactly (e.g. in a report), use `evid-snapshot` to export a portable JSON snapshot, and pass `--evidence-snapshot` to `evid-train`/`evid-eval` to load it, this bypasses both the live Tavily call and the local sqlite cache for any claim it covers.
 
 ---
 
@@ -114,7 +114,7 @@ EvidenceRL supports three training strategies, switchable via a single config fl
 
 ### Multi-Armed Bandit
 
-Action selection modeled as a bandit problem. No temporal credit assignment — useful as a baseline to verify that the reward signal is learnable at all.
+Action selection modeled as a bandit problem. No temporal credit assignment. It is useful as a baseline to verify that the reward signal is learnable at all.
 
 ### Policy Gradient (REINFORCE)
 
@@ -169,7 +169,7 @@ runs both on every push and pull request.
 
 ## Configuration
 
-All training hyperparameters live in `configs/`. The base defaults are in `configs/base.yaml`; per-algorithm overrides are in `configs/ppo_baseline.yaml`, `configs/pg_baseline.yaml`, and `configs/bandit_baseline.yaml`.
+All training hyperparameters live in `configs/`. The base defaults are in `configs/base.yaml`. Per-algorithm overrides are in `configs/ppo_baseline.yaml`, `configs/pg_baseline.yaml`, and `configs/bandit_baseline.yaml`.
 
 ```yaml
 # configs/base.yaml
@@ -193,7 +193,7 @@ rl:
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
 ```
 
-`src/evid_rl_env/agent/config.py`'s `BaseConfig`/`PPOConfig`/`PGConfig`/`BanditConfig` classes define the config *schema* and hold real defaults only for cross-cutting fields that aren't per-run tuning knobs (model choices, seed). Algorithm-specific RL hyperparameters (`lr`, `clip`, `entropy_coef`, `gamma`, `alpha`, ...) are intentionally left unset there — `configs/*_baseline.yaml` is the single source of truth for those, so edit the YAML (or point `--config` at a new file) rather than the Python class to tune a run.
+`src/evid_rl_env/agent/config.py`'s `BaseConfig`/`PPOConfig`/`PGConfig`/`BanditConfig` classes define the config *schema* and hold real defaults only for cross-cutting fields that aren't per-run tuning knobs (model choices, seed). Algorithm-specific RL hyperparameters (`lr`, `clip`, `entropy_coef`, `gamma`, `alpha`, ...) are intentionally left unset there, `configs/*_baseline.yaml` is the single source of truth for those, so edit the YAML (or point `--config` at a new file) rather than the Python class to tune a run.
 
 ---
 
@@ -270,7 +270,7 @@ evid-eval \
   --seed 0
 ```
 
-**Available baselines:**
+The available baselines are:
 
 | Baseline | Description |
 |---|---|
@@ -365,18 +365,18 @@ The dashboard reads from `artifacts/experiments/` and offers four views:
 | **Episode Drilldown** | Step-by-step replay for any episode: claim, evidence pool, generated arguments, action probabilities, value estimates, advantage signal, LLM judge scores per step |
 | **Config** | Full hyperparameter table for each selected experiment |
 
-**Live monitoring:** enable the "Live Monitoring" toggle in the sidebar to auto-refresh at a configurable interval (1–10 seconds) while training runs.
+To monitor live, enable the "Live Monitoring" toggle in the sidebar to auto-refresh at a configurable interval (1–10 seconds) while training runs.
 
-**LLM judge metrics tracked per step:**
+The judge tracks these metrics at every step:
 
 | Metric | Direction | Description |
 |---|---|---|
-| `LCS` | ↑ higher is better | Logical consistency — argument is internally coherent |
-| `ESS` | ↑ higher is better | Evidence support — reasoning is grounded in selected evidence |
-| `GRS` | ↓ lower is better | Grounding risk — claims introduced not present in evidence |
-| `COMP` | ↑ higher is better | Completeness — all key aspects of the claim are addressed |
-| `BIAS` | ↓ lower is better | Selective citation bias — only supporting evidence cited, contradictions ignored |
-| `confidence` | — | Judge's confidence in the above scores |
+| `LCS` | ↑ higher is better | Logical consistency: argument is internally coherent |
+| `ESS` | ↑ higher is better | Evidence support: reasoning is grounded in selected evidence |
+| `GRS` | ↓ lower is better | Grounding risk: claims introduced not present in evidence |
+| `COMP` | ↑ higher is better | Completeness: all key aspects of the claim are addressed |
+| `BIAS` | ↓ lower is better | Selective citation bias: only supporting evidence cited, contradictions ignored |
+| `confidence` | n/a | Judge's confidence in the above scores |
 
 Score-to-reward conversion: `0.30 × LCS + 0.25 × ESS + 0.20 × COMP − 0.25 × GRS − 0.15 × BIAS`. When judge confidence is below 0.4, the reward is blended 50/50 toward the neutral value of 0.5. Scores are cached by content hash to avoid redundant inference across episodes.
 
@@ -385,7 +385,7 @@ Score-to-reward conversion: `0.30 × LCS + 0.25 × ESS + 0.20 × COMP − 0.25 �
 ## Example Episode
 
 1. Environment initializes with claim: *"Statins reduce cardiovascular mortality in high-risk patients"*
-2. Tavily retrieves live evidence documents; pool is constructed
+2. Tavily retrieves live evidence documents and the pool is constructed
 3. Agent iterates:
    - `SELECT` → pulls two high-relevance documents
    - `SUPPORT` → generates argument citing trial data
@@ -399,7 +399,7 @@ Score-to-reward conversion: `0.30 × LCS + 0.25 × ESS + 0.20 × COMP − 0.25 �
 
 ## Future Work
 
-- **Learned reward models:** replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less dependent on the `EvidenceLabeler`'s own LLM-based stance/reliability judgments (an improvement over the old static `"neutral"` default, but still a heuristic proxy, not ground truth)
-- **Re-annotation pipeline:** `evid-collect --annotator-model` is wired for labeling trajectories with a strong LLM but not yet connected to a re-scoring workflow for *existing* imitation trajectories; completing this would enable iterative dataset improvement without full recollection
-- **Multi-agent debate:** pit two independent agents against each other — one constrained to support, one to contradiction — with a separate arbiter issuing the final reward signal; this separates role from policy and eliminates the need for a single agent to self-regulate debate balance
-- **Domain expansion:** extend beyond scientific claims to regulatory filings, clinical trial reports, and policy documents, with domain-specific evidence retrievers and reward calibration for each domain's ground-truth structure
+- Learned reward models: replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less dependent on the `EvidenceLabeler`'s own LLM-based stance/reliability judgments (an improvement over the old static `"neutral"` default, but still a heuristic proxy, not ground truth)
+- Re-annotation pipeline: `evid-collect --annotator-model` is wired for labeling trajectories with a strong LLM but not yet connected to a re-scoring workflow for *existing* imitation trajectories. Completing this would enable iterative dataset improvement without full recollection
+- Multi-agent debate: pit two independent agents against each other, one constrained to support, one to contradiction, with a separate arbiter issuing the final reward signal. This separates role from policy and eliminates the need for a single agent to self-regulate debate balance
+- Domain expansion: extend beyond scientific claims to regulatory filings, clinical trial reports, and policy documents, with domain-specific evidence retrievers and reward calibration for each domain's ground-truth structure

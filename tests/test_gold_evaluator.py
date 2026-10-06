@@ -1,6 +1,6 @@
 """
 Unit tests for GoldEvaluator's aggregation math (agent/gold_evaluator.py),
-against a scripted fake env/policy/judge — no real model loads, mirroring
+against a scripted fake env/policy/judge, no real model loads, mirroring
 the mocked-LLM style used in tests/test_llm_judge_smoke.py.
 """
 
@@ -165,7 +165,7 @@ def test_correlation_none_when_constant():
 
 def test_escalation_rate_none_when_key_absent():
     """Architectures without an escalation tier (LLMJudge, EnsembleJudge)
-    never set "escalated" in their scores dict — None, not 0.0, means
+    never set "escalated" in their scores dict, None, not 0.0, means
     "not applicable" for this architecture."""
     episodes = [
         {"true_label": 1.0, "confidence": 0.9, "task_success": 1.0,

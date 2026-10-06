@@ -13,7 +13,7 @@ is possible because:
     transformers/torch's heavy generation pipelines are never touched. Tests
     that exercise PPO/PolicyGradient/the trainers do still import
     agent.policy for `encode_state`, which (via state_encoder.py) loads the
-    much lighter sentence-transformers embedding model — a one-time, fully
+    much lighter sentence-transformers embedding model, a one-time, fully
     offline-after-first-download cost, not the multi-GB generation models.
 """
 
@@ -34,7 +34,7 @@ class _MockLLM:
     """Minimal stub LLM client: no model loading, fully deterministic.
 
     Pass `responses` (a list) to return a different canned response on each
-    successive call (last one repeats once the list is exhausted); pass
+    successive call (last one repeats once the list is exhausted). Pass
     `raise_exc` to make every call raise, for testing fallback paths.
     """
 
@@ -82,7 +82,7 @@ def no_network_fetch(monkeypatch, fake_evidence_docs):
 
     fetch_evidence is looked up from two places at runtime: environment.py's
     module-level import (used by reset()) and a fresh import inside the QUERY
-    action handler (used mid-episode) — both must be patched.
+    action handler (used mid-episode), both must be patched.
     """
     def _fake_fetch(claim, search_query, max_results=5):
         return list(fake_evidence_docs)
@@ -109,7 +109,7 @@ def make_llm_judge():
 
 class FakeLabeler:
     """Injectable stand-in for EvidenceLabeler with fully controlled, static
-    labels — avoids ever constructing a real EvidenceLabeler/JudgeLLMClient.
+    labels, avoids ever constructing a real EvidenceLabeler/JudgeLLMClient.
     Defaults every text to "neutral", matching the pre-labeling-pipeline
     behavior every text used to get, so existing tests that don't care about
     labels are unaffected."""
@@ -129,7 +129,7 @@ def fake_evidence_labeler():
 
 @pytest.fixture
 def make_env(make_llm_judge, fake_evidence_labeler):
-    """Build a ClaimEnv with an injected mock judge — no torch, no network.
+    """Build a ClaimEnv with an injected mock judge, no torch, no network.
 
     Pass `embedder=<callable>` to also inject a fake embedder (see
     ClaimEnv's `embedder=` param) instead of the real sentence-transformers
@@ -150,7 +150,7 @@ def make_env(make_llm_judge, fake_evidence_labeler):
 
 
 class FakePolicy:
-    """Duck-typed stand-in for ActorCriticPolicy with plain numpy params —
+    """Duck-typed stand-in for ActorCriticPolicy with plain numpy params,
     avoids ever constructing a real LLMClient (no gemma/qwen model load)."""
 
     def __init__(self, state_dim: int = 4, n_actions: int = None, seed: int = 0):

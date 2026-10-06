@@ -1,7 +1,7 @@
 """
 conftest.py's `no_network_fetch` autouse fixture monkeypatches
 evidence_fetcher.fetch_evidence itself (so the rest of the suite never hits
-Tavily) — these tests are specifically about that function's real behavior,
+Tavily), these tests are specifically about that function's real behavior,
 so they call a reference captured at import time, before any fixture has a
 chance to patch the module attribute.
 """

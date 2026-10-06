@@ -138,7 +138,7 @@ def _read_jsonl(path: str, mtime: float) -> pd.DataFrame:
 
 def load_gold_eval(exp_path):
     """Rows written by EvalMixin._maybe_run_gold_eval during training and/or
-    evid-gold-eval standalone runs — see agent/gold_evaluator.py. Flattens
+    evid-gold-eval standalone runs, see agent/gold_evaluator.py. Flattens
     the nested "dimensions" dict (LCS/ESS/GRS/COMP/BIAS -> proxy/gold/
     disagreement) into flat columns so it's plot-ready."""
     path = os.path.join(exp_path, "gold_eval.jsonl")
@@ -166,7 +166,7 @@ def _line_chart(df, x, y, title):
     return fig
 
 def _load_real_baselines(selected):
-    """Per-experiment baseline results from evid-eval's eval_results.json —
+    """Per-experiment baseline results from evid-eval's eval_results.json,
     the actual RandomBaseline/GreedyLLMBaseline/etc. evaluator classes, not a
     heuristic proxy. Returns (rows, experiment_names_missing_eval_results)."""
     rows = []
@@ -563,7 +563,7 @@ with tab1:
                 fig_acc.update_traces(line=dict(color=GOLD_COLOR, width=2))
                 st.plotly_chart(fig_acc, width="stretch")
 
-    # Policy behavior — internal training diagnostics, hidden in demo mode
+    # Policy behavior, internal training diagnostics, hidden in demo mode
     if not demo_mode:
         st.subheader("Policy Behavior")
 
@@ -612,7 +612,7 @@ with tab1:
         else:
             st.info("Action distribution data not yet available (requires commit 5 trainer changes)")
 
-        # Action frequency heatmap (uses traj_by_episode — no extra file reads)
+        # Action frequency heatmap (uses traj_by_episode, no extra file reads)
         st.subheader("Action preference heatmap")
         if traj_by_episode:
             ep_action_rows = []
@@ -642,7 +642,7 @@ with tab1:
 with tab2:
     st.header("Compare Experiments")
 
-    # Baseline comparison bar chart — the real RandomBaseline/GreedyLLMBaseline/
+    # Baseline comparison bar chart, the real RandomBaseline/GreedyLLMBaseline/
     # etc. evaluator results from each experiment's evid-eval run, not a proxy
     # computed from the training curve.
     st.subheader("Baseline comparison")
@@ -950,7 +950,7 @@ with tab3:
             for e in evidence:
                 st.markdown(f"**[{e['id']}]** {e['text']}")
 
-            # Debate timeline — ACTION_SHORT maps full names to color keys
+            # Debate timeline, ACTION_SHORT maps full names to color keys
             st.subheader("Debate timeline")
             debate_html = "<div style='display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;'>"
             for s_idx, s in enumerate(traj):

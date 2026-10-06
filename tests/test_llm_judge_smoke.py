@@ -85,7 +85,7 @@ def test_compute_reward_empty_reasoning_returns_zeros():
 def test_get_scores_matches_compute_reward_scores():
     """Regression guard for the get_scores() extraction (added so
     EnsembleJudge can fetch raw per-member scores without going through
-    compute_reward's reward formula) — must return exactly what
+    compute_reward's reward formula), must return exactly what
     compute_reward's second return value was before the refactor."""
     good_response = '{"LCS": 0.85, "ESS": 0.90, "GRS": 0.10, "COMP": 0.80, "BIAS": 0.05, "confidence": 0.92}'
     judge = _make_judge(good_response)

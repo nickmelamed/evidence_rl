@@ -1,7 +1,7 @@
 """
 Unit tests for EscalatingJudge (judge/escalating_judge.py): the three
 escalation triggers (low confidence, high GRS, high BIAS, adversarial
-evidence), the empty-reasoning short-circuit, and the "escalated" flag —
+evidence), the empty-reasoning short-circuit, and the "escalated" flag,
 all against mocked LLM clients, no real model loads.
 """
 
@@ -142,7 +142,7 @@ def test_escalated_flag_present_on_both_paths(tmp_path):
 def test_shared_instance_with_ensemble_member_avoids_redundant_call(tmp_path):
     """The actual payoff of EnsembleJudge/build_ensemble_judge's `reuse`
     wiring in environment.py: when tier-1 and an ensemble member are the
-    *same* LLMJudge instance, escalating doesn't re-query that model — the
+    *same* LLMJudge instance, escalating doesn't re-query that model, the
     member's get_scores() hits the cache tier-1's own call already wrote,
     moments earlier, for the exact same (claim, reasoning, evidence)."""
     from evid_rl_env.judge.ensemble_judge import EnsembleJudge

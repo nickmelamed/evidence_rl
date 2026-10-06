@@ -6,8 +6,8 @@ a held-out eval split, and prints the same formatted comparison table as the
 training loop.
 
 Exit codes:
-  0 — RL policy beats greedy_llm (or greedy_llm was not requested)
-  1 — RL policy does not beat greedy_llm  (usable in CI)
+  0: RL policy beats greedy_llm (or greedy_llm was not requested)
+  1: RL policy does not beat greedy_llm  (usable in CI)
 """
 
 from __future__ import annotations
@@ -329,7 +329,7 @@ def main() -> None:
         with open(out_path, "w") as _f:
             json.dump(eval_json, _f, indent=2)
 
-    # Persist RL results immediately — a later segfault won't erase them.
+    # Persist RL results immediately so a later segfault won't erase them.
     _flush_json()
 
     # Baselines 

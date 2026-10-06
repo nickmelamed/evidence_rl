@@ -4,9 +4,9 @@ evid-migrate: one-time migration of legacy JSONL trajectory records.
 Scans data/ and logs/ for .jsonl files.  For each record that is missing any
 of the three provenance fields introduced after the initial schema:
 
-    collected_at   — ISO-8601 timestamp of when the trajectory was collected
-    annotator_model — model or strategy that produced the actions
-    mode           — collection mode (llm_annotator | reward_filtered | best_rollouts)
+    collected_at: ISO-8601 timestamp of when the trajectory was collected
+    annotator_model: model or strategy that produced the actions
+    mode: collection mode (llm_annotator | reward_filtered | best_rollouts)
 
 …it stamps default values derived from the file's modification time and writes
 the patched records back to the same file in-place.
@@ -44,7 +44,7 @@ def _migrate_file(path: str, dry_run: bool) -> tuple[int, int]:
     Process one .jsonl file.
 
     Returns:
-        (migrated, skipped) — count of records patched vs already complete.
+        (migrated, skipped): count of records patched vs already complete.
     """
     try:
         with open(path, encoding="utf-8") as fh:

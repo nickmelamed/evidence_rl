@@ -4,8 +4,8 @@ class BaseConfig:
     cross-cutting operational defaults sourced from configs/base.yaml).
 
     Algorithm-specific RL hyperparameters live on the subclasses below and are
-    intentionally left as None — configs/*_baseline.yaml's `rl:` block is the
-    single source of truth for those; see config_loader.load_config(), which
+    intentionally left as None. configs/*_baseline.yaml's `rl:` block is the
+    single source of truth for those, and config_loader.load_config()
     always overwrites them before a config is used for real training.
     """
     def __init__(self):
@@ -15,7 +15,7 @@ class BaseConfig:
         self.default_annotator_model = "claude-opus-4-5"
         self.eval_every = 10
         # Held-out judge (different model family than actor/judge_model) used
-        # only for periodic gold_eval — never in the training reward path.
+        # only for periodic gold_eval, never in the training reward path.
         self.gold_judge_model = "mistralai/Mistral-7B-Instruct-v0.2"
         self.gold_eval_every = 5   # in eval *rounds*, not episodes
         self.gold_eval_n_episodes = 20

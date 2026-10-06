@@ -9,15 +9,15 @@ class GoldEvaluator:
     Structurally a sibling of agent/evaluator.py's Evaluator, but instead of
     aggregating the training judge's own running scores, it captures the
     training judge's FINALIZE-step scores (already computed by
-    ClaimEnv.step and returned in info["llm_scores"] / info["llm_reward"] —
-    no extra training-judge calls needed) and compares them to fresh
+    ClaimEnv.step and returned in info["llm_scores"] / info["llm_reward"],
+    so no extra training-judge calls are needed) and compares them to fresh
     gold-judge scores on the exact same (claim, reasoning, evidence) triple.
 
     Unlike Evaluator, this rollout samples stochastically (greedy=False)
     rather than greedy/argmax. Evaluator's job is measuring the policy's
-    true performance, where greedy is the right choice; GoldEvaluator's job
+    true performance, where greedy is the right choice. GoldEvaluator's job
     is auditing the reward signal itself, which needs episodes that reach
-    FINALIZE to produce anything to compare — an under-trained policy's
+    FINALIZE to produce anything to compare. An under-trained policy's
     greedy/argmax action can get stuck never selecting FINALIZE within the
     step budget (no exploration to escape it), starving gold_eval of any
     scored episodes early in training. Stochastic sampling avoids that.
@@ -51,7 +51,7 @@ class GoldEvaluator:
                 state, _reward, done, info = self.env.step(action, payload)
 
             # task_success is only set on the FINALIZE step (see
-            # environment.py) — None means the episode was cut off by the
+            # environment.py), so None means the episode was cut off by the
             # step/token limit before reaching a judged final answer.
             proxy = info.get("llm_scores")
             if info.get("task_success") is None or not proxy:
@@ -87,7 +87,7 @@ class GoldEvaluator:
             accuracies.append(1.0 - abs(confidence - true_label))
             hard_correct.append(1.0 if (confidence >= 0.5) == (true_label >= 0.5) else 0.0)
             # only architectures with an escalation tier (EscalatingJudge)
-            # set this key at all — its absence, not False, is what means
+            # set this key at all, so its absence, not False, is what means
             # "not applicable" (see result["escalation_rate"] below)
             if "escalated" in proxy:
                 escalated_flags.append(bool(proxy["escalated"]))

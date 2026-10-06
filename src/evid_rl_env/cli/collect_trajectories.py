@@ -3,9 +3,9 @@ CLI entry point: evid-collect
 
 Collects labeled trajectories for imitation learning / offline RL.
 Three modes:
-  llm_annotator   — strong LLM selects actions (AnnotatorClient)
-  reward_filtered — random rollouts, keep top-k% by reward
-  best_rollouts   — load existing JSONL files from logs/, filter by min-reward
+  llm_annotator: strong LLM selects actions (AnnotatorClient)
+  reward_filtered: random rollouts, keep top-k% by reward
+  best_rollouts: load existing JSONL files from logs/, filter by min-reward
 
 Output: newline-delimited JSON, one trajectory object per line.
 """

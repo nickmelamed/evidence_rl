@@ -89,7 +89,7 @@ class LLMJudge:
 
     def get_scores(self, claim, reasoning, evidence) -> dict:
         """Raw per-dimension scores dict, independent of the reward formula
-        — used by compute_reward below, and by EnsembleJudge to aggregate
+        Used by compute_reward below, and by EnsembleJudge to aggregate
         multiple members' scores before computing a single reward."""
         if not reasoning.strip():
             return {"LCS": 0.0, "ESS": 0.0, "GRS": 0.5, "COMP": 0.0, "BIAS": 0.5, "confidence": 0.0}
@@ -112,7 +112,7 @@ class LLMJudge:
                 getattr(self.llm, "model_name", "unknown"),
                 claim,
             )
-            # not cached — a transient failure shouldn't permanently deny
+            # not cached, since a transient failure shouldn't permanently deny
             # this (claim, reasoning, evidence) combo a real judge score
             return {"LCS": 0.5, "ESS": 0.5, "GRS": 0.5, "COMP": 0.5, "BIAS": 0.5, "confidence": 0.0}
 
@@ -137,7 +137,7 @@ class LLMJudge:
         conf = float(scores.get("confidence", 0.5))
 
         if lcs == ess == grs == comp == bias == 0.5:
-            # fallback/parse-failure sentinel — no usable judge signal, so
+            # fallback/parse-failure sentinel: no usable judge signal, so
             # treat it as neutral rather than running it through the asymmetric
             # weight formula below (which maps all-0.5 to 0.175, not 0.5)
             return 0.5

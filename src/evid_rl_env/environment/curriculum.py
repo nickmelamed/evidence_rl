@@ -20,7 +20,7 @@ class Curriculum:
       which expose a directly comparable value-error signal.
     - staleness = how long it's been since a claim was last sampled,
       normalised to [0, 1]. This is PLR's mechanism for preventing claims
-      with a low historical score from being starved forever — it forces
+      with a low historical score from being starved forever, it forces
       periodic revisits so a claim's score can be re-evaluated under the
       current policy.
     - min_weight is a constant floor so every claim keeps some sampling
@@ -29,7 +29,7 @@ class Curriculum:
     Caveat: with hundreds of claims and a training run of comparable or
     fewer episodes, most claims are seen rarely, so early on the score is
     dominated by the cold-start weight and staleness bonus rather than a
-    well-estimated learning-progress signal — the prioritization sharpens
+    well-estimated learning-progress signal, the prioritization sharpens
     as more episodes accumulate per claim.
     """
 
@@ -46,7 +46,7 @@ class Curriculum:
 
     @staticmethod
     def _claim_key(claim: dict):
-        """Claims are keyed by their 'id' field; falls back to the claim
+        """Claims are keyed by their 'id' field and fall back to the claim
         text itself if 'id' is absent (e.g. ad-hoc datasets in tests)."""
         return claim.get("id", claim.get("claim"))
 
@@ -91,7 +91,7 @@ class Curriculum:
         weights = [self.score(i) for i in self._known_ids]
         total = sum(weights)
         # all-zero weights are reachable (e.g. min_weight=0 and every claim's
-        # learning progress + staleness has simultaneously bottomed out) —
+        # learning progress + staleness has simultaneously bottomed out),
         # fall back to uniform rather than dividing by zero.
         probs = [w / total for w in weights] if total > 0 else None
         return random.choices(dataset, weights=probs, k=1)[0]
@@ -101,7 +101,7 @@ class Curriculum:
         """Read-only float for logging: the average current PLR score across
         every claim in the most recently sampled dataset. Falls toward the
         min_weight floor as the policy's performance stabilizes across the
-        whole claim pool; stays elevated while the policy is still finding
+        whole claim pool, and stays elevated while the policy is still finding
         claims whose performance is shifting."""
         if not self._known_ids:
             return self.min_weight

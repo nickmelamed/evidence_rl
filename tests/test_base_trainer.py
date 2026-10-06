@@ -1,6 +1,6 @@
 """
 Unit test for BaseTrainer._init_common's eval_env construction
-(agent/base_trainer.py) — confirms the run's seed is actually passed
+(agent/base_trainer.py), confirms the run's seed is actually passed
 through to the eval ClaimEnv instead of silently defaulting, with every
 expensive dependency (ExperimentTracker's real directory creation,
 ClaimEnv's real model loads) mocked out.

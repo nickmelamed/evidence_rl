@@ -54,7 +54,7 @@ class BaseTrainer(EvalMixin):
     """Shared setup and per-episode helpers for Trainer (PPO/PG) and BanditTrainer.
 
     The two subclasses genuinely differ in action-selection and RL-update
-    mechanics, so `train()` stays subclass-specific — this holds only the
+    mechanics, so `train()` stays subclass-specific, this holds only the
     byte-identical (or near-identical) scaffolding around it.
     """
 
@@ -100,7 +100,7 @@ class BaseTrainer(EvalMixin):
             "seed": seed,
             "state_dim": getattr(self.policy, "state_dim", None),
             "eval_every": self.eval_every,
-            # judge architecture — recorded so a run's config.json is
+            # judge architecture, recorded so a run's config.json is
             # self-describing when comparing single/ensemble/escalation
             "judge_model": getattr(config, "judge_model", None),
             "judge_ensemble_models": getattr(config, "judge_ensemble_models", None),
@@ -113,7 +113,7 @@ class BaseTrainer(EvalMixin):
 
         self.tracker.save_config(wandb_config)
 
-        # RL evaluator — receives the training normalizer for reward scale alignment.
+        # RL evaluator, receives the training normalizer for reward scale alignment.
         # The normalizer is read-only inside Evaluator (never updated there).
         self.evaluator = None
         self.baselines = {}
@@ -162,7 +162,7 @@ class BaseTrainer(EvalMixin):
     def _build_gold_evaluator(self, eval_dataset, gold_judge_model, judge_model, n_episodes, seed):
         """Held-out judge (different model family, never used in training
         reward) plus a fixed-size seeded subsample of eval_dataset, wrapped
-        in a GoldEvaluator — see agent/gold_evaluator.py. Kept a small
+        in a GoldEvaluator, see agent/gold_evaluator.py. Kept a small
         subsample regardless of eval_dataset size since gold_judge_model is
         typically 5-10x larger than judge_model and this runs on its own,
         coarser cadence (self.gold_eval_every)."""
@@ -187,10 +187,10 @@ class BaseTrainer(EvalMixin):
     def _update_curriculum(self, claim_id, task_success) -> None:
         """Feed the episode's task-success signal to the curriculum, keyed by
         the specific claim just attempted (per-claim Prioritized Level
-        Replay — see curriculum.py). task_success is the bounded [0,1]
+        Replay, see curriculum.py). task_success is the bounded [0,1]
         calibration score from the FINALIZE step's info dict (1 - |confidence
-        - true_score|); episodes that never reach FINALIZE (step-limit cutoff,
-        token budget) count as 0 — the agent didn't complete the task."""
+        - true_score|). Episodes that never reach FINALIZE (step-limit cutoff,
+        token budget) count as 0."""
         if self.curriculum is None:
             return
         perf = task_success if task_success is not None else 0.0
@@ -198,7 +198,7 @@ class BaseTrainer(EvalMixin):
 
     def _apply_token_budget(self, total_tokens: float, reward: float, done: bool) -> tuple:
         """Force-end the episode, like the environment's own step-limit does,
-        once the per-episode token budget is exceeded — previously this field
+        once the per-episode token budget is exceeded, previously this field
         was set but never enforced."""
         if not done and total_tokens >= self.max_tokens_per_episode:
             return -0.2, True
