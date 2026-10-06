@@ -1,0 +1,4 @@
+# Adjust the style checker's word list. "+word" (or just "word") adds a word,
+# "-word" removes one of the defaults. One per line, every inflection listed.
+# Example, for a repo where "comprehensive" is a term of art:
+# -comprehensive

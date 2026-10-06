@@ -1,0 +1,9 @@
+# Fast checks that must pass before Claude may end a turn. One shell command
+# per line, run from the repo root. The whole list must finish in about 18
+# minutes (the gate's budget), and a few minutes is the real target.
+#
+# Start with only the style check in an empty repo, since a check whose tool
+# is not installed yet fails every turn. Switch to `make agent-check` once
+# the Makefile's tools are installed.
+python3 scripts/agent/check_style.py --changed .
+# make agent-check

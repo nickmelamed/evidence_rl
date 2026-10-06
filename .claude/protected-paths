@@ -1,0 +1,35 @@
+# Edits to these paths need the owner's approval, even in auto mode.
+# One glob per line, relative to the repo root. "*" crosses directories and a
+# trailing "/" means everything under it. Text after "  #" is the reason.
+#
+# The agent's own settings, this list, gate-commands, style-ignore,
+# style-words, and scripts/agent/ are always protected by guard_edit.py,
+# whatever this file says.
+CLAUDE.md  # the project's instructions to Claude
+.claude/rules/  # path-scoped standards
+.claude/agents/  # reviewer agents
+.claude/skills/  # repo procedures
+Makefile  # defines agent-check and ci
+pyproject.toml  # dependencies and lint, type, and test configuration
+setup.cfg  # tool configuration
+pytest.ini  # test selection
+tox.ini  # test selection
+.pre-commit-config.yaml  # commit hooks
+.github/workflows/  # CI
+*.lock  # locked dependencies
+package-lock.json  # locked dependencies
+src/evid_rl_env/judge/metrics.py  # F1, contradiction and contamination metrics behind the reward
+src/evid_rl_env/judge/reward.py  # final reward weights
+src/evid_rl_env/judge/llm_judge.py  # judge score to reward conversion
+src/evid_rl_env/environment/environment.py  # step and final rewards, labels vs observation
+src/evid_rl_env/agent/evaluator.py  # held-out evaluation
+src/evid_rl_env/agent/gold_evaluator.py  # gold judge audit
+src/evid_rl_env/agent/eval_mixin.py  # per-episode eval seeding
+src/evid_rl_env/cli/eval.py  # baseline comparison and the seed-42 split
+src/evid_rl_env/cli/gold_eval.py  # gold judge audit CLI
+src/evid_rl_env/data/seed_claims.json  # claims, labels, and gold evidence
+src/evid_rl_env/data/ATTRIBUTION.md  # dataset license terms
+configs/base.yaml  # seed and gold judge model
+artifacts/experiments/  # reported run results
+.env  # secrets
+.env.example  # secrets template
