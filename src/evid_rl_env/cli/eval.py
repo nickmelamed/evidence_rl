@@ -344,6 +344,9 @@ def main() -> None:
     baseline_results = {}
     for name, bl in baselines.items():
         print(f"  Running {name}...")
+        # reseed so a baseline's random draws do not depend on which ran before it
+        random.seed(seed)
+        np.random.seed(seed)
         r = bl.run(args.n_episodes)
         baseline_results[name] = r
         # Update JSON after each baseline so partial results survive a crash.

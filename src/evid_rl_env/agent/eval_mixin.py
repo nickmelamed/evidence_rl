@@ -80,6 +80,9 @@ class EvalMixin:
         for name, bl in self.baselines.items():
             if name in _EXPENSIVE_BASELINES and not run_expensive_baselines:
                 continue
+            # reseed so a baseline's random draws do not depend on which ran before it
+            random.seed(self.seed ^ (ep + 1))
+            np.random.seed(self.seed ^ (ep + 1))
             baseline_results[name] = bl.run(self.baseline_n_episodes)
 
         ref = baseline_results.get("greedy_llm", {}).get("mean_reward", 0.0)

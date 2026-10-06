@@ -9,9 +9,26 @@ is shown to Claude at the start of each session and after compaction.
 - [ ] Review the `feat/env-rng` change (not pushed yet).
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
+## Rerun plan
+
+Run these from the repo root inside the `ev_rl` venv, with `TAVILY_API_KEY` set in `.env`. The seed is 42 everywhere, from `configs/base.yaml`.
+
+1. Train one run per judge architecture, with the same episode count and seed:
+   `evid-train --config configs/ppo_baseline.yaml --episodes 300 --exp-name full_baseline`
+   `evid-train --config configs/ppo_ensemble_judge.yaml --episodes 300 --exp-name full_ensemble`
+   `evid-train --config configs/ppo_escalation_judge.yaml --episodes 300 --exp-name full_escalation`
+   `evid-train --config configs/ppo_debate_judge.yaml --episodes 300 --exp-name full_debate`
+   Add `evid-train --config configs/pg_baseline.yaml` and `configs/bandit_baseline.yaml` if you want the three algorithms again.
+2. Evaluate each checkpoint against the baselines. The eval env uses the default single judge, so every architecture is scored on the same yardstick:
+   `evid-eval --checkpoint artifacts/experiments/<run>/policy.npz --baselines random,majority,greedy_llm,fewshot_k3,best_of_5 --n-episodes 100`
+3. Raise `gold_eval_n_episodes` in `configs/base.yaml` before training if you want usable gold-judge numbers. Most past rounds scored 0 to 5 episodes. That file is a protected path.
+4. Run `make results`, then update the README Results section from `results/tables/`. `make numbers` fails until the quoted numbers match the tables.
+5. Old rows stay in the tables, since they are built from every folder in `artifacts/experiments/`. Move or delete the old folders first if you want the tables to show only the new runs.
+
+Claim order is now fixed by the seed, so two methods evaluated with the same seed see the same claims. Do not compare these runs with ones made before `feat/env-rng`.
+
 ## Next
 
-- [ ] Give `Curriculum.sample` its own RNG too. Training claim order with the curriculum on still depends on global seeding.
 
 - [ ] Rerun the PPO, PG and bandit evaluations. The three runs in `results/tables/eval_baselines.csv` predate the reward and judge changes of July 2026.
 - [ ] Raise `gold_eval_n_episodes`, since most logged gold rounds scored 0 to 5 episodes and say little about judge agreement.
