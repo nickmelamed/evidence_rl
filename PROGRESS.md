@@ -27,6 +27,20 @@ Run these from the repo root inside the `ev_rl` venv, with `TAVILY_API_KEY` set 
 
 Claim order is now fixed by the seed, so two methods evaluated with the same seed see the same claims. Do not compare these runs with ones made before `feat/env-rng`.
 
+## Determinism on MPS
+
+Done: torch is seeded before every generation from the run seed, the prompt and how often that prompt was seen (`derive_call_seed` in `agent/llm_client.py`), and `config.json` records the device and library versions. A sample no longer depends on call order or on judge cache hits.
+
+Smoke test (2026-10-06, MPS, torch 2.11.0, transformers 5.5.4): two 10-episode PPO runs with seed 42, the second with a warmer judge cache (13m47s against 3m42s). Every per-episode reward, step count, token count and entropy matched, the eval table matched, and the saved policy weights were identical. Ten episodes on one machine is a small test, so longer runs could still drift.
+
+Not done, to revisit if the smoke test or the reruns show the variation matters:
+
+- [ ] Greedy decoding for the judge (`do_sample=False`). It makes scoring deterministic but slightly changes the reward distribution, so it needs a decision.
+- [ ] Several seeds per configuration (3 to 5), reported as mean and spread. This matters more than bitwise determinism, and it costs compute.
+- [ ] Final runs on one deterministic device. CPU with float32 is slow for 2B to 7B models. CUDA with `torch.use_deterministic_algorithms(True)` is deterministic but gives different numbers from MPS.
+- [ ] Pin the model dtype instead of `torch_dtype="auto"`, since half precision adds numeric noise.
+- [ ] Empty the judge cache before the final runs so they reproduce from cold. `artifacts/cache/judge_cache*.sqlite3` persists across runs.
+
 ## Next
 
 
