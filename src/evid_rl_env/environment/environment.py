@@ -1,4 +1,5 @@
 import random
+from typing import Any
 
 import numpy as np
 
@@ -85,8 +86,8 @@ class ClaimEnv:
                  embedder=None, evidence_labeler=None, judge_ensemble_models=None,
                  judge_escalation=False, judge_escalation_target="ensemble"):
         self.dataset = dataset
-        self.state = None
-        self.current_sample = None
+        self.state: State | None = None
+        self.current_sample: Any = None
         self.reward_fn = RewardFunction()
 
         judge_model_name = judge_model or "Qwen/Qwen2.5-1.5B-Instruct"
@@ -130,6 +131,7 @@ class ClaimEnv:
 
     def _evidence_diversity_bonus(self, new_evidence_id):
         """Returns a small bonus if this evidence id hasn't been selected before."""
+        assert self.state is not None
         return 0.05 if new_evidence_id not in self.state.selected_evidence_ids else 0.0
 
     def reset(self):
@@ -167,6 +169,7 @@ class ClaimEnv:
 
     def step(self, action, payload):
         s = self.state
+        assert s is not None, "reset() must be called before step()"
         s.steps_taken += 1
         reward = 0.0
         llm_reward = 0.0
@@ -252,6 +255,7 @@ class ClaimEnv:
                 )
 
                 # use dataset ground truth if available
+                true_score: Any
                 if "label" in self.current_sample:
                     true_score = float(self.current_sample["label"])
                 else:

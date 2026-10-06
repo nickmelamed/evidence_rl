@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 
 from evid_rl_env.agent.policy import encode_state
@@ -17,7 +19,7 @@ class PPO:
 
     def compute_advantages(self, rewards, values, next_value=0.0):
         gae_lambda = getattr(self, "gae_lambda", 0.95)
-        advantages = []
+        advantages: Any = []
         gae = 0.0
         values_extended = list(values) + [next_value]
 

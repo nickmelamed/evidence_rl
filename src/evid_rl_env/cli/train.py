@@ -59,7 +59,7 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
     resolved_exp_name = exp_name or f"{method}_run"
 
     if method == 'bandit':
-        trainer = BanditTrainer(
+        trainer: BanditTrainer | Trainer = BanditTrainer(
             env=env,
             policy=policy,
             config=config,

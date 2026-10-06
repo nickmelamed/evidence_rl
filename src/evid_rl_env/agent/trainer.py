@@ -1,5 +1,6 @@
 # For bandit training use BanditTrainer in bandit_trainer.py
 import os
+from typing import Any
 
 try:
     import wandb
@@ -53,6 +54,7 @@ class Trainer(BaseTrainer):
         )
 
         # RL algorithm
+        self.rl: Any
         if algo == "ppo":
             assert hasattr(config, "clip"), "PPOConfig required"
             self.rl = PPO(policy, config)

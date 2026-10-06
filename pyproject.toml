@@ -45,6 +45,7 @@ ignore = ["E501", "E402"]
 mypy_path = "src"
 packages = ["evid_rl_env"]
 ignore_missing_imports = true
+check_untyped_defs = true
 
 [project.scripts]
 train-rl = "evid_rl_env.cli.train:main"
