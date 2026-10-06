@@ -59,3 +59,28 @@ def test_seed_claims_have_binary_labels_and_unique_ids():
 def test_seed_claims_have_one_known_duplicate_claim_text():
     texts = [s["claim"] for s in load_dataset()]
     assert len(texts) - len(set(texts)) == 1
+
+
+def test_collect_main_seed_controls_randomness_after_split_load(monkeypatch, tmp_path):
+    from evid_rl_env.cli import collect_trajectories as collect
+
+    draws = []
+
+    def fake_collect(env, n_episodes, top_k_percent):
+        draws.append(random.random())
+        return []
+
+    monkeypatch.setattr(collect, "ClaimEnv", lambda dataset: None)
+    monkeypatch.setattr(collect, "collect_reward_filtered", fake_collect)
+    monkeypatch.setattr(collect, "_write_jsonl", lambda trajectories, path: None)
+    monkeypatch.setattr(collect, "_print_summary", lambda trajectories, path: None)
+
+    for seed in ("7", "8"):
+        monkeypatch.setattr(
+            "sys.argv",
+            ["evid-collect", "--mode", "reward_filtered", "--seed", seed,
+             "--output", str(tmp_path / "out.jsonl")],
+        )
+        collect.main()
+
+    assert draws[0] != draws[1]
