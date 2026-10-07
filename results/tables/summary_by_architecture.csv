@@ -1,0 +1,7 @@
+algo,judge_architecture,n_runs,train_reward_last_50_mean,train_reward_last_50_std,eval_rl_reward_mean,eval_rl_reward_std,eval_greedy_llm_reward_mean,gold_runs_with_correlation,gold_correlation_mean,gold_correlation_std,gold_n_scored_total
+bandit,single,1,0.6375,,0.781,,0.6284,0,,,0
+pg,single,1,0.0943,,0.072,,0.69,0,,,0
+ppo,ensemble,3,0.0819,0.0869,,,,0,,,2
+ppo,escalating_debate,1,-0.2872,,,,,0,,,0
+ppo,escalating_ensemble,2,0.1514,0.7378,,,,1,0.7298,,5
+ppo,single,4,0.1388,0.4942,0.16,,0.6203,0,,,3

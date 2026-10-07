@@ -1,7 +1,34 @@
 import csv
 import json
 import os
+import platform
+import sys
 from datetime import datetime
+
+
+def runtime_environment() -> dict:
+    """Describe the software and device a run used, for config.json."""
+    info: dict = {
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+    }
+    try:
+        import torch
+
+        info["torch"] = torch.__version__
+        info["device"] = "mps" if torch.backends.mps.is_available() else (
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
+    except ImportError:
+        pass
+    try:
+        import transformers
+
+        info["transformers"] = transformers.__version__
+    except ImportError:
+        pass
+    return info
+
 
 FIXED_FIELDS = [
     "episode",

@@ -19,3 +19,8 @@ rl:
     - "HuggingFaceTB/SmolLM2-1.7B-Instruct"
   judge_escalation: true
   judge_escalation_target: "debate"
+
+# The debate arbiter is Mistral-7B-Instruct-v0.2, which is also the default gold
+# judge. A gold judge that produced the training reward is not independent, so
+# this config audits with a different model.
+gold_judge_model: "Qwen/Qwen2.5-3B-Instruct"

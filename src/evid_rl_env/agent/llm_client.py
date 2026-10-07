@@ -1,3 +1,4 @@
+import hashlib
 import logging as _logging
 import os
 import random
@@ -23,6 +24,37 @@ _logger = _logging.getLogger(__name__)
 _DEVICE = "mps" if torch.backends.mps.is_available() else "cpu"
 
 
+def derive_call_seed(seed: int, prompt: str, occurrence: int) -> int:
+    """Return a torch seed that depends only on the run seed, the prompt text,
+    and how many times that prompt has been seen before."""
+    digest = hashlib.sha256(f"{seed}\x1f{occurrence}\x1f{prompt}".encode()).digest()
+    return int.from_bytes(digest[:4], "big")
+
+
+class _PerCallSeeding:
+    """Seeds torch before every generation, so a sample depends on the prompt
+    and the run seed, not on how many generations came before it.
+
+    Without this, all generations share torch's global RNG. A judge cache hit
+    skips a generation and shifts every later sample, so a warm cache and a cold
+    cache would give different results. Only torch is seeded here, because
+    transformers.set_seed would also reset numpy's and random's global state in
+    the middle of training.
+    """
+
+    seed: int
+
+    def _seed_for_call(self, prompt: str) -> None:
+        counts = self.__dict__.setdefault("_prompt_counts", {})
+        key = hashlib.sha256(prompt.encode()).hexdigest()
+        occurrence = counts.get(key, 0)
+        counts[key] = occurrence + 1
+        call_seed = derive_call_seed(self.seed, prompt, occurrence)
+        torch.manual_seed(call_seed)
+        if torch.backends.mps.is_available():
+            torch.mps.manual_seed(call_seed)
+
+
 def _extract_text(output):
     """Safely extract generated text from pipeline output regardless of format."""
     result = output[0]["generated_text"]
@@ -46,7 +78,7 @@ def _extract_texts(output):
     return texts
 
 
-class LLMClient:
+class LLMClient(_PerCallSeeding):
     """
     Instruction-tuned generation model for producing arguments, summaries,
     and other natural language outputs during episodes.
@@ -72,6 +104,7 @@ class LLMClient:
         return [{"role": "user", "content": prompt}]
 
     def generate(self, prompt):
+        self._seed_for_call(prompt)
         out = self._pipe(
             self._chat(prompt),
             max_new_tokens=128,
@@ -85,6 +118,7 @@ class LLMClient:
 
     def generate_structured(self, prompt, temperature=0.1):
         """Lower temperature for structured outputs like JSON."""
+        self._seed_for_call(prompt)
         out = self._pipe(
             self._chat(prompt),
             max_new_tokens=32,   # callers only need an action index (1-2 tokens)
@@ -102,6 +136,7 @@ class LLMClient:
         instead of n sequential pipeline calls. Used by BestOfNBaseline,
         which otherwise called generate_structured n times for a literally
         identical input."""
+        self._seed_for_call(prompt)
         out = self._pipe(
             self._chat(prompt),
             max_new_tokens=32,
@@ -114,7 +149,7 @@ class LLMClient:
         return [(text, len(text.split())) for text in texts]
 
 
-class JudgeLLMClient:
+class JudgeLLMClient(_PerCallSeeding):
     """
     Separate instruction-tuned model dedicated to structured JSON scoring.
     Kept separate from the actor model to avoid conflicts and allow
@@ -145,6 +180,7 @@ class JudgeLLMClient:
         return [{"role": "user", "content": prompt}]
 
     def generate(self, prompt):
+        self._seed_for_call(prompt)
         out = self._pipe(
             self._chat(prompt),
             max_new_tokens=128,  

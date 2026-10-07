@@ -43,3 +43,24 @@ def test_load_config_unknown_algo_raises(tmp_path):
     bogus.write_text("algo: nonsense\n")
     with pytest.raises(ValueError):
         load_config(str(bogus))
+
+
+def test_gold_judge_is_never_one_of_the_training_judges():
+    import glob
+
+    from evid_rl_env.judge import debate_judge
+
+    debate_models = {
+        debate_judge._DEFAULT_ADVOCATE_FOR_MODEL,
+        debate_judge._DEFAULT_ADVOCATE_AGAINST_MODEL,
+        debate_judge._DEFAULT_ARBITER_MODEL,
+    }
+    paths = [p for p in sorted(glob.glob("configs/*.yaml")) if not p.endswith("base.yaml")]
+    assert paths
+    for path in paths:
+        _, cfg = load_config(path)
+        training = {cfg.judge_model}
+        training.update(getattr(cfg, "judge_ensemble_models", None) or [])
+        if getattr(cfg, "judge_escalation", False) and cfg.judge_escalation_target == "debate":
+            training |= debate_models
+        assert cfg.gold_judge_model not in training, path

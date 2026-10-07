@@ -41,3 +41,11 @@ def test_init_common_passes_seed_to_eval_env(monkeypatch, tmp_path):
     )
 
     assert captured["kwargs"]["seed"] == 99
+
+
+def test_runtime_environment_reports_device_and_versions():
+    from evid_rl_env.utils.experiment import runtime_environment
+
+    info = runtime_environment()
+    assert info["device"] in {"mps", "cuda", "cpu"}
+    assert "torch" in info and "transformers" in info and "python" in info
