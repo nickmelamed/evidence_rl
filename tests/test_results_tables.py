@@ -69,3 +69,32 @@ def test_eval_rows_list_every_policy(tmp_path):
     rows = build.eval_rows([run])
     assert [r["policy"] for r in rows] == ["rl", "random"]
     assert rows[0]["reward_mean"] == 0.5
+
+
+def test_summary_groups_seeds_and_reports_spread(tmp_path):
+    runs = []
+    for seed, last in ((1, 0.2), (2, 0.4), (3, 0.6)):
+        cfg = {"algo": "ppo", "seed": seed}
+        runs.append(_make_run(
+            tmp_path, f"ppo_s{seed}", cfg, [last] * 50,
+            gold=[{"episode": 10, "n_episodes": 5, "n_scored": 2,
+                   "proxy_gold_correlation": 0.5 if seed != 3 else None}],
+            evals={"n_episodes": 5, "baselines": {"rl": {"mean": last, "std": 0.1},
+                                                   "greedy_llm": {"mean": 0.5, "std": 0.1}}},
+        ))
+    rows = build.summary_rows(build.training_rows(runs), build.eval_rows(runs), build.gold_rows(runs))
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["n_runs"] == 3
+    assert row["train_reward_last_50_mean"] == 0.4
+    assert row["train_reward_last_50_std"] == 0.2
+    assert row["eval_rl_reward_mean"] == 0.4
+    assert row["eval_greedy_llm_reward_mean"] == 0.5
+    assert row["gold_runs_with_correlation"] == 2
+    assert row["gold_n_scored_total"] == 6
+
+
+def test_summary_spread_is_empty_for_a_single_run(tmp_path):
+    run = _make_run(tmp_path, "solo", {"algo": "ppo", "seed": 1}, [0.3] * 5)
+    rows = build.summary_rows(build.training_rows([run]), [], [])
+    assert rows[0]["train_reward_last_50_std"] == ""

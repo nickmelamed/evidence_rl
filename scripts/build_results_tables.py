@@ -56,6 +56,8 @@ def training_rows(runs: list[Path]) -> list[dict]:
 
 
 def r4(value):
+    if value is None:
+        return ""
     return round(value, 4) if isinstance(value, float) else value
 
 
@@ -74,6 +76,7 @@ def gold_rows(runs: list[Path]) -> list[dict]:
             "run": run.name,
             "algo": cfg.get("algo", ""),
             "judge_architecture": judge_architecture(cfg),
+            "seed": cfg.get("seed", ""),
             "rounds": len(rounds),
             "last_round_episode": last.get("episode", ""),
             "n_episodes": last.get("n_episodes", ""),
@@ -94,9 +97,13 @@ def eval_rows(runs: list[Path]) -> list[dict]:
         if not path.exists():
             continue
         result = json.loads(path.read_text())
+        cfg = load_config(run)
         for name, stats in result.get("baselines", {}).items():
             rows.append({
                 "run": run.name,
+                "algo": cfg.get("algo", ""),
+                "judge_architecture": judge_architecture(cfg),
+                "seed": cfg.get("seed", ""),
                 "n_episodes": result.get("n_episodes", ""),
                 "policy": name,
                 "reward_mean": stats.get("mean", ""),
@@ -104,6 +111,70 @@ def eval_rows(runs: list[Path]) -> list[dict]:
                 "rl_win_rate_vs_greedy": result.get("rl_win_rate_vs_greedy", ""),
             })
     return rows
+
+
+def _mean_std(values: list[float]) -> tuple:
+    if not values:
+        return "", ""
+    mean = sum(values) / len(values)
+    if len(values) < 2:
+        return round(mean, 4), ""
+    var = sum((v - mean) ** 2 for v in values) / (len(values) - 1)
+    return round(mean, 4), round(var ** 0.5, 4)
+
+
+def summary_rows(training: list[dict], evals: list[dict], gold: list[dict]) -> list[dict]:
+    """One row per (algo, judge architecture), across seeds.
+
+    The spread columns are sample standard deviations across runs and are empty
+    with fewer than two runs. Gold columns use only runs that scored at least
+    one episode, and `gold_n_scored_total` shows how thin that sample is.
+    """
+    groups: dict = {}
+    for row in training:
+        groups.setdefault((row["algo"], row["judge_architecture"]), {"train": [], "rl": [],
+                                                                       "greedy": [], "corr": [],
+                                                                       "scored": 0, "runs": set()})
+    for row in training:
+        g = groups[(row["algo"], row["judge_architecture"])]
+        g["runs"].add(row["run"])
+        g["train"].append(row[f"mean_reward_last_{TAIL}"])
+    for row in evals:
+        g = groups.get((row["algo"], row["judge_architecture"]))
+        if g is None or row["reward_mean"] == "":
+            continue
+        if row["policy"] == "rl":
+            g["rl"].append(row["reward_mean"])
+        elif row["policy"] == "greedy_llm":
+            g["greedy"].append(row["reward_mean"])
+    for row in gold:
+        g = groups.get((row["algo"], row["judge_architecture"]))
+        if g is None:
+            continue
+        g["scored"] += row["n_scored"] or 0
+        if row["proxy_gold_correlation"] != "":
+            g["corr"].append(row["proxy_gold_correlation"])
+    out = []
+    for (algo, arch), g in sorted(groups.items()):
+        train_m, train_s = _mean_std(g["train"])
+        rl_m, rl_s = _mean_std(g["rl"])
+        greedy_m, _ = _mean_std(g["greedy"])
+        corr_m, corr_s = _mean_std(g["corr"])
+        out.append({
+            "algo": algo,
+            "judge_architecture": arch,
+            "n_runs": len(g["runs"]),
+            f"train_reward_last_{TAIL}_mean": train_m,
+            f"train_reward_last_{TAIL}_std": train_s,
+            "eval_rl_reward_mean": rl_m,
+            "eval_rl_reward_std": rl_s,
+            "eval_greedy_llm_reward_mean": greedy_m,
+            "gold_runs_with_correlation": len(g["corr"]),
+            "gold_correlation_mean": corr_m,
+            "gold_correlation_std": corr_s,
+            "gold_n_scored_total": g["scored"],
+        })
+    return out
 
 
 def write(path: Path, rows: list[dict]) -> None:
@@ -125,9 +196,11 @@ def main() -> None:
 
     runs = sorted(p for p in Path(args.experiments).iterdir() if p.is_dir())
     out = Path(args.out)
-    write(out / "training_summary.csv", training_rows(runs))
-    write(out / "gold_eval_last_round.csv", gold_rows(runs))
-    write(out / "eval_baselines.csv", eval_rows(runs))
+    training, gold, evals = training_rows(runs), gold_rows(runs), eval_rows(runs)
+    write(out / "training_summary.csv", training)
+    write(out / "gold_eval_last_round.csv", gold)
+    write(out / "eval_baselines.csv", evals)
+    write(out / "summary_by_architecture.csv", summary_rows(training, evals, gold))
 
 
 if __name__ == "__main__":
