@@ -476,6 +476,19 @@ def test_hedge_triggers_judge_and_reward_like_concede(make_env):
     assert "HEDGE: partially true" in env.state.debate_history
 
 
+@pytest.mark.parametrize("action,prefix", [
+    (Actions.SUPPORT, "SUPPORT"),
+    (Actions.CONTRADICT, "CONTRADICT"),
+])
+def test_argument_actions_put_only_the_argument_text_in_the_transcript(make_env, action, prefix):
+    env = make_env()
+    env.reset()
+    env.step(Actions.SELECT, 0)
+    payload = {"argument": "the trial shows a benefit", "evidence_ids": [0], "tokens": 56}
+    env.step(action, payload)
+    assert env.state.debate_history == [f"{prefix}: the trial shows a benefit"]
+
+
 # task_success info signal (curriculum performance signal)
 
 def test_finalize_includes_bounded_task_success_in_info(make_env):
