@@ -226,7 +226,11 @@ def _replay_trajectory(env: ClaimEnv, rec: dict, seed_key: str, annotator=None,
                 "source_reward": step.get("reward"),
             }
             if annotator is not None:
+                # The annotator may draw from the global RNG (it falls back to a
+                # random action), which must not change the replayed payloads.
+                replay_state = random.getstate()
                 new_step["annotator_action"] = int(annotator.select_action(obs, list(ACTIONS)))
+                random.setstate(replay_state)
             steps.append(new_step)
             state = next_state
     finally:
@@ -413,6 +417,10 @@ def main():
         if args.relabel:
             from evid_rl_env.agent.llm_client import AnnotatorClient
             annotator = AnnotatorClient(model=args.annotator_model)
+            if not os.environ.get("ANTHROPIC_API_KEY"):
+                # Without a key the client silently returns random actions, which
+                # would be stored as the annotator's labels.
+                parser.error("--relabel needs ANTHROPIC_API_KEY in the environment")
         trajectories = rescore_trajectories(
             _read_jsonl(args.input), train_dataset, lambda ds: ClaimEnv(ds),
             seed=args.seed, annotator=annotator, annotator_model=args.annotator_model,

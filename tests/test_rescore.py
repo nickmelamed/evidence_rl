@@ -118,3 +118,37 @@ def test_best_rollouts_accepts_rescored_files(tmp_path):
     (tmp_path / "r.jsonl").write_text(json.dumps(rec) + "\n")
     out = collect.collect_best_rollouts(0.5, logs_dir=str(tmp_path))
     assert len(out) == 1
+
+
+class _RngUsingAnnotator:
+    def select_action(self, obs, descriptions):
+        return random.randint(0, len(descriptions) - 1)
+
+
+def test_relabel_does_not_change_the_replayed_rewards(factory):
+    records = [_record(actions=("SELECT", "SELECT", "SELECT", "FINALIZE"))]
+    plain = collect.rescore_trajectories(records, TRAIN, factory, seed=3)[0]
+    relabeled = collect.rescore_trajectories(
+        records, TRAIN, factory, seed=3, annotator=_RngUsingAnnotator(), annotator_model="m"
+    )[0]
+    assert [s["reward"] for s in plain["steps"]] == [s["reward"] for s in relabeled["steps"]]
+
+
+def test_main_relabel_refuses_to_run_without_an_api_key(monkeypatch, tmp_path):
+    import sys
+    import types
+
+    path = tmp_path / "t.jsonl"
+    path.write_text(json.dumps(_record()) + "\n")
+    fake_client = types.SimpleNamespace(AnnotatorClient=lambda model: object())
+    monkeypatch.setitem(sys.modules, "evid_rl_env.agent.llm_client", fake_client)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(collect, "_load_train_split", lambda path: TRAIN)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["evid-collect", "--mode", "rescore", "--relabel", "--input", str(path),
+         "--output", str(tmp_path / "out.jsonl")],
+    )
+    with pytest.raises(SystemExit):
+        collect.main()
+    assert not (tmp_path / "out.jsonl").exists()
