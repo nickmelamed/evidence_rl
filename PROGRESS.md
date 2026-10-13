@@ -6,7 +6,7 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Multi-agent debate (Future Work item 2) is built and tested with mocks on `feat/multi-agent-debate`. It has not been run with real models. A tiny end-to-end run needs your approval, and the PR needs review.
+- [ ] Multi-agent debate (Future Work item 2) is built on `feat/multi-agent-debate` and passed a small real-model smoke run on 2026-10-13 (4 training episodes with two gold rounds, then `eval_debate` and a standalone gold audit, 3 episodes each). The branch needs your review and a PR. See the arbiter note under Open questions.
 - [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation. The update fixes are on `main`, so they can start.
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
@@ -15,7 +15,7 @@ is shown to Claude at the start of each session and after compaction.
 The README listed four Future Work items. Item 2 is removed from it on the debate branch. Their state as of 2026-10-12:
 
 1. Re-annotation pipeline: done. `evid-collect --mode rescore` replays recorded actions under the current environment and reward, and `--relabel` adds a strong LLM's action per step (D-017). Checked end to end on 3 trajectories against the real environment and the real Anthropic API.
-2. Multi-agent debate: built and mock-tested on `feat/multi-agent-debate` (D-018), not yet run with real models. See HANDOFF.md, Task 1.
+2. Multi-agent debate: built on `feat/multi-agent-debate` (D-018) and smoke-tested with real models, not yet trained at scale. See HANDOFF.md, Task 1.
 3. Learned reward models: agreed scope is scaffolding only. A pluggable reward model judge type plus training code, tested on synthetic preference pairs. A trained model needs human preference data that this repo does not have.
 4. Domain expansion: agreed scope is scaffolding only. A domain registry, a retriever interface and a per-domain split contract. It needs labeled datasets for each domain, which this repo does not have.
 
@@ -73,7 +73,7 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - [x] Results tables report mean and spread across seeds (`summary_by_architecture.csv`).
 - [x] `evid-collect --mode rescore` and `--relabel` (D-017). `--relabel` exits without `ANTHROPIC_API_KEY`, and relabeling never changes the replayed rewards.
 - [x] `AnnotatorClient.select_action` raises `AnnotatorError` on an API or parse failure. It used to return a random action that `evid-collect` stored as the model's label.
-- [x] Multi-agent debate code (2026-10-13): role masks, `Arbiter`, `DebateEnv`, `DebateTrainer`, `ppo_multiagent_debate.yaml`, `DebateEvaluator`, `eval_debate`, a gold audit of the pair and a debate token budget. Mock-tested only.
+- [x] Multi-agent debate code (2026-10-13): role masks, `Arbiter`, `DebateEnv`, `DebateTrainer`, `ppo_multiagent_debate.yaml`, `DebateEvaluator`, `eval_debate`, a gold audit of the pair and a debate token budget. Smoke-tested with real models on 2026-10-13. The run folder is in `artifacts/smoke_runs/` so it stays out of the results tables.
 - [x] `SUPPORT` and `CONTRADICT` write only the argument text to `debate_history` (2026-10-13). They used `str(payload)`, so the judge and the gold judge read a dict repr. Every earlier run, bandit included, was scored on that text.
 - [x] Fixed the PPO and PG updates (2026-10-13). `ClaimEnv` mutates one `State` in place, so every trajectory entry held the end-of-episode state and each step was updated with the wrong inputs (`7426705`). The updaters also used a plain softmax while `act` sampled from a masked one, so the PPO ratio and entropy were computed on the wrong distribution (`cce5354`). Features and the action mask are now stored at act time and shared through `masked_softmax`.
 
@@ -83,3 +83,4 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - Runs made before `feat/env-rng` cannot be replayed exactly, because their claim order came from the global RNG.
 - Imitation files made by `evid-collect --mode llm_annotator` before the `AnnotatorError` change may contain random actions labeled as the annotator's, wherever an API call failed. The old client only logged a warning. Check the logs for "returning random" before using them.
 - mypy runs with `ignore_missing_imports = true`, because several dependencies ship no stubs.
+- The SmolLM2-1.7B arbiter often echoes the score template, which `LLMJudge` turns into a neutral 0.5. In the smoke run's standalone gold audit all three scored episodes got exactly 0.5 from the arbiter, and the log showed the echo warning. The arbiter may give a weak reward signal. Qwen2.5-3B-Instruct is the other local candidate, and it would need the gold judge kept at Mistral-7B. Decide before the full debate runs.
