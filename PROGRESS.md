@@ -35,7 +35,7 @@ State as of 2026-10-06:
 - `results/tables/summary_by_architecture.csv` groups runs by algorithm and judge architecture and reports the mean and sample standard deviation across seeds.
 - Old rows stay in the results tables, since they are built from every folder in `artifacts/experiments/`. Move the old folders aside before the first new run, with the owner's approval.
 - Claim order is fixed by the seed, so runs made before `feat/env-rng` cannot be compared with the new ones.
-- Every PPO and PG run made before the two fixes under Done (2026-10-13) is invalid, not only the pre-seeding ones. Bandit runs were not affected. The fixes are merged to `main`, so the reruns can start.
+- Every PPO and PG run made before the two fixes under Done (2026-10-13) is invalid, not only the pre-seeding ones. Bandit runs were not affected. The fixes are merged to `main`. A third fix (2026-10-13) changes judge-scored rewards for every algorithm, bandit included: `SUPPORT` and `CONTRADICT` used to put the whole payload dict, with evidence ids and the token count, into the transcript the judge reads, and now put in only the argument text. Do not start the reruns until it is on `main`.
 
 Budget TODO: record the wall-clock time and disk use of the first finished run here, and extrapolate to the rest. Inputs we have: a 10-episode PPO run with one eval round took 13m47s with a cold judge cache and 3m42s with a warm one. Earlier 300-episode runs took roughly a day each (from folder timestamps, not measured). Gold eval at 100 episodes with a 7B judge every 5 eval rounds is a large share of each run. Twelve runs at that rate is a long job, so cut seeds or episodes if the first run confirms it.
 
@@ -73,6 +73,7 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - [x] Results tables report mean and spread across seeds (`summary_by_architecture.csv`).
 - [x] `evid-collect --mode rescore` and `--relabel` (D-017). `--relabel` exits without `ANTHROPIC_API_KEY`, and relabeling never changes the replayed rewards.
 - [x] `AnnotatorClient.select_action` raises `AnnotatorError` on an API or parse failure. It used to return a random action that `evid-collect` stored as the model's label.
+- [x] `SUPPORT` and `CONTRADICT` write only the argument text to `debate_history` (2026-10-13). They used `str(payload)`, so the judge and the gold judge read a dict repr. Every earlier run, bandit included, was scored on that text.
 - [x] Fixed the PPO and PG updates (2026-10-13). `ClaimEnv` mutates one `State` in place, so every trajectory entry held the end-of-episode state and each step was updated with the wrong inputs (`7426705`). The updaters also used a plain softmax while `act` sampled from a masked one, so the PPO ratio and entropy were computed on the wrong distribution (`cce5354`). Features and the action mask are now stored at act time and shared through `masked_softmax`.
 
 ## Open questions for the owner
