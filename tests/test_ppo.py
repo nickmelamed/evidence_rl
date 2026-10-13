@@ -35,16 +35,18 @@ def test_compute_advantages_earlier_steps_have_larger_raw_return():
     assert returns[0] > returns[1] > returns[2]
 
 
-def test_update_runs_and_changes_actor_and_value_params(fake_policy, monkeypatch):
+def test_update_runs_and_changes_actor_and_value_params(fake_policy):
     policy = fake_policy(state_dim=4)
-    monkeypatch.setattr("evid_rl_env.agent.ppo.encode_state", lambda state: policy._features(state))
 
     ppo = PPO(policy, _FakeConfig())
-    states = [State(claim="c", evidence_pool=[], steps_taken=i) for i in range(3)]
+    features = [
+        policy._features(State(claim="c", evidence_pool=[], steps_taken=i)) for i in range(3)
+    ]
+    mask = np.ones(policy.n_actions, dtype=bool)
     trajectories = [
-        (states[0], 0, 0.3, 1.0, 0.0),
-        (states[1], 1, 0.2, -0.5, 0.0),
-        (states[2], 2, 0.1, 2.0, 0.0),
+        (features[0], mask, 0, 0.3, 1.0, 0.0),
+        (features[1], mask, 1, 0.2, -0.5, 0.0),
+        (features[2], mask, 2, 0.1, 2.0, 0.0),
     ]
 
     actor_before = policy.actor_params.copy()
@@ -55,16 +57,15 @@ def test_update_runs_and_changes_actor_and_value_params(fake_policy, monkeypatch
     assert np.all(np.isfinite(policy.value_params))
 
 
-def test_gradient_clipping_bounds_extreme_advantage(fake_policy, monkeypatch):
+def test_gradient_clipping_bounds_extreme_advantage(fake_policy):
     policy = fake_policy(state_dim=4)
-    monkeypatch.setattr("evid_rl_env.agent.ppo.encode_state", lambda state: policy._features(state))
 
     config = _FakeConfig()
     config.max_grad_norm = 0.1
     ppo = PPO(policy, config)
 
-    state = State(claim="c", evidence_pool=[], steps_taken=5)
-    trajectories = [(state, 0, 0.5, 1e6, 0.0)]  # absurdly large reward/advantage
+    features = policy._features(State(claim="c", evidence_pool=[], steps_taken=5))
+    trajectories = [(features, np.ones(policy.n_actions, dtype=bool), 0, 0.5, 1e6, 0.0)]  # absurdly large reward/advantage
 
     ppo.update(trajectories)
     assert np.all(np.isfinite(policy.actor_params))

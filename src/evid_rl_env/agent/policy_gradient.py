@@ -1,6 +1,6 @@
 import numpy as np
 
-from evid_rl_env.agent.policy import encode_state
+from evid_rl_env.agent.policy import masked_softmax
 
 
 class PolicyGradient:
@@ -27,18 +27,17 @@ class PolicyGradient:
         self._episode_count += 1
         effective_lr = self.current_lr
 
-        rewards = [r for (_, _, r) in trajectories]
+        rewards = [r for (_, _, _, r) in trajectories]
 
         mean = np.mean(rewards)
         std = np.std(rewards) + 1e-8
 
-        for state, action_idx, reward in trajectories:
+        for features, mask, action_idx, reward in trajectories:
 
             norm_r = (reward - mean) / std
 
-            # Encode once and pass through so grad_log_prob doesn't re-encode.
-            features = encode_state(state)
-            grad = self.policy.grad_log_prob(state, action_idx, features=features)
+            probs = masked_softmax(features @ self.policy.actor_params, mask)
+            grad = self.policy.grad_log_prob(None, action_idx, features=features, probs=probs)
 
             grad_norm = np.linalg.norm(grad)
             if grad_norm > self.max_grad_norm:
