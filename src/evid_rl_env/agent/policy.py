@@ -58,9 +58,15 @@ class ActorCriticPolicy:
         features = encode_state(state)
         return features @ self.value_params
 
-    def action_mask(self, state):
-        """Return a boolean array that is True for the actions allowed in ``state``."""
+    def action_mask(self, state, allowed_actions=None):
+        """Return a boolean array that is True for the actions allowed in ``state``.
+
+        ``allowed_actions`` restricts the policy to a role, such as a debate side
+        that may not use the opposite argument action. The state rules still apply.
+        """
         mask = np.ones(self.n_actions, dtype=bool)
+        if allowed_actions is not None:
+            mask &= np.array([a in allowed_actions for a in self.actions])
 
         # QUERY / REQUEST_CLARIFICATION share the per-episode query budget
         if state.query_count >= state.max_queries:
@@ -85,14 +91,15 @@ class ActorCriticPolicy:
 
         return mask
 
-    def act(self, state, greedy: bool = False, force_action_idx: int | None = None):
+    def act(self, state, greedy: bool = False, force_action_idx: int | None = None,
+            allowed_actions=None):
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
         # Snapshot the inputs: the env mutates one State in place, so the updater
         # cannot rebuild these from the stored state later.
         features = encode_state(state)
-        mask = self.action_mask(state)
+        mask = self.action_mask(state, allowed_actions)
         self.last_features = features
         self.last_mask = mask
         # Masking before sampling keeps the gradient attribution correct.
