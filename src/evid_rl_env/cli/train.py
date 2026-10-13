@@ -33,6 +33,10 @@ _DEFAULT_CONFIG_PATHS = {
 
 def train_multiagent(train_dataset, config, episodes, seed, exp_name, curriculum):
     """Train the support and contradict policies against the configured arbiter."""
+    if config.arbiter_model == config.gold_judge_model:
+        raise ValueError(
+            f"the gold judge must differ from the arbiter, both are {config.arbiter_model}"
+        )
     arbiter = build_arbiter(config.arbiter_model, seed)
     env = ClaimEnv(train_dataset, judge_model=config.judge_model, seed=seed, llm_judge=arbiter)
 

@@ -1,3 +1,5 @@
+import pytest
+
 from evid_rl_env.agent.config import MultiAgentPPOConfig
 from evid_rl_env.cli import train as train_cli
 
@@ -59,3 +61,14 @@ def test_the_cli_routes_the_multiagent_algo_to_train_multiagent(monkeypatch):
     assert len(train_data) == 8
     assert config.arbiter_model == "HuggingFaceTB/SmolLM2-1.7B-Instruct"
     assert (episodes, seed, exp_name) == (2, 5, "routed")
+
+
+def test_train_multiagent_refuses_an_arbiter_that_is_also_the_gold_judge(monkeypatch):
+    monkeypatch.setattr(train_cli, "build_arbiter",
+                        lambda model, seed: pytest.fail("the arbiter must not be built"))
+    config = MultiAgentPPOConfig()
+    config.arbiter_model = "org/shared"
+    config.gold_judge_model = "org/shared"
+    with pytest.raises(ValueError, match="gold judge"):
+        train_cli.train_multiagent(["claim"], config, episodes=1, seed=0, exp_name="x",
+                                   curriculum=None)
