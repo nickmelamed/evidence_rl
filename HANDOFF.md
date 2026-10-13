@@ -6,7 +6,20 @@ This file is for a fresh conversation. It has two tasks. Task 1 builds the multi
 
 README Future Work item 2. Two independent agents argue the claim, one limited to support and one to contradiction, and a separate arbiter issues the reward. This separates role from policy, so a single agent no longer has to balance the debate itself.
 
-Write the plan into the conversation first and wait for approval, as CLAUDE.md requires for a change that spans several modules and touches the spec. The owner already chose a dedicated arbiter config, meaning the arbiter model is set in YAML and is not tied to the arbiter inside `DebateJudge`. The questions below are still open.
+The plan was approved on 2026-10-13 and the open questions are answered (see "Decisions" below). The full plan is in `~/.claude/plans/woolly-stargazing-metcalfe.md` on the owner's machine and is summarized here. Two things in it still need the owner's approval before code: the new `arbiter_model` config key, and the `DebateEvaluator`.
+
+## Decisions
+
+1. Reward split: the arbiter's score is shared by both roles.
+2. Episode end: fixed turns, 5 per side, then the arbiter scores. `State.max_steps` stays 10.
+3. Evidence: one shared pool and one shared selected set. `State` is unchanged.
+4. Actor model: both policies share one `LLMClient`. The actor heads are numpy matrices, so the client is only used to write payload text. This avoids doubling memory and needs no `ActorCriticPolicy` redesign.
+5. Arbiter model: `HuggingFaceTB/SmolLM2-1.7B-Instruct`, set by `arbiter_model` in YAML. The default Mistral-7B gold judge stays, so the config needs no D-016 exception.
+6. Baselines: compare the debate pair with the single-agent PPO runs on the shared single judge, as `evid-eval` does.
+
+## Already done on main
+
+The PPO and PG updates were fixed on 2026-10-13, and this changes how the role masks are built. `ActorCriticPolicy.action_mask(state)` now builds the boolean mask, `masked_softmax(logits, mask)` in `agent/policy.py` is the one softmax used by `act`, `PPO.update` and `PolicyGradient.update`, and the trainer stores each step's features and mask. The update tuples are `(features, mask, action_idx, old_prob, reward, value)` for PPO and `(features, mask, action_idx, reward)` for PG. The role constraint is therefore a small layer on top: an optional `allowed_actions` argument to `action_mask` that removes `CONTRADICT` for the support role and `SUPPORT` for the contradict role. The masked PPO update test and the "never samples a masked action" test already exist in `tests/test_policy_masks.py`, so the debate tests only need to cover the role layer.
 
 ## What exists today
 
@@ -18,7 +31,7 @@ Write the plan into the conversation first and wait for approval, as CLAUDE.md r
 ## Proposed design
 
 1. `environment/debate_env.py` adds `DebateEnv`, a wrapper over `ClaimEnv` that owns turn order. `ClaimEnv` stays unchanged, so existing runs and their results do not move. Each `DebateEnv.step` takes the role whose turn it is. The observation for a role is built from the same `State` summary the agents see today, so labels never enter it.
-2. Role constraints are action masks. The support role may not use `CONTRADICT` and the contradict role may not use `SUPPORT`. `ActorCriticPolicy.act` and the probability path used by the PPO update need an optional `allowed_actions` argument, and the update must use the masked probabilities so the ratio is computed on the same distribution that sampled the action.
+2. Role constraints are action masks. The support role may not use `CONTRADICT` and the contradict role may not use `SUPPORT`. Add an optional `allowed_actions` argument to `ActorCriticPolicy.action_mask` and `act`. The update already uses the stored mask, so no change to `PPO.update` is needed.
 3. `agent/debate_trainer.py` adds `DebateTrainer`, built on `BaseTrainer`. It holds two policies and two PPO instances, keeps one trajectory per role, and updates each role from its own steps. It writes `policy_support.npz` and `policy_contradict.npz` to the run folder next to the usual `config.json`, `metrics.csv` and `gold_eval.jsonl`.
 4. The arbiter is a new class in `judge/arbiter.py` that reuses `LLMJudge` scoring on the full two-sided transcript. The model name comes from `arbiter_model` in the config. The final reward goes to both roles. How it is split is open question 1.
 5. `configs/ppo_multiagent_debate.yaml` sets both roles' hyperparameters, `arbiter_model` and `gold_judge_model`. The gold judge must differ from the arbiter. If the arbiter is not Mistral-7B, the default gold judge can stay as it is, so this config would not need the D-016 exception.
@@ -28,33 +41,23 @@ Write the plan into the conversation first and wait for approval, as CLAUDE.md r
 
 ## Tests
 
-- A role never samples a masked action. Use a Hypothesis test over random states and logits, plus a hand-worked example.
-- The masked PPO update uses the masked probabilities. Pin it with a two-action example whose answer is known.
-- Turn order alternates and the episode ends on the rule chosen in open question 2.
+- A role never samples an action outside its role mask. Use a Hypothesis test over random states and logits, plus a hand-worked example. The generic mask tests already exist.
+- Turn order alternates and the episode ends after 5 turns per side.
 - Two runs with the same seed give the same transcript and the same rewards. The global RNG state is restored after seeding.
 - Observations and prompts for both roles contain no claim label and no evidence label.
 - The arbiter test uses a mock judge. No test touches the network or loads a model.
 - The gold-judge guard test described above.
 
-## Open questions for the owner
-
-1. Reward split. Is the arbiter's score shared by both roles, or zero-sum, so that the side the arbiter favors gains and the other loses? A shared score rewards a good joint argument. A zero-sum score rewards winning, which is closer to a real debate but can push both sides toward overclaiming.
-2. How does an episode end? Options are a fixed number of turns per side, or either role may call `FINALIZE` and the other gets a last turn. The current step limit is 10 in `State`, which would be 5 turns each.
-3. Evidence. Is the pool and the selected set shared, or does each role select its own evidence? Shared is simpler and keeps `State` intact. Separate selection is a stronger debate but needs a change to `State`.
-4. Actor model. Two gemma-2-2b actors double the memory use on MPS. Sharing one base model between the roles with separate policy heads is cheaper but is a larger change to `ActorCriticPolicy`.
-5. Arbiter model. The owner chose a dedicated arbiter config. Which model? Local candidates are in the Hugging Face cache listed under Task 2. Qwen2.5-3B-Instruct is already used as the debate config's gold judge, so picking it as the arbiter would need a different gold judge.
-6. Baselines. Should the evaluation compare the debate pair with the single-agent PPO runs, and on which reward? The arbiter's score is not the reward the single-agent policies were trained on, so a fair comparison probably needs a shared judge, as `evid-eval` uses today.
-
 ## Order of work
 
-1. Plan approved and open questions answered.
-2. Role masks in the policy and the PPO update, with tests.
+1. Plan approved and questions answered (done).
+2. Role layer on `action_mask` and `act`, with tests.
 3. `DebateEnv` and the arbiter, with tests.
-4. `DebateTrainer` and the config, with the guard test.
+4. `DebateTrainer` and the config, with the guard test. Ask the owner about the `arbiter_model` key first.
 5. `DebateEvaluator`, after the owner approves the evaluation change.
 6. D-018, the SPEC section and the README.
 
-Use a branch named `feat/multi-agent-debate` and Conventional Commits. A tiny end-to-end run of a few episodes with real models needs the owner's approval first, the same as any training run.
+Use a branch named `feat/multi-agent-debate`, cut from the current `main`, and Conventional Commits. A tiny end-to-end run of a few episodes with real models needs the owner's approval first, the same as any training run.
 
 # Task 2: rerun the evaluations
 
@@ -63,7 +66,8 @@ This task trains and evaluates the models. It does not depend on Task 1, because
 ## Where things stand
 
 - All preparation is merged to `main`. Check `git status` and `git log -3` first. The rescore mode and the `AnnotatorError` change are also in, and neither touches training or evaluation.
-- The code is ready to train. A real 10-episode PPO run plus an eval round ran end to end on 2026-10-06, and two identical runs gave identical rewards and weights, one with a cold judge cache and one with a warm one.
+- Two bugs in the PPO and PG updates were fixed and merged on 2026-10-13. `ClaimEnv` mutates one `State` in place, so every step used to be updated with the end-of-episode state, and the updaters used an unmasked softmax while `act` sampled from a masked one. Every PPO and PG run made before that is invalid, so the old experiment folders cannot be compared with new runs for that reason too. Bandit runs were not affected.
+- The code is ready to train. A real 10-episode PPO run plus an eval round ran end to end on 2026-10-06, and two identical runs gave identical rewards and weights, one with a cold judge cache and one with a warm one. That smoke test predates the 2026-10-13 fixes. Before the full runs, ask the owner whether to repeat a short two-run determinism check on the fixed code.
 - Claim order, curriculum, policy init, baseline randomness and each LLM generation are seeded from `--seed`. Results from before this work cannot be compared with new ones.
 - `gold_eval_n_episodes` is 100 in `configs/base.yaml`. The judge caches were emptied and archived in `artifacts/cache_archive/judge_caches_20261006/`. The evidence caches were kept.
 - The debate config audits with `Qwen/Qwen2.5-3B-Instruct`, not Mistral-7B, because the debate arbiter is Mistral-7B (D-016). All other configs use Mistral-7B as the gold judge.

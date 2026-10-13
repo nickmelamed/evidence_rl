@@ -6,8 +6,8 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Build the multi-agent debate (Future Work item 2) in a separate conversation. The plan and the questions that need your answers are in HANDOFF.md, Task 1.
-- [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation.
+- [ ] Build the multi-agent debate (Future Work item 2). The plan is approved and the questions are answered. HANDOFF.md, Task 1 has the decisions and the order of work. The next step is the role layer on `action_mask`, on a fresh `feat/multi-agent-debate` branch.
+- [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation. The update fixes are on `main`, so they can start.
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
 ## Future Work status
@@ -15,7 +15,7 @@ is shown to Claude at the start of each session and after compaction.
 The README lists four Future Work items. Their state as of 2026-10-12:
 
 1. Re-annotation pipeline: done. `evid-collect --mode rescore` replays recorded actions under the current environment and reward, and `--relabel` adds a strong LLM's action per step (D-017). Checked end to end on 3 trajectories against the real environment and the real Anthropic API.
-2. Multi-agent debate: planned, not started. See HANDOFF.md, Task 1.
+2. Multi-agent debate: plan approved on 2026-10-13, code not started. See HANDOFF.md, Task 1.
 3. Learned reward models: agreed scope is scaffolding only. A pluggable reward model judge type plus training code, tested on synthetic preference pairs. A trained model needs human preference data that this repo does not have.
 4. Domain expansion: agreed scope is scaffolding only. A domain registry, a retriever interface and a per-domain split contract. It needs labeled datasets for each domain, which this repo does not have.
 
@@ -35,7 +35,7 @@ State as of 2026-10-06:
 - `results/tables/summary_by_architecture.csv` groups runs by algorithm and judge architecture and reports the mean and sample standard deviation across seeds.
 - Old rows stay in the results tables, since they are built from every folder in `artifacts/experiments/`. Move the old folders aside before the first new run, with the owner's approval.
 - Claim order is fixed by the seed, so runs made before `feat/env-rng` cannot be compared with the new ones.
-- Every PPO and PG run made before the two fixes under Done (2026-10-13) is invalid, not only the pre-seeding ones. Bandit runs were not affected. Do not start the reruns before those fixes are on `main`.
+- Every PPO and PG run made before the two fixes under Done (2026-10-13) is invalid, not only the pre-seeding ones. Bandit runs were not affected. The fixes are merged to `main`, so the reruns can start.
 
 Budget TODO: record the wall-clock time and disk use of the first finished run here, and extrapolate to the rest. Inputs we have: a 10-episode PPO run with one eval round took 13m47s with a cold judge cache and 3m42s with a warm one. Earlier 300-episode runs took roughly a day each (from folder timestamps, not measured). Gold eval at 100 episodes with a 7B judge every 5 eval rounds is a large share of each run. Twelve runs at that rate is a long job, so cut seeds or episodes if the first run confirms it.
 
