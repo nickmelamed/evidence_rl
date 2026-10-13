@@ -24,7 +24,7 @@ def masked_softmax(logits, mask):
     return exp / np.sum(exp)
 
 class ActorCriticPolicy:
-    def __init__(self, n_actions, state_dim=None, model_name=None, seed: int = 42):
+    def __init__(self, n_actions, state_dim=None, model_name=None, seed: int = 42, llm=None):
         if state_dim is None:
             state_dim = get_state_dim()
         self.actions = ACTIONS
@@ -37,9 +37,13 @@ class ActorCriticPolicy:
         # Critic (value function)
         self.value_params = np.zeros(state_dim)
 
-        actor_model = model_name or "google/gemma-2-2b-it"
-        # Propagate seed so LLMClient calls transformers.set_seed once at init.
-        self.llm = LLMClient(model_name=actor_model, seed=seed)
+        if llm is not None:
+            # Policies that only differ in their weights can share one loaded model.
+            self.llm = llm
+        else:
+            actor_model = model_name or "google/gemma-2-2b-it"
+            # Propagate seed so LLMClient calls transformers.set_seed once at init.
+            self.llm = LLMClient(model_name=actor_model, seed=seed)
 
     def reset_episode_cache(self):
         self._arg_cache: dict = {}
