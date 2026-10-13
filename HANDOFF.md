@@ -78,7 +78,7 @@ This task trains and evaluates the models. It does not depend on Task 1, because
 
 Four judge architectures times three seeds (42, 43, 44) is twelve runs. Start with seed 42 for all four and look at the results and timing before launching seeds 43 and 44. The owner said to adjust as needed, so cut seeds or episodes if one run takes too long. After the first run finishes, record its wall-clock time and disk use in PROGRESS.md under "Budget TODO".
 
-Before the first new run, ask the owner to approve moving the old experiment folders to `artifacts/experiments_archive_pre_seeding/`. Otherwise the results tables mix old and new runs. `artifacts/experiments/` is a protected path.
+The owner approved moving the old experiment folders on 2026-10-13, and all 13 are now in `artifacts/experiments_archive_pre_seeding/` (gitignored). `artifacts/experiments/` is empty, so `make results` will only see new runs. The committed tables in `results/tables/` still describe the old runs until the reruns rebuild them. `artifacts/experiments/` is a protected path.
 
 ## Commands
 

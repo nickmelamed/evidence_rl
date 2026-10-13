@@ -33,7 +33,7 @@ State as of 2026-10-06:
 - Tavily has auto-reload on, so running out of credits is not a concern.
 - Three seeds per architecture, as decided. The order and the number of seeds can be adjusted once the first runs show how long they take.
 - `results/tables/summary_by_architecture.csv` groups runs by algorithm and judge architecture and reports the mean and sample standard deviation across seeds.
-- Old rows stay in the results tables, since they are built from every folder in `artifacts/experiments/`. Move the old folders aside before the first new run, with the owner's approval.
+- The 13 old experiment folders were moved to `artifacts/experiments_archive_pre_seeding/` on 2026-10-13 with the owner's approval, so `make results` will only see new runs. The committed tables in `results/tables/` still describe the old runs until the reruns rebuild them.
 - Claim order is fixed by the seed, so runs made before `feat/env-rng` cannot be compared with the new ones.
 - Every PPO and PG run made before the two fixes under Done (2026-10-13) is invalid, not only the pre-seeding ones. Bandit runs were not affected. The fixes are merged to `main`. A third fix (2026-10-13) changes judge-scored rewards for every algorithm, bandit included: `SUPPORT` and `CONTRADICT` used to put the whole payload dict, with evidence ids and the token count, into the transcript the judge reads, and now put in only the argument text. It is merged, so the reruns can start.
 
