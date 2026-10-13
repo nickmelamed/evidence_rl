@@ -72,6 +72,17 @@ def _get_evidence_labeler(model_name: str, seed: int) -> EvidenceLabeler:
     return _evidence_labeler_cache[model_name]
 
 
+def _argument_text(payload) -> str:
+    """Return the argument text of a SUPPORT or CONTRADICT payload.
+
+    The policy sends a dict with the argument, evidence ids and a token count.
+    Only the argument belongs in the transcript the judge reads.
+    """
+    if isinstance(payload, dict):
+        return str(payload.get("argument", ""))
+    return str(payload) if payload else ""
+
+
 def _default_embedder(text: str):
     # Lazy import
     from evid_rl_env.agent.state_encoder import embed_text
@@ -203,8 +214,9 @@ class ClaimEnv:
             ]
 
         elif action == Actions.SUPPORT:
-            if payload:
-                s.debate_history.append("SUPPORT: " + str(payload))
+            text = _argument_text(payload)
+            if text:
+                s.debate_history.append("SUPPORT: " + text)
 
                 partial_reasoning = " ".join(s.debate_history)
                 if s.steps_taken - self._last_judge_step >= 2:
@@ -222,8 +234,9 @@ class ClaimEnv:
 
 
         elif action == Actions.CONTRADICT:
-            if payload:
-                s.debate_history.append("CONTRADICT: " + str(payload))
+            text = _argument_text(payload)
+            if text:
+                s.debate_history.append("CONTRADICT: " + text)
 
                 partial_reasoning = " ".join(s.debate_history)
                 if s.steps_taken - self._last_judge_step >= 2:
