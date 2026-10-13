@@ -40,6 +40,13 @@ class PPOConfig(BaseConfig):
         self.gae_lambda = None
         self.ppo_epochs = None
 
+class MultiAgentPPOConfig(PPOConfig):
+    def __init__(self):
+        super().__init__()
+        self.arbiter_model = None
+        self.turns_per_side = None
+        self.max_tokens_per_episode = None
+
 class PGConfig(BaseConfig):
     def __init__(self):
         super().__init__()

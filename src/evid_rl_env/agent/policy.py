@@ -24,7 +24,7 @@ def masked_softmax(logits, mask):
     return exp / np.sum(exp)
 
 class ActorCriticPolicy:
-    def __init__(self, n_actions, state_dim=None, model_name=None, seed: int = 42):
+    def __init__(self, n_actions, state_dim=None, model_name=None, seed: int = 42, llm=None):
         if state_dim is None:
             state_dim = get_state_dim()
         self.actions = ACTIONS
@@ -37,9 +37,13 @@ class ActorCriticPolicy:
         # Critic (value function)
         self.value_params = np.zeros(state_dim)
 
-        actor_model = model_name or "google/gemma-2-2b-it"
-        # Propagate seed so LLMClient calls transformers.set_seed once at init.
-        self.llm = LLMClient(model_name=actor_model, seed=seed)
+        if llm is not None:
+            # Policies that only differ in their weights can share one loaded model.
+            self.llm = llm
+        else:
+            actor_model = model_name or "google/gemma-2-2b-it"
+            # Propagate seed so LLMClient calls transformers.set_seed once at init.
+            self.llm = LLMClient(model_name=actor_model, seed=seed)
 
     def reset_episode_cache(self):
         self._arg_cache: dict = {}
@@ -58,9 +62,15 @@ class ActorCriticPolicy:
         features = encode_state(state)
         return features @ self.value_params
 
-    def action_mask(self, state):
-        """Return a boolean array that is True for the actions allowed in ``state``."""
+    def action_mask(self, state, allowed_actions=None):
+        """Return a boolean array that is True for the actions allowed in ``state``.
+
+        ``allowed_actions`` restricts the policy to a role, such as a debate side
+        that may not use the opposite argument action. The state rules still apply.
+        """
         mask = np.ones(self.n_actions, dtype=bool)
+        if allowed_actions is not None:
+            mask &= np.array([a in allowed_actions for a in self.actions])
 
         # QUERY / REQUEST_CLARIFICATION share the per-episode query budget
         if state.query_count >= state.max_queries:
@@ -85,14 +95,15 @@ class ActorCriticPolicy:
 
         return mask
 
-    def act(self, state, greedy: bool = False, force_action_idx: int | None = None):
+    def act(self, state, greedy: bool = False, force_action_idx: int | None = None,
+            allowed_actions=None):
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
         # Snapshot the inputs: the env mutates one State in place, so the updater
         # cannot rebuild these from the stored state later.
         features = encode_state(state)
-        mask = self.action_mask(state)
+        mask = self.action_mask(state, allowed_actions)
         self.last_features = features
         self.last_mask = mask
         # Masking before sampling keeps the gradient attribution correct.
@@ -267,7 +278,7 @@ Write a concise argument challenging the reliability or relevance of this eviden
         )
 
     @classmethod
-    def load(cls, path: str, seed: int = 42) -> "ActorCriticPolicy":
+    def load(cls, path: str, seed: int = 42, llm=None) -> "ActorCriticPolicy":
         """Reconstruct a policy from a .npz checkpoint produced by save().
 
         The LLM pipeline is re-initialised from the stored model_name, so the
@@ -277,7 +288,8 @@ Write a concise argument challenging the reliability or relevance of this eviden
         n_actions  = int(data["n_actions"][0])
         state_dim  = int(data["state_dim"][0])
         model_name = str(data["model_name"][0])
-        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name, seed=seed)
+        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name, seed=seed,
+                     llm=llm)
         policy.actor_params = data["actor_params"]
         policy.value_params = data["value_params"]
         return policy

@@ -3,7 +3,7 @@ from pathlib import Path
 
 import yaml
 
-from evid_rl_env.agent.config import BanditConfig, PGConfig, PPOConfig
+from evid_rl_env.agent.config import BanditConfig, MultiAgentPPOConfig, PGConfig, PPOConfig
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ def load_config(path: str):
     """Load base.yaml then deep-merge the algorithm yaml on top (algorithm wins).
 
     Expected algorithm YAML structure:
-      algo: ppo          # or pg / bandit
+      algo: ppo          # or pg / bandit / ppo_multiagent
       rl:
         lr: 0.001
         ...
@@ -44,9 +44,11 @@ def load_config(path: str):
     d = _deep_merge(base, algo_data)
 
     algo = d.get("algo", "ppo")
-    cfg: PPOConfig | PGConfig | BanditConfig
+    cfg: PPOConfig | MultiAgentPPOConfig | PGConfig | BanditConfig
     if algo == "ppo":
         cfg = PPOConfig()
+    elif algo == "ppo_multiagent":
+        cfg = MultiAgentPPOConfig()
     elif algo == "pg":
         cfg = PGConfig()
     elif algo == "bandit":

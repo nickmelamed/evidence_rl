@@ -1,0 +1,22 @@
+algo: ppo_multiagent
+rl:
+  lr: 0.001
+  clip: 0.2
+  entropy_coef: 0.05
+  value_coef: 0.05
+  gamma: 0.99
+  ppo_epochs: 2
+  gae_lambda: 0.95
+  actor_model: "google/gemma-2-2b-it"
+  # Only labels evidence for claims without gold evidence. The arbiter below
+  # produces the reward.
+  judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
+  arbiter_model: "Qwen/Qwen2.5-3B-Instruct"
+  turns_per_side: 5
+  # Safety cap on the tokens one debate may use. A debate that reaches it stops
+  # and is still finalized and scored.
+  max_tokens_per_episode: 6000
+
+# The gold judge audits runs and must not be the arbiter. The default from
+# base.yaml (Mistral-7B) already differs from it.
+gold_judge_model: "mistralai/Mistral-7B-Instruct-v0.2"

@@ -153,3 +153,50 @@ def test_policy_gradient_uses_the_masked_probabilities():
     p0 = np.exp(a) / (np.exp(a) + np.exp(-a))
     assert policy.actor_params[0, 2] == 0.0
     assert policy.actor_params[0, 0] == pytest.approx(a + lr * p0, rel=1e-6)
+
+
+SUPPORT_ROLE = [a for a in ACTIONS if a != Actions.CONTRADICT]
+CONTRADICT_ROLE = [a for a in ACTIONS if a != Actions.SUPPORT]
+
+
+def test_role_mask_hand_example():
+    p = _policy(np.zeros((STATE_DIM, len(ACTIONS))))
+    state = _state(n_selected=1, confidence=0.7, query_count=0)
+    assert _allowed_names(p.action_mask(state)) == set(ACTIONS)
+    assert _allowed_names(p.action_mask(state, allowed_actions=SUPPORT_ROLE)) == (
+        set(ACTIONS) - {Actions.CONTRADICT}
+    )
+    assert _allowed_names(p.action_mask(state, allowed_actions=CONTRADICT_ROLE)) == (
+        set(ACTIONS) - {Actions.SUPPORT}
+    )
+
+
+def test_role_mask_adds_to_the_state_mask():
+    p = _policy(np.zeros((STATE_DIM, len(ACTIONS))))
+    state = _state(n_selected=0, confidence=None, query_count=2)
+    mask = p.action_mask(state, allowed_actions=SUPPORT_ROLE)
+    assert _allowed_names(mask) == {Actions.SELECT, Actions.RERANK}
+
+
+@settings(max_examples=60, deadline=None)
+@given(
+    params=st.lists(st.floats(-5, 5), min_size=STATE_DIM * len(ACTIONS),
+                    max_size=STATE_DIM * len(ACTIONS)),
+    n_selected=st.integers(0, 3),
+    confidence=st.one_of(st.none(), st.floats(0, 1)),
+    query_count=st.integers(0, 2),
+    seed=st.integers(0, 10_000),
+    support_role=st.booleans(),
+)
+def test_a_role_never_samples_its_blocked_action(
+    params, n_selected, confidence, query_count, seed, support_role
+):
+    p = _policy(np.array(params).reshape(STATE_DIM, len(ACTIONS)))
+    allowed = SUPPORT_ROLE if support_role else CONTRADICT_ROLE
+    blocked = ACTIONS.index(Actions.CONTRADICT if support_role else Actions.SUPPORT)
+    np.random.seed(seed)
+    for _ in range(5):
+        _, _, idx = p.act(_state(n_selected, confidence, query_count), allowed_actions=allowed)
+        assert idx != blocked
+        assert p.last_probs[blocked] == 0.0
+        assert not p.last_mask[blocked]

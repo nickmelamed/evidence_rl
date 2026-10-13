@@ -6,16 +6,16 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Build the multi-agent debate (Future Work item 2). The plan is approved and the questions are answered. HANDOFF.md, Task 1 has the decisions and the order of work. The next step is the role layer on `action_mask`, on a fresh `feat/multi-agent-debate` branch.
-- [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation. The update fixes are on `main`, so they can start.
+- [x] Multi-agent debate (Future Work item 2) is merged to `main` as PR #10. The arbiter is Qwen2.5-3B-Instruct (D-020). It passed two small real-model smoke runs and has not been trained at scale.
+- [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation. Everything it needs is on `main` and it is ready to start. The multi-agent debate pair is an optional extra run there and needs your approval.
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
 ## Future Work status
 
-The README lists four Future Work items. Their state as of 2026-10-12:
+The README listed four Future Work items. Item 2 is removed from it. Their state as of 2026-10-12:
 
 1. Re-annotation pipeline: done. `evid-collect --mode rescore` replays recorded actions under the current environment and reward, and `--relabel` adds a strong LLM's action per step (D-017). Checked end to end on 3 trajectories against the real environment and the real Anthropic API.
-2. Multi-agent debate: plan approved on 2026-10-13, code not started. See HANDOFF.md, Task 1.
+2. Multi-agent debate: done and merged (PR #10, D-018, D-020), smoke-tested with real models and not yet trained at scale. See HANDOFF.md, Task 1.
 3. Learned reward models: agreed scope is scaffolding only. A pluggable reward model judge type plus training code, tested on synthetic preference pairs. A trained model needs human preference data that this repo does not have.
 4. Domain expansion: agreed scope is scaffolding only. A domain registry, a retriever interface and a per-domain split contract. It needs labeled datasets for each domain, which this repo does not have.
 
@@ -33,7 +33,7 @@ State as of 2026-10-06:
 - Tavily has auto-reload on, so running out of credits is not a concern.
 - Three seeds per architecture, as decided. The order and the number of seeds can be adjusted once the first runs show how long they take.
 - `results/tables/summary_by_architecture.csv` groups runs by algorithm and judge architecture and reports the mean and sample standard deviation across seeds.
-- Old rows stay in the results tables, since they are built from every folder in `artifacts/experiments/`. Move the old folders aside before the first new run, with the owner's approval.
+- The 13 old experiment folders were moved to `artifacts/experiments_archive_pre_seeding/` on 2026-10-13 with the owner's approval, so `make results` will only see new runs. The committed tables in `results/tables/` still describe the old runs until the reruns rebuild them.
 - Claim order is fixed by the seed, so runs made before `feat/env-rng` cannot be compared with the new ones.
 - Every PPO and PG run made before the two fixes under Done (2026-10-13) is invalid, not only the pre-seeding ones. Bandit runs were not affected. The fixes are merged to `main`. A third fix (2026-10-13) changes judge-scored rewards for every algorithm, bandit included: `SUPPORT` and `CONTRADICT` used to put the whole payload dict, with evidence ids and the token count, into the transcript the judge reads, and now put in only the argument text. It is merged, so the reruns can start.
 
@@ -73,6 +73,7 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - [x] Results tables report mean and spread across seeds (`summary_by_architecture.csv`).
 - [x] `evid-collect --mode rescore` and `--relabel` (D-017). `--relabel` exits without `ANTHROPIC_API_KEY`, and relabeling never changes the replayed rewards.
 - [x] `AnnotatorClient.select_action` raises `AnnotatorError` on an API or parse failure. It used to return a random action that `evid-collect` stored as the model's label.
+- [x] Multi-agent debate code (2026-10-13): role masks, `Arbiter`, `DebateEnv`, `DebateTrainer`, `ppo_multiagent_debate.yaml`, `DebateEvaluator`, `eval_debate`, a gold audit of the pair and a debate token budget. Smoke-tested with real models on 2026-10-13. The run folder is in `artifacts/smoke_runs/` so it stays out of the results tables.
 - [x] `SUPPORT` and `CONTRADICT` write only the argument text to `debate_history` (2026-10-13). They used `str(payload)`, so the judge and the gold judge read a dict repr. Every earlier run, bandit included, was scored on that text.
 - [x] Fixed the PPO and PG updates (2026-10-13). `ClaimEnv` mutates one `State` in place, so every trajectory entry held the end-of-episode state and each step was updated with the wrong inputs (`7426705`). The updaters also used a plain softmax while `act` sampled from a masked one, so the PPO ratio and entropy were computed on the wrong distribution (`cce5354`). Features and the action mask are now stored at act time and shared through `masked_softmax`.
 
@@ -82,3 +83,4 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - Runs made before `feat/env-rng` cannot be replayed exactly, because their claim order came from the global RNG.
 - Imitation files made by `evid-collect --mode llm_annotator` before the `AnnotatorError` change may contain random actions labeled as the annotator's, wherever an API call failed. The old client only logged a warning. Check the logs for "returning random" before using them.
 - mypy runs with `ignore_missing_imports = true`, because several dependencies ship no stubs.
+- The debate arbiter was changed from SmolLM2-1.7B to Qwen2.5-3B-Instruct on 2026-10-13, because SmolLM2 often echoed the score template and could not tell a matched debate from a mismatched one (D-020). The first smoke run in `artifacts/smoke_runs/` used SmolLM2. A second one with the Qwen arbiter (4 training episodes with two gold rounds, then `eval_debate` and a standalone gold audit) also ran clean, with no template-echo warnings and every gold round scoring all of its episodes.

@@ -20,6 +20,7 @@ is possible because:
 import numpy as np
 import pytest
 
+from evid_rl_env.agent.policy import masked_softmax
 from evid_rl_env.environment.actions import ACTIONS, Actions
 from evid_rl_env.environment.environment import ClaimEnv
 from evid_rl_env.environment.state import Evidence
@@ -186,10 +187,15 @@ class FakePolicy:
     def get_value(self, state):
         return float(self._features(state) @ self.value_params)
 
-    def act(self, state, greedy: bool = False, force_action_idx: int = None):
-        probs = self.get_probs(state)
-        self.last_features = self._features(state)
-        self.last_mask = np.ones(self.n_actions, dtype=bool)
+    def act(self, state, greedy: bool = False, force_action_idx: int = None,
+            allowed_actions=None):
+        features = self._features(state)
+        mask = np.ones(self.n_actions, dtype=bool)
+        if allowed_actions is not None:
+            mask = np.array([a in allowed_actions for a in self.actions])
+        probs = masked_softmax(features @ self.actor_params, mask)
+        self.last_features = features
+        self.last_mask = mask
         self.last_probs = probs.copy()
         self.last_entropy = float(-np.sum(probs * np.log(probs + 1e-8)))
 
