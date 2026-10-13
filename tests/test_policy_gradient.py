@@ -42,10 +42,11 @@ def test_update_runs_and_changes_actor_params(fake_policy):
     features = [
         policy._features(State(claim="c", evidence_pool=[], steps_taken=i)) for i in range(3)
     ]
+    mask = np.ones(policy.n_actions, dtype=bool)
     trajectories = [
-        (features[0], 0, 1.0),
-        (features[1], 1, -1.0),
-        (features[2], 2, 2.0),
+        (features[0], mask, 0, 1.0),
+        (features[1], mask, 1, -1.0),
+        (features[2], mask, 2, 2.0),
     ]
 
     actor_before = policy.actor_params.copy()
@@ -63,7 +64,8 @@ def test_gradient_clipping_bounds_extreme_reward(fake_policy):
     pg = PolicyGradient(policy, config)
 
     features = policy._features(State(claim="c", evidence_pool=[], steps_taken=0))
-    trajectories = [(features, 0, 1e6), (features, 1, -1e6)]
+    mask = np.ones(policy.n_actions, dtype=bool)
+    trajectories = [(features, mask, 0, 1e6), (features, mask, 1, -1e6)]
 
     pg.update(trajectories)
     assert np.all(np.isfinite(policy.actor_params))

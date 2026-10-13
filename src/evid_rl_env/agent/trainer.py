@@ -97,6 +97,7 @@ class Trainer(BaseTrainer):
 
                 prob = self.policy.last_probs[action_idx]   # already computed inside act()
                 features = self.policy.last_features
+                mask = self.policy.last_mask
                 value = self.policy.get_value(state)
 
                 # env step
@@ -119,6 +120,7 @@ class Trainer(BaseTrainer):
                 # store unified trajectory
                 trajectory.append({
                     "features": features,
+                    "mask": mask,
                     "action_idx": action_idx,
                     "reward": reward,
                     "prob": prob,
@@ -170,13 +172,13 @@ class Trainer(BaseTrainer):
             # episode-level policy update
             if self.algo == "ppo":
                 self.rl.update([
-                    (t["features"], t["action_idx"], t["prob"], t["reward"], t["value"])
+                    (t["features"], t["mask"], t["action_idx"], t["prob"], t["reward"], t["value"])
                     for t in trajectory
                 ])
 
             elif self.algo == "pg":
                 self.rl.update([
-                    (t["features"], t["action_idx"], t["reward"])
+                    (t["features"], t["mask"], t["action_idx"], t["reward"])
                     for t in trajectory
                 ])
 

@@ -11,6 +11,18 @@ STATE_DIM = get_state_dim()
 def encode_state(state):
     return encode_state_semantic(state)
 
+
+def masked_softmax(logits, mask):
+    """Return the softmax of ``logits`` restricted to the actions where ``mask`` is True.
+
+    Masked actions get probability exactly zero. The sampler and both updaters
+    use this one function so they see the same distribution.
+    """
+    shifted = np.where(mask, logits, -np.inf)
+    shifted = shifted - np.max(shifted)
+    exp = np.exp(shifted)
+    return exp / np.sum(exp)
+
 class ActorCriticPolicy:
     def __init__(self, n_actions, state_dim=None, model_name=None, seed: int = 42):
         if state_dim is None:
@@ -46,6 +58,33 @@ class ActorCriticPolicy:
         features = encode_state(state)
         return features @ self.value_params
 
+    def action_mask(self, state):
+        """Return a boolean array that is True for the actions allowed in ``state``."""
+        mask = np.ones(self.n_actions, dtype=bool)
+
+        # QUERY / REQUEST_CLARIFICATION share the per-episode query budget
+        if state.query_count >= state.max_queries:
+            mask[self.actions.index(Actions.QUERY)] = False
+            mask[self.actions.index(Actions.REQUEST_CLARIFICATION)] = False
+
+        # Argument-generating and evidence-removing actions need selected evidence.
+        if not state.selected_evidence and state.evidence_pool:
+            for a in (Actions.SUPPORT, Actions.CONTRADICT,
+                      Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE,
+                      Actions.ASSIGN_CONFIDENCE, Actions.CHALLENGE_EVIDENCE,
+                      Actions.HEDGE):
+                mask[self.actions.index(a)] = False
+
+        # FINALIZE needs an explicit confidence, so it never falls back to the
+        # evidence-count heuristic, which has no relation to whether the claim is
+        # true. With an empty pool there is no path to a confidence, so FINALIZE
+        # stays available and hits the environment's zero-evidence penalty
+        # instead of deadlocking.
+        if state.confidence is None and state.evidence_pool:
+            mask[self.actions.index(Actions.FINALIZE)] = False
+
+        return mask
+
     def act(self, state, greedy: bool = False, force_action_idx: int | None = None):
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
@@ -53,42 +92,11 @@ class ActorCriticPolicy:
         # Snapshot the inputs: the env mutates one State in place, so the updater
         # cannot rebuild these from the stored state later.
         features = encode_state(state)
+        mask = self.action_mask(state)
         self.last_features = features
-        logits = features @ self.actor_params
-        logits -= np.max(logits)
-        probs = np.exp(logits)
-        probs /= probs.sum()
-
-        # Mask 1: QUERY / REQUEST_CLARIFICATION share the per-episode query budget
-        if state.query_count >= state.max_queries:
-            probs[self.actions.index(Actions.QUERY)] = 0
-            probs[self.actions.index(Actions.REQUEST_CLARIFICATION)] = 0
-            probs /= probs.sum()
-
-        # Mask 2: argument-generating and evidence-removing actions require at least
-        # one piece of evidence to be selected first.
+        self.last_mask = mask
         # Masking before sampling keeps the gradient attribution correct.
-        if not state.selected_evidence and state.evidence_pool:
-            for _a in (Actions.SUPPORT, Actions.CONTRADICT,
-                       Actions.CONCEDE, Actions.SUMMARIZE, Actions.REMOVE,
-                       Actions.ASSIGN_CONFIDENCE, Actions.CHALLENGE_EVIDENCE,
-                       Actions.HEDGE):
-                probs[self.actions.index(_a)] = 0
-            _s = probs.sum()
-            probs /= _s if _s > 0 else 1.0
-
-        # Mask 3: FINALIZE requires the agent to have explicitly assigned a
-        # confidence first, so FINALIZE can never fall back to the
-        # evidence-count heuristic (which has no relationship to whether the
-        # claim is actually true). Only enforced when there's evidence to
-        # work with, if the pool is empty the agent has no path to
-        # ASSIGN_CONFIDENCE either (Mask 2 requires evidence too), so
-        # FINALIZE is left available and hits the environment's
-        # zero-evidence penalty instead of creating a deadlock.
-        if state.confidence is None and state.evidence_pool:
-            probs[self.actions.index(Actions.FINALIZE)] = 0
-            _s = probs.sum()
-            probs /= _s if _s > 0 else 1.0
+        probs = masked_softmax(features @ self.actor_params, mask)
 
         self.last_entropy = float(-np.sum(probs * np.log(probs + 1e-8)))
         self.last_probs = probs.copy()

@@ -42,10 +42,11 @@ def test_update_runs_and_changes_actor_and_value_params(fake_policy):
     features = [
         policy._features(State(claim="c", evidence_pool=[], steps_taken=i)) for i in range(3)
     ]
+    mask = np.ones(policy.n_actions, dtype=bool)
     trajectories = [
-        (features[0], 0, 0.3, 1.0, 0.0),
-        (features[1], 1, 0.2, -0.5, 0.0),
-        (features[2], 2, 0.1, 2.0, 0.0),
+        (features[0], mask, 0, 0.3, 1.0, 0.0),
+        (features[1], mask, 1, 0.2, -0.5, 0.0),
+        (features[2], mask, 2, 0.1, 2.0, 0.0),
     ]
 
     actor_before = policy.actor_params.copy()
@@ -64,7 +65,7 @@ def test_gradient_clipping_bounds_extreme_advantage(fake_policy):
     ppo = PPO(policy, config)
 
     features = policy._features(State(claim="c", evidence_pool=[], steps_taken=5))
-    trajectories = [(features, 0, 0.5, 1e6, 0.0)]  # absurdly large reward/advantage
+    trajectories = [(features, np.ones(policy.n_actions, dtype=bool), 0, 0.5, 1e6, 0.0)]  # absurdly large reward/advantage
 
     ppo.update(trajectories)
     assert np.all(np.isfinite(policy.actor_params))

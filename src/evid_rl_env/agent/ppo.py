@@ -2,6 +2,8 @@ from typing import Any
 
 import numpy as np
 
+from evid_rl_env.agent.policy import masked_softmax
+
 
 class PPO:
     def __init__(self, policy, config):
@@ -32,18 +34,15 @@ class PPO:
         return returns, advantages
 
     def update(self, trajectories):
-        all_features, actions, old_probs, rewards, values = zip(*trajectories)
+        all_features, masks, actions, old_probs, rewards, values = zip(*trajectories)
 
         returns, advantages = self.compute_advantages(list(rewards), list(values))
 
         for _ in range(self.K):
-            for features, action_idx, old_prob, ret, adv in zip(
-                all_features, actions, old_probs, returns, advantages
+            for features, mask, action_idx, old_prob, ret, adv in zip(
+                all_features, masks, actions, old_probs, returns, advantages
             ):
-                logits = features @ self.policy.actor_params
-                logits -= np.max(logits)
-                exp = np.exp(logits)
-                probs = exp / np.sum(exp)
+                probs = masked_softmax(features @ self.policy.actor_params, mask)
                 new_prob = probs[action_idx]
 
                 ratio = new_prob / (old_prob + 1e-8)
