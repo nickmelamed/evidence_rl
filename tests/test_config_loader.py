@@ -76,7 +76,7 @@ def test_gold_judge_is_never_one_of_the_training_judges():
 def test_multiagent_config_sets_the_arbiter_and_the_turn_count():
     algo, cfg = load_config("configs/ppo_multiagent_debate.yaml")
     assert algo == "ppo_multiagent"
-    assert cfg.arbiter_model == "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    assert cfg.arbiter_model == "Qwen/Qwen2.5-3B-Instruct"
     assert cfg.turns_per_side == 5
     assert cfg.max_tokens_per_episode > 2000
     assert cfg.gold_judge_model != cfg.arbiter_model

@@ -6,7 +6,7 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Multi-agent debate (Future Work item 2) is built on `feat/multi-agent-debate` and passed a small real-model smoke run on 2026-10-13 (4 training episodes with two gold rounds, then `eval_debate` and a standalone gold audit, 3 episodes each). The branch needs your review and a PR. See the arbiter note under Open questions.
+- [ ] Multi-agent debate (Future Work item 2) is built on `feat/multi-agent-debate` and passed a small real-model smoke run on 2026-10-13 (4 training episodes with two gold rounds, then `eval_debate` and a standalone gold audit, 3 episodes each). The branch needs your review and a PR. The arbiter is now Qwen2.5-3B-Instruct (D-020).
 - [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation. The update fixes are on `main`, so they can start.
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
@@ -83,4 +83,4 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - Runs made before `feat/env-rng` cannot be replayed exactly, because their claim order came from the global RNG.
 - Imitation files made by `evid-collect --mode llm_annotator` before the `AnnotatorError` change may contain random actions labeled as the annotator's, wherever an API call failed. The old client only logged a warning. Check the logs for "returning random" before using them.
 - mypy runs with `ignore_missing_imports = true`, because several dependencies ship no stubs.
-- The SmolLM2-1.7B arbiter often echoes the score template, which `LLMJudge` turns into a neutral 0.5. In the smoke run's standalone gold audit all three scored episodes got exactly 0.5 from the arbiter, and the log showed the echo warning. The arbiter may give a weak reward signal. Qwen2.5-3B-Instruct is the other local candidate, and it would need the gold judge kept at Mistral-7B. Decide before the full debate runs.
+- The debate arbiter was changed from SmolLM2-1.7B to Qwen2.5-3B-Instruct on 2026-10-13, because SmolLM2 often echoed the score template and could not tell a matched debate from a mismatched one (D-020). The smoke run in `artifacts/smoke_runs/` used SmolLM2.

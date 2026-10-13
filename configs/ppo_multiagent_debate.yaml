@@ -11,7 +11,7 @@ rl:
   # Only labels evidence for claims without gold evidence. The arbiter below
   # produces the reward.
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
-  arbiter_model: "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+  arbiter_model: "Qwen/Qwen2.5-3B-Instruct"
   turns_per_side: 5
   # Safety cap on the tokens one debate may use. A debate that reaches it stops
   # and is still finalized and scored.

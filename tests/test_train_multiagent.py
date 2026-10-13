@@ -66,7 +66,7 @@ def test_the_cli_routes_the_multiagent_algo_to_train_multiagent(monkeypatch):
     assert len(train_data) == 8
     assert len(eval_data) == 2
     assert eval_every == 10
-    assert config.arbiter_model == "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    assert config.arbiter_model == "Qwen/Qwen2.5-3B-Instruct"
     assert (episodes, seed, exp_name) == (2, 5, "routed")
 
 

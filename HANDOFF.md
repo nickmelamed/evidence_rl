@@ -4,7 +4,7 @@ This file is for a fresh conversation. It has two tasks. Task 1 builds the multi
 
 # Task 1: multi-agent debate
 
-Status on 2026-10-13: built on `feat/multi-agent-debate` and covered by mock tests (D-018, SPEC section 8, README). The gold audit of the pair and a debate token budget are also built. A real-model smoke run passed on 2026-10-13 (training, both gold paths, `eval_debate`). What is left is the owner's review and the arbiter question in PROGRESS.md (SmolLM2 often echoes the score template). The rest of this section is the original plan and decisions, kept for reference.
+Status on 2026-10-13: built on `feat/multi-agent-debate` and covered by mock tests (D-018, SPEC section 8, README). The gold audit of the pair and a debate token budget are also built. A real-model smoke run passed on 2026-10-13 (training, both gold paths, `eval_debate`). What is left is the owner's review. The arbiter was switched to Qwen2.5-3B-Instruct after SmolLM2 often echoed the score template (D-020). The rest of this section is the original plan and decisions, kept for reference.
 
 README Future Work item 2. Two independent agents argue the claim, one limited to support and one to contradiction, and a separate arbiter issues the reward. This separates role from policy, so a single agent no longer has to balance the debate itself.
 
@@ -16,7 +16,7 @@ The plan was approved on 2026-10-13 and the open questions are answered (see "De
 2. Episode end: fixed turns, 5 per side, then the arbiter scores. `State.max_steps` stays 10.
 3. Evidence: one shared pool and one shared selected set. `State` is unchanged.
 4. Actor model: both policies share one `LLMClient`. The actor heads are numpy matrices, so the client is only used to write payload text. This avoids doubling memory and needs no `ActorCriticPolicy` redesign.
-5. Arbiter model: `HuggingFaceTB/SmolLM2-1.7B-Instruct`, set by `arbiter_model` in YAML. The default Mistral-7B gold judge stays, so the config needs no D-016 exception.
+5. Arbiter model: `Qwen/Qwen2.5-3B-Instruct` (changed from SmolLM2-1.7B-Instruct after a format test, see D-020), set by `arbiter_model` in YAML. The default Mistral-7B gold judge stays, so the config needs no D-016 exception.
 6. Baselines: compare the debate pair with the single-agent PPO runs on the shared single judge, as `evid-eval` does.
 
 ## Already done on main
