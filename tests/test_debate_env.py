@@ -115,3 +115,36 @@ def test_the_observation_does_not_depend_on_evidence_labels(debate):
 def test_too_few_turns_is_rejected(make_env):
     with pytest.raises(ValueError):
         DebateEnv(make_env(dataset=DATASET), turns_per_side=1)
+
+
+def _run_turns(debate, n, action=Actions.SELECT):
+    """Play ``n`` turns of selecting evidence 0, 1, 2 in order."""
+    for i in range(n):
+        debate.step(action, i % 3)
+
+
+def test_the_last_turn_must_assign_a_confidence_when_none_was_set(debate):
+    debate.reset()
+    _run_turns(debate, 9)
+    assert debate.role == "contradict"
+    assert debate.current_allowed_actions() == [Actions.ASSIGN_CONFIDENCE]
+    with pytest.raises(ValueError):
+        debate.step(Actions.CONTRADICT, ARGUMENT)
+    _, _, done, info = debate.step(Actions.ASSIGN_CONFIDENCE, 0.7)
+    assert done
+    assert debate.env.state.confidence == 0.7
+
+
+def test_no_confidence_is_forced_once_one_was_assigned(debate):
+    debate.reset()
+    debate.step(Actions.SELECT, 0)
+    debate.step(Actions.ASSIGN_CONFIDENCE, 0.4)
+    _run_turns(debate, 7)
+    assert debate.current_allowed_actions() == CONTRADICT_ROLE
+
+
+def test_no_confidence_is_forced_when_no_evidence_was_selected(debate):
+    debate.reset()
+    for _ in range(9):
+        debate.step(Actions.RERANK, None)
+    assert debate.current_allowed_actions() == CONTRADICT_ROLE

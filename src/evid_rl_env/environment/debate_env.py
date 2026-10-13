@@ -13,7 +13,9 @@ class DebateEnv:
 
     Both roles share the evidence pool, the selected set and the transcript.
     ``step`` takes the action of whichever role is up and returns that step's
-    reward. After the last turn the environment runs FINALIZE itself, so the
+    reward. If no confidence has been assigned by the last turn, that turn must
+    assign one, so the final score does not fall back to the evidence-count
+    guess. After the last turn the environment runs FINALIZE itself, so the
     arbiter that backs the ``ClaimEnv`` scores the full transcript. That reward
     comes back in ``info["final_reward"]`` and belongs to both roles.
     """
@@ -41,6 +43,16 @@ class DebateEnv:
     def allowed_actions(role: str) -> list:
         return _ROLE_ACTIONS[role]
 
+    def current_allowed_actions(self) -> list:
+        """Return the actions the role whose turn it is may take now."""
+        state = self.env.state
+        last_turn = self._turn == self.total_turns - 1
+        # With nothing selected, ASSIGN_CONFIDENCE is not available to any policy,
+        # so forcing it would leave the role with no action.
+        if last_turn and state.confidence is None and state.selected_evidence:
+            return [Actions.ASSIGN_CONFIDENCE]
+        return self.allowed_actions(self.role)
+
     def reset(self):
         state = self.env.reset()
         # One step past the last turn, so the forced FINALIZE is not cut off by
@@ -52,7 +64,7 @@ class DebateEnv:
     def step(self, action, payload):
         if self._turn >= self.total_turns:
             raise RuntimeError("the debate is over, call reset()")
-        if action not in self.allowed_actions(self.role):
+        if action not in self.current_allowed_actions():
             raise ValueError(f"{self.role} may not use {action}")
 
         state, reward, done, info = self.env.step(action, payload)
