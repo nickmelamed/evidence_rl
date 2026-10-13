@@ -2,10 +2,12 @@
 CLI entry point: evid-collect
 
 Collects labeled trajectories for imitation learning / offline RL.
-Three modes:
+Four modes:
   llm_annotator: strong LLM selects actions (AnnotatorClient)
   reward_filtered: random rollouts, keep top-k% by reward
   best_rollouts: load existing JSONL files from logs/, filter by min-reward
+  rescore: replay the actions of an existing JSONL file under the current
+    environment and reward, optionally adding a strong LLM's action per step
 
 Output: newline-delimited JSON, one trajectory object per line.
 """
@@ -38,7 +40,9 @@ N_ACTIONS = len(ACTIONS)
 
 # define the set of modes that originate from training-only collection;
 # best_rollouts uses this to filter out any stray non-training records
-_TRAIN_COLLECTION_MODES = frozenset({"llm_annotator", "reward_filtered", "best_rollouts"})
+_TRAIN_COLLECTION_MODES = frozenset(
+    {"llm_annotator", "reward_filtered", "best_rollouts", "rescored"}
+)
 
 
 # dataset helpers 
@@ -186,6 +190,119 @@ def collect_best_rollouts(min_reward: float, logs_dir: str = "logs") -> list:
     return selected
 
 
+# Rescore mode 
+
+def _replay_trajectory(env: ClaimEnv, rec: dict, seed_key: str, annotator=None,
+                       annotator_model: str | None = None) -> dict:
+    """Replay the recorded action indices of ``rec`` in ``env`` and score them again.
+
+    Trajectories store the action index but not the payload, so the payloads are
+    rebuilt. The global RNG is seeded from ``seed_key`` for the replay and
+    restored afterwards, which makes the rebuilt payloads repeatable. The new
+    reward is therefore the reward of a seeded replay, not of the original episode.
+    """
+    saved_state = random.getstate()
+    random.seed(seed_key)
+    try:
+        state = env.reset()
+        steps = []
+        total_reward = 0.0
+        done = False
+        recorded = rec.get("steps", [])
+        for step in recorded:
+            if done:
+                break
+            obs = _state_summary(state)
+            action_idx = int(np.clip(int(step["action"]), 0, N_ACTIONS - 1))
+            action = ACTIONS[action_idx]
+            next_state, reward, done, _ = env.step(action, _build_payload(action, state))
+            total_reward += reward
+            new_step = {
+                "obs": obs,
+                "action": action_idx,
+                "reward": float(reward),
+                "next_obs": _state_summary(next_state),
+                "done": done,
+                "source_reward": step.get("reward"),
+            }
+            if annotator is not None:
+                # The annotator may draw from the global RNG (it falls back to a
+                # random action), which must not change the replayed payloads.
+                replay_state = random.getstate()
+                new_step["annotator_action"] = int(annotator.select_action(obs, list(ACTIONS)))
+                random.setstate(replay_state)
+            steps.append(new_step)
+            state = next_state
+    finally:
+        random.setstate(saved_state)
+
+    out = {
+        "claim": rec["claim"],
+        "annotator_model": rec.get("annotator_model"),
+        "mode": "rescored",
+        "source_mode": rec.get("mode"),
+        "collected_at": rec.get("collected_at"),
+        "rescored_at": datetime.now(timezone.utc).isoformat(),
+        "source_total_reward": rec.get("total_reward"),
+        "total_reward": float(total_reward),
+        "steps_dropped": len(recorded) - len(steps),
+        "steps": steps,
+    }
+    if annotator is not None:
+        out["relabel_model"] = annotator_model
+    return out
+
+
+def rescore_trajectories(records: list, train_dataset: list, env_factory, seed: int = 0,
+                         annotator=None, annotator_model: str | None = None) -> list:
+    """Replay existing trajectories under the current environment and reward.
+
+    Only records for claims in ``train_dataset`` with a training collection mode
+    are kept. Anything else is skipped, so eval claims cannot enter the imitation
+    data through an old file. ``env_factory`` gets a one-claim dataset and returns
+    an environment.
+    """
+    by_claim = {s["claim"]: s for s in train_dataset}
+    rescored = []
+    skipped_split = skipped_mode = 0
+    for i, rec in enumerate(records):
+        claim = rec.get("claim")
+        if claim not in by_claim:
+            skipped_split += 1
+            continue
+        if rec.get("mode") not in _TRAIN_COLLECTION_MODES:
+            skipped_mode += 1
+            continue
+        env = env_factory([by_claim[claim]])
+        rescored.append(
+            _replay_trajectory(env, rec, f"{seed}:{i}:{claim}", annotator, annotator_model)
+        )
+        logger.info(
+            "rescore %d/%d | reward %s -> %.3f",
+            i + 1, len(records), rec.get("total_reward"), rescored[-1]["total_reward"],
+        )
+    if skipped_split or skipped_mode:
+        logger.warning(
+            "rescore: skipped %d records outside the training split and %d with an "
+            "unrecognized mode", skipped_split, skipped_mode,
+        )
+    return rescored
+
+
+def _read_jsonl(path: str) -> list:
+    records = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return records
+
+
 # Output 
 
 def _write_jsonl(trajectories: list, output_path: str) -> None:
@@ -222,7 +339,7 @@ def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["llm_annotator", "reward_filtered", "best_rollouts"],
+        choices=["llm_annotator", "reward_filtered", "best_rollouts", "rescore"],
         default="llm_annotator",
     )
     parser.add_argument("--n-episodes", type=int, default=50)
@@ -244,6 +361,16 @@ def main():
         help="Anthropic model string for llm_annotator mode.",
     )
     parser.add_argument(
+        "--input",
+        default=None,
+        help="Trajectory JSONL to replay in rescore mode.",
+    )
+    parser.add_argument(
+        "--relabel",
+        action="store_true",
+        help="In rescore mode, also ask --annotator-model for an action at each step.",
+    )
+    parser.add_argument(
         "--output",
         default="data/trajectories.jsonl",
         help="Output JSONL path.",
@@ -257,6 +384,12 @@ def main():
              "Does not affect the train/eval split (always seed 42).",
     )
     args = parser.parse_args()
+
+    if args.mode == "rescore":
+        if not args.input:
+            parser.error("--input is required in rescore mode")
+        if os.path.abspath(args.input) == os.path.abspath(args.output):
+            parser.error("--output must differ from --input, rescoring never overwrites")
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -278,6 +411,20 @@ def main():
 
     elif args.mode == "best_rollouts":
         trajectories = collect_best_rollouts(args.min_reward)
+
+    elif args.mode == "rescore":
+        annotator = None
+        if args.relabel:
+            from evid_rl_env.agent.llm_client import AnnotatorClient
+            annotator = AnnotatorClient(model=args.annotator_model)
+            if not os.environ.get("ANTHROPIC_API_KEY"):
+                # Without a key the client silently returns random actions, which
+                # would be stored as the annotator's labels.
+                parser.error("--relabel needs ANTHROPIC_API_KEY in the environment")
+        trajectories = rescore_trajectories(
+            _read_jsonl(args.input), train_dataset, lambda ds: ClaimEnv(ds),
+            seed=args.seed, annotator=annotator, annotator_model=args.annotator_model,
+        )
 
     _write_jsonl(trajectories, args.output)
     _print_summary(trajectories, args.output)

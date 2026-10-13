@@ -6,8 +6,20 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Run the reruns from HANDOFF.md in a separate conversation.
+- [ ] Build the multi-agent debate (Future Work item 2) in a separate conversation. The plan and the questions that need your answers are in HANDOFF.md, Task 1.
+- [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation.
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
+
+## Future Work status
+
+The README lists four Future Work items. Their state as of 2026-10-12:
+
+1. Re-annotation pipeline: done. `evid-collect --mode rescore` replays recorded actions under the current environment and reward, and `--relabel` adds a strong LLM's action per step (D-017). Checked end to end on 3 trajectories against the real environment and the real Anthropic API.
+2. Multi-agent debate: planned, not started. See HANDOFF.md, Task 1.
+3. Learned reward models: agreed scope is scaffolding only. A pluggable reward model judge type plus training code, tested on synthetic preference pairs. A trained model needs human preference data that this repo does not have.
+4. Domain expansion: agreed scope is scaffolding only. A domain registry, a retriever interface and a per-domain split contract. It needs labeled datasets for each domain, which this repo does not have.
+
+Items 3 and 4 change the reward and the data loading, so each needs a short plan and your approval before code.
 
 ## Rerun plan
 
@@ -40,7 +52,7 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 
 ## Next
 
-
+- [ ] Scaffolding for Future Work items 3 and 4, after item 2.
 - [ ] Rerun the PPO, PG and bandit evaluations. The three runs in `results/tables/eval_baselines.csv` predate the reward and judge changes of July 2026.
 - [ ] Add `ruff format --check` only if you want the repo reformatted.
 
@@ -58,9 +70,12 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - [x] Judge caches emptied and archived, gold eval raised to 100 episodes.
 - [x] Debate config uses a different gold judge (D-016), with a guard test.
 - [x] Results tables report mean and spread across seeds (`summary_by_architecture.csv`).
+- [x] `evid-collect --mode rescore` and `--relabel` (D-017). `--relabel` exits without `ANTHROPIC_API_KEY`, and relabeling never changes the replayed rewards.
+- [x] `AnnotatorClient.select_action` raises `AnnotatorError` on an API or parse failure. It used to return a random action that `evid-collect` stored as the model's label.
 
 ## Open questions for the owner
 
 - Trajectory and log files made by `evid-collect` before `1d98db8` replayed the same random stream whatever `--seed` was. They were not regenerated. Decide whether any imitation data or results that depended on them need recollecting.
 - Runs made before `feat/env-rng` cannot be replayed exactly, because their claim order came from the global RNG.
+- Imitation files made by `evid-collect --mode llm_annotator` before the `AnnotatorError` change may contain random actions labeled as the annotator's, wherever an API call failed. The old client only logged a warning. Check the logs for "returning random" before using them.
 - mypy runs with `ignore_missing_imports = true`, because several dependencies ship no stubs.

@@ -332,6 +332,17 @@ make collect-n n=100
 
 Output is a JSONL file (one trajectory per line) compatible with the `imitation` baseline.
 
+To re-score trajectories you already have, for example after a reward change, replay them with `--mode rescore`:
+
+```bash
+evid-collect --mode rescore --input data/trajectories.jsonl --output data/trajectories_rescored.jsonl
+
+# also ask a strong LLM which action it would take at each step
+evid-collect --mode rescore --relabel --input data/trajectories.jsonl --output data/relabeled.jsonl
+```
+
+Trajectories do not store payloads, so the replay rebuilds them from the seed and the rewards are those of a seeded replay, not of the original episode. Records for claims outside the training split are skipped. Each output record keeps `source_total_reward` and each step keeps `source_reward`, and `--relabel` adds `annotator_action` without changing the action that was replayed. The command never overwrites its input. See D-017 in `docs/DECISIONS.md`.
+
 To migrate trajectory files after format changes:
 
 ```bash
@@ -414,6 +425,5 @@ Score-to-reward conversion: `0.30 × LCS + 0.25 × ESS + 0.20 × COMP − 0.25 �
 ## Future Work
 
 - Learned reward models: replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less dependent on the `EvidenceLabeler`'s own LLM-based stance/reliability labels, which are still a heuristic proxy and not ground truth
-- Re-annotation pipeline: `evid-collect --annotator-model` is wired for labeling trajectories with a strong LLM but not yet connected to a re-scoring workflow for *existing* imitation trajectories. Completing this would enable iterative dataset improvement without full recollection
 - Multi-agent debate: pit two independent agents against each other, one constrained to support, one to contradiction, with a separate arbiter issuing the final reward signal. This separates role from policy and eliminates the need for a single agent to self-regulate debate balance
 - Domain expansion: extend beyond scientific claims to regulatory filings, clinical trial reports, and policy documents, with domain-specific evidence retrievers and reward calibration for each domain's ground-truth structure

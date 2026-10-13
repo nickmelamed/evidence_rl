@@ -1,7 +1,6 @@
 import hashlib
 import logging as _logging
 import os
-import random
 import re
 
 # Disable the fast tokenizer's Rust-backed parallel worker pool. Without this,
@@ -197,6 +196,10 @@ class JudgeLLMClient(_PerCallSeeding):
         return self.generate(prompt)
 
 
+class AnnotatorError(RuntimeError):
+    """The annotator could not produce an action."""
+
+
 class AnnotatorClient:
     """
     Strong LLM annotator for labeling trajectories via the Anthropic Messages API.
@@ -227,7 +230,9 @@ class AnnotatorClient:
     def select_action(self, observation: str, action_descriptions: list) -> int:
         """
         Ask the model to choose the best action index for the given observation.
-        Falls back to a random valid index on parse failure.
+
+        Raises ``AnnotatorError`` if the API call fails or the reply has no
+        index, since a random action would be stored as the model's label.
         """
         # check per-instance cache before making an API call
 
@@ -251,19 +256,16 @@ class AnnotatorClient:
                 messages=[{"role": "user", "content": prompt}],
             )
             text = msg.content[0].text.strip()  # type: ignore[union-attr]
-            match = re.search(r"\d+", text)
-            if match:
-                result = int(max(0, min(int(match.group()), len(action_descriptions) - 1)))
-                self._cache[cache_key] = result
-                return result
-            # include model and observation context so parse failures are debuggable
-            _logger.warning(
-                "AnnotatorClient: could not parse index from response %r | model=%s | obs='%.80s'",
-                text, self.model, observation,
-            )
         except Exception as exc:
-            _logger.warning(
-                "AnnotatorClient: LLM call failed (%s) | model=%s | obs='%.80s' — returning random.",
-                exc, self.model, observation,
+            raise AnnotatorError(
+                f"LLM call failed ({exc}) | model={self.model} | obs='{observation[:80]}'"
+            ) from exc
+        match = re.search(r"\d+", text)
+        if not match:
+            raise AnnotatorError(
+                f"could not parse an index from {text!r} | model={self.model} "
+                f"| obs='{observation[:80]}'"
             )
-        return random.randint(0, len(action_descriptions) - 1)
+        result = int(max(0, min(int(match.group()), len(action_descriptions) - 1)))
+        self._cache[cache_key] = result
+        return result
