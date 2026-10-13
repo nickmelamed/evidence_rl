@@ -13,6 +13,9 @@ rl:
   judge_model: "Qwen/Qwen2.5-1.5B-Instruct"
   arbiter_model: "HuggingFaceTB/SmolLM2-1.7B-Instruct"
   turns_per_side: 5
+  # Safety cap on the tokens one debate may use. A debate that reaches it stops
+  # and is still finalized and scored.
+  max_tokens_per_episode: 6000
 
 # The gold judge audits runs and must not be the arbiter. The default from
 # base.yaml (Mistral-7B) already differs from it.

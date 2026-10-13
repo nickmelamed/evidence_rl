@@ -1,8 +1,10 @@
 import os
+import random
 
 import numpy as np
 
 from evid_rl_env.agent.base_trainer import BaseTrainer
+from evid_rl_env.agent.debate_gold import build_debate_gold_evaluator
 from evid_rl_env.agent.ppo import PPO
 from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.environment.debate_env import ROLES, DebateEnv
@@ -15,11 +17,13 @@ class DebateTrainer(BaseTrainer):
     trajectory and its own PPO update, built from its own turns only. The
     arbiter's final reward goes to both roles, added to each role's last step.
 
-    The per-episode token budget is not enforced, because ending a debate early
-    would skip the arbiter's score. The per-token penalty still applies.
+    ``max_tokens`` caps the tokens a debate may use. A debate that reaches it
+    stops and is still finalized, so the arbiter always scores it.
 
-    There is no evaluation round here yet. The existing evaluators play one
-    policy, so the pair is scored by a separate debate evaluator.
+    With ``eval_dataset`` set, the trainer audits the arbiter against the gold
+    judge every ``eval_every * gold_eval_every`` episodes and appends the result
+    to ``gold_eval.jsonl``. There is no other evaluation round here, because the
+    existing evaluators play one policy. The pair is scored by ``DebateEvaluator``.
     """
 
     def __init__(
@@ -35,6 +39,10 @@ class DebateTrainer(BaseTrainer):
         curriculum=None,
         turns_per_side=5,
         arbiter_model=None,
+        max_tokens=None,
+        eval_dataset=None,
+        eval_every=10,
+        gold_judges=None,
     ):
         self.policies = {"support": support_policy, "contradict": contradict_policy}
         self._init_common(
@@ -46,7 +54,7 @@ class DebateTrainer(BaseTrainer):
             seed=seed,
             use_wandb=use_wandb,
             eval_dataset=None,
-            eval_every=0,
+            eval_every=eval_every,
             baseline_n_episodes=0,
             curriculum=curriculum,
             extra_wandb_config={
@@ -54,6 +62,7 @@ class DebateTrainer(BaseTrainer):
                 "roles": list(ROLES),
                 "turns_per_side": turns_per_side,
                 "arbiter_model": arbiter_model,
+                "max_tokens_per_episode": max_tokens,
                 "lr": getattr(config, "lr", None),
                 "gamma": getattr(config, "gamma", None),
                 "clip": getattr(config, "clip", None),
@@ -62,8 +71,69 @@ class DebateTrainer(BaseTrainer):
             },
         )
         assert hasattr(config, "clip"), "PPOConfig required"
-        self.debate = DebateEnv(env, turns_per_side=turns_per_side)
+        self.debate = DebateEnv(env, turns_per_side=turns_per_side, max_tokens=max_tokens)
         self.rl = {role: PPO(policy, config) for role, policy in self.policies.items()}
+
+        self.gold_evaluator = None
+        gold_judge_model = getattr(config, "gold_judge_model", None)
+        if eval_dataset is not None and gold_judge_model:
+            if arbiter_model is not None and gold_judge_model == arbiter_model:
+                raise ValueError(
+                    f"the gold judge must differ from the arbiter, both are {arbiter_model}"
+                )
+            self.gold_evaluator = self._build_pair_gold_evaluator(
+                eval_dataset, gold_judge_model, gold_judges, turns_per_side, max_tokens
+            )
+        self.gold_every_episodes = eval_every * getattr(config, "gold_eval_every", 5)
+
+    def _build_pair_gold_evaluator(self, eval_dataset, gold_judge_model, gold_judges,
+                                   turns_per_side, max_tokens):
+        from evid_rl_env.environment.environment import ClaimEnv
+
+        n_episodes = getattr(self.config, "gold_eval_n_episodes", 20)
+        if gold_judges is None:
+            from evid_rl_env.agent.llm_client import JudgeLLMClient
+            from evid_rl_env.judge.llm_judge import LLMJudge
+
+            gold_judges = [LLMJudge(
+                JudgeLLMClient(model_name=gold_judge_model, seed=self.seed),
+                cache_path="artifacts/cache/gold_judge_cache.sqlite3",
+            )]
+
+        _rng_state = random.getstate()
+        random.seed(self.seed)
+        gold_subset = random.sample(eval_dataset, min(n_episodes, len(eval_dataset)))
+        random.setstate(_rng_state)
+
+        # Same arbiter and labeler as training, so the proxy side is the arbiter's score.
+        gold_env = ClaimEnv(
+            gold_subset, judge_model=getattr(self.config, "judge_model", None), seed=self.seed,
+            llm_judge=self.env.llm_judge, evidence_labeler=self.env.evidence_labeler,
+        )
+        return build_debate_gold_evaluator(
+            gold_env, self.policies["support"], self.policies["contradict"], gold_judges,
+            n_episodes=len(gold_subset), turns_per_side=turns_per_side, max_tokens=max_tokens,
+        )
+
+    def _run_gold_round(self, ep: int) -> None:
+        assert self.gold_evaluator is not None
+        # Seed the audit from the episode and put the training streams back afterwards,
+        # so auditing more or less often does not change what training learns.
+        _rng_state = random.getstate()
+        _np_rng_state = np.random.get_state()
+        random.seed(self.seed ^ (ep + 1))
+        np.random.seed(self.seed ^ (ep + 1))
+        try:
+            summary = self.gold_evaluator.evaluate()
+        finally:
+            random.setstate(_rng_state)
+            np.random.set_state(_np_rng_state)
+        print(
+            f"[Gold eval ep {ep + 1}] proxy={summary['proxy_reward_mean']} "
+            f"gold={summary['gold_reward_mean']} corr={summary['proxy_gold_correlation']} "
+            f"scored={summary['n_scored']}/{summary['n_episodes']}"
+        )
+        self.tracker.log_gold_eval(ep + 1, summary)
 
     def train(self):
         for ep in range(self.episodes):
@@ -170,6 +240,9 @@ class DebateTrainer(BaseTrainer):
             self.tracker.log_episode(metrics)
             self.tracker.save_trajectory(ep, viz)
             print(f"Ep {ep} | Reward {total_reward:.3f}")
+
+            if self.gold_evaluator is not None and (ep + 1) % self.gold_every_episodes == 0:
+                self._run_gold_round(ep)
 
         for role, policy in self.policies.items():
             path = os.path.join(self.tracker.base_dir, f"policy_{role}.npz")

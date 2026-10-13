@@ -97,3 +97,71 @@ def test_the_turn_count_comes_from_the_run_config(tmp_path, patched):
 def test_a_missing_checkpoint_is_reported(tmp_path):
     with pytest.raises(FileNotFoundError):
         eval_debate.evaluate_run(str(tmp_path), DATASET, n_episodes=1, seed=3)
+
+
+def test_the_budget_comes_from_the_run_config(tmp_path, patched):
+    run = _write_run(tmp_path)
+    cfg = json.loads((run / "config.json").read_text())
+    cfg["max_tokens_per_episode"] = 1
+    (run / "config.json").write_text(json.dumps(cfg))
+    np.random.seed(0)
+    result = eval_debate.evaluate_run(str(run), DATASET, n_episodes=2, seed=3)
+    assert result["eval/mean_steps"] < 10
+
+
+def _gold_patches(monkeypatch, make_llm_judge, make_env, patched):
+    built = {}
+
+    def fake_build_arbiter(model, seed):
+        built["arbiter"] = model
+        return make_llm_judge()
+
+    class _Client:
+        def __init__(self, model_name, seed):
+            built["gold"] = model_name
+
+    monkeypatch.setattr(eval_debate, "build_arbiter", fake_build_arbiter)
+    monkeypatch.setattr(eval_debate, "JudgeLLMClient", _Client)
+    monkeypatch.setattr(
+        eval_debate, "LLMJudge",
+        lambda client, cache_path: make_llm_judge(
+            '{"LCS": 0.3, "ESS": 0.3, "GRS": 0.7, "COMP": 0.3, "BIAS": 0.7, "confidence": 0.9}'))
+    monkeypatch.setattr(
+        eval_debate, "ClaimEnv",
+        lambda dataset, seed, judge_model=None, llm_judge=None, **kw:
+            make_env(dataset=dataset, seed=seed))
+    return built
+
+
+def test_gold_audit_appends_a_row_for_the_run(tmp_path, patched, monkeypatch,
+                                              make_llm_judge, make_env):
+    run = _write_run(tmp_path)
+    cfg = json.loads((run / "config.json").read_text())
+    cfg["arbiter_model"] = "org/arbiter"
+    (run / "config.json").write_text(json.dumps(cfg))
+    built = _gold_patches(monkeypatch, make_llm_judge, make_env, patched)
+
+    np.random.seed(0)
+    summary = eval_debate.gold_audit_run(str(run), DATASET, "org/gold", n_episodes=2, seed=3)
+
+    rows = [json.loads(line) for line in (run / "gold_eval.jsonl").read_text().splitlines()]
+    assert len(rows) == 1
+    assert rows[0]["n_episodes"] == 2
+    assert rows[0]["checkpoint"] == str(run)
+    assert rows[0]["n_scored"] == summary["n_scored"]
+    assert built == {"arbiter": "org/arbiter", "gold": "org/gold"}
+
+
+def test_gold_audit_refuses_a_gold_judge_that_is_the_arbiter(tmp_path, patched):
+    run = _write_run(tmp_path)
+    cfg = json.loads((run / "config.json").read_text())
+    cfg["arbiter_model"] = "org/same"
+    (run / "config.json").write_text(json.dumps(cfg))
+    with pytest.raises(ValueError, match="gold judge"):
+        eval_debate.gold_audit_run(str(run), DATASET, "org/same", n_episodes=1, seed=3)
+
+
+def test_gold_audit_needs_the_arbiter_recorded_in_the_run_config(tmp_path, patched):
+    run = _write_run(tmp_path)
+    with pytest.raises(ValueError, match="arbiter_model"):
+        eval_debate.gold_audit_run(str(run), DATASET, "org/gold", n_episodes=1, seed=3)

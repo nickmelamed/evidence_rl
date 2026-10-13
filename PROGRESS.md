@@ -73,7 +73,7 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - [x] Results tables report mean and spread across seeds (`summary_by_architecture.csv`).
 - [x] `evid-collect --mode rescore` and `--relabel` (D-017). `--relabel` exits without `ANTHROPIC_API_KEY`, and relabeling never changes the replayed rewards.
 - [x] `AnnotatorClient.select_action` raises `AnnotatorError` on an API or parse failure. It used to return a random action that `evid-collect` stored as the model's label.
-- [x] Multi-agent debate code (2026-10-13): role masks, `Arbiter`, `DebateEnv`, `DebateTrainer`, `ppo_multiagent_debate.yaml`, `DebateEvaluator` and `eval_debate`. Mock-tested only.
+- [x] Multi-agent debate code (2026-10-13): role masks, `Arbiter`, `DebateEnv`, `DebateTrainer`, `ppo_multiagent_debate.yaml`, `DebateEvaluator`, `eval_debate`, a gold audit of the pair and a debate token budget. Mock-tested only.
 - [x] `SUPPORT` and `CONTRADICT` write only the argument text to `debate_history` (2026-10-13). They used `str(payload)`, so the judge and the gold judge read a dict repr. Every earlier run, bandit included, was scored on that text.
 - [x] Fixed the PPO and PG updates (2026-10-13). `ClaimEnv` mutates one `State` in place, so every trajectory entry held the end-of-episode state and each step was updated with the wrong inputs (`7426705`). The updaters also used a plain softmax while `act` sampled from a masked one, so the PPO ratio and entropy were computed on the wrong distribution (`cce5354`). Features and the action mask are now stored at act time and shared through `masked_softmax`.
 

@@ -78,6 +78,7 @@ def test_multiagent_config_sets_the_arbiter_and_the_turn_count():
     assert algo == "ppo_multiagent"
     assert cfg.arbiter_model == "HuggingFaceTB/SmolLM2-1.7B-Instruct"
     assert cfg.turns_per_side == 5
+    assert cfg.max_tokens_per_episode > 2000
     assert cfg.gold_judge_model != cfg.arbiter_model
 
 

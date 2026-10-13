@@ -45,6 +45,7 @@ class MultiAgentPPOConfig(PPOConfig):
         super().__init__()
         self.arbiter_model = None
         self.turns_per_side = None
+        self.max_tokens_per_episode = None
 
 class PGConfig(BaseConfig):
     def __init__(self):

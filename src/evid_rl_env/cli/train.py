@@ -31,7 +31,8 @@ _DEFAULT_CONFIG_PATHS = {
 }
 
 
-def train_multiagent(train_dataset, config, episodes, seed, exp_name, curriculum):
+def train_multiagent(train_dataset, eval_dataset, config, episodes, seed, exp_name, curriculum,
+                     eval_every):
     """Train the support and contradict policies against the configured arbiter."""
     if config.arbiter_model == config.gold_judge_model:
         raise ValueError(
@@ -59,6 +60,9 @@ def train_multiagent(train_dataset, config, episodes, seed, exp_name, curriculum
         curriculum=curriculum,
         turns_per_side=config.turns_per_side,
         arbiter_model=config.arbiter_model,
+        max_tokens=config.max_tokens_per_episode,
+        eval_dataset=eval_dataset,
+        eval_every=eval_every,
     )
     trainer.train()
 
@@ -82,8 +86,10 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
 
     curriculum = Curriculum(rng=random.Random(seed))
     if method == "ppo_multiagent":
-        train_multiagent(train_dataset, config, episodes, seed,
-                         exp_name or f"{method}_run", curriculum)
+        eval_every_episodes = eval_every if eval_every is not None else getattr(
+            config, "eval_every", 25)
+        train_multiagent(train_dataset, eval_dataset, config, episodes, seed,
+                         exp_name or f"{method}_run", curriculum, eval_every_episodes)
         return
 
     # Config loaded first so judge_model/actor_model actually drive which

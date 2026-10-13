@@ -232,7 +232,7 @@ Training artifacts are written to `artifacts/experiments/<run_name>/`:
 evid-train --config configs/ppo_multiagent_debate.yaml --episodes 300 --seed 42 --exp-name debate_pair_s42
 ```
 
-This trains two policies against each other on the same claim. One may only use `SUPPORT`, the other only `CONTRADICT`. They alternate for 5 turns each, share the evidence pool and the transcript, and then the environment finalizes. A separate arbiter model, set by `arbiter_model` in the config, scores the transcript, and both policies receive that final reward. The run folder holds `policy_support.npz` and `policy_contradict.npz` in place of `policy.npz`.
+This trains two policies against each other on the same claim. One may only use `SUPPORT`, the other only `CONTRADICT`. They alternate for 5 turns each, share the evidence pool and the transcript, and then the environment finalizes. A separate arbiter model, set by `arbiter_model` in the config, scores the transcript, and both policies receive that final reward. `max_tokens_per_episode` stops a long debate early, and it is still scored. The run folder holds `policy_support.npz` and `policy_contradict.npz` in place of `policy.npz`.
 
 ---
 
@@ -298,6 +298,8 @@ python -m evid_rl_env.cli.eval_debate --run-dir artifacts/experiments/<run_name>
 ```
 
 The pair plays the held-out split greedily, scored by the same single judge and on the same claims as `evid-eval`, so use the same `--seed`. The result goes to `eval_results.json` in the run folder under the policy name `rl`.
+
+To audit the arbiter against a held-out judge, pass `--gold-judge-model <model>` with a model other than the arbiter. This appends a row to `gold_eval.jsonl`. Training also writes these rows every `eval_every * gold_eval_every` episodes.
 
 ---
 

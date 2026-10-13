@@ -17,18 +17,21 @@ class DebateEvaluator:
     """
 
     def __init__(self, env, support_policy, contradict_policy, turns_per_side=5,
-                 n_eval_episodes=20):
+                 n_eval_episodes=20, max_tokens=None):
         self.env = env
         self.support_policy = support_policy
         self.contradict_policy = contradict_policy
         self.turns_per_side = turns_per_side
         self.n_eval_episodes = n_eval_episodes
+        self.max_tokens = max_tokens
 
     def evaluate(self) -> dict:
         print("[Eval] greedy mode active, running debate evaluation...")
         if hasattr(self.env, "reseed"):
             self.env.reseed()
-        debate = DebateEnv(self.env, turns_per_side=self.turns_per_side)
+        debate = DebateEnv(
+            self.env, turns_per_side=self.turns_per_side, max_tokens=self.max_tokens
+        )
 
         rewards = []
         steps_list = []

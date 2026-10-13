@@ -35,7 +35,9 @@ def test_train_multiagent_wires_the_arbiter_and_one_shared_actor(monkeypatch):
     config.judge_model = "org/labeler"
     config.actor_model = "org/actor"
     config.turns_per_side = 4
-    train_cli.train_multiagent(["claim"], config, episodes=3, seed=9, exp_name="x", curriculum=None)
+    config.max_tokens_per_episode = 6000
+    train_cli.train_multiagent(["claim"], ["held-out"], config, episodes=3, seed=9, exp_name="x",
+                               curriculum=None, eval_every=7)
 
     assert built["arbiter"] == ("org/arbiter", 9)
     assert built["env"] == ("org/labeler", 9, "ARBITER")
@@ -45,6 +47,9 @@ def test_train_multiagent_wires_the_arbiter_and_one_shared_actor(monkeypatch):
     assert kwargs["turns_per_side"] == 4
     assert kwargs["arbiter_model"] == "org/arbiter"
     assert kwargs["episodes"] == 3
+    assert kwargs["max_tokens"] == 6000
+    assert kwargs["eval_dataset"] == ["held-out"]
+    assert kwargs["eval_every"] == 7
     assert built["trained"] is True
 
 
@@ -57,8 +62,10 @@ def test_the_cli_routes_the_multiagent_algo_to_train_multiagent(monkeypatch):
                         lambda *args: called.setdefault("args", args))
     train_cli.train(2, config_path="configs/ppo_multiagent_debate.yaml", seed=5,
                     exp_name="routed")
-    train_data, config, episodes, seed, exp_name, _ = called["args"]
+    train_data, eval_data, config, episodes, seed, exp_name, _, eval_every = called["args"]
     assert len(train_data) == 8
+    assert len(eval_data) == 2
+    assert eval_every == 10
     assert config.arbiter_model == "HuggingFaceTB/SmolLM2-1.7B-Instruct"
     assert (episodes, seed, exp_name) == (2, 5, "routed")
 
@@ -70,5 +77,5 @@ def test_train_multiagent_refuses_an_arbiter_that_is_also_the_gold_judge(monkeyp
     config.arbiter_model = "org/shared"
     config.gold_judge_model = "org/shared"
     with pytest.raises(ValueError, match="gold judge"):
-        train_cli.train_multiagent(["claim"], config, episodes=1, seed=0, exp_name="x",
-                                   curriculum=None)
+        train_cli.train_multiagent(["claim"], ["held-out"], config, episodes=1, seed=0,
+                                   exp_name="x", curriculum=None, eval_every=10)

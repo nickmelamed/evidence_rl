@@ -4,7 +4,7 @@ This file is for a fresh conversation. It has two tasks. Task 1 builds the multi
 
 # Task 1: multi-agent debate
 
-Status on 2026-10-13: built on `feat/multi-agent-debate` and covered by mock tests (D-018, SPEC section 8, README). What is left is the owner's review, an approved tiny end-to-end run with real models, and the gold audit of the pair, which is not built. The rest of this section is the original plan and decisions, kept for reference.
+Status on 2026-10-13: built on `feat/multi-agent-debate` and covered by mock tests (D-018, SPEC section 8, README). The gold audit of the pair and a debate token budget are also built. What is left is the owner's review and the result of the real-model smoke run. The rest of this section is the original plan and decisions, kept for reference.
 
 README Future Work item 2. Two independent agents argue the claim, one limited to support and one to contradiction, and a separate arbiter issues the reward. This separates role from policy, so a single agent no longer has to balance the debate itself.
 
