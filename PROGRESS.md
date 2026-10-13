@@ -6,16 +6,16 @@ is shown to Claude at the start of each session and after compaction.
 
 ## Now
 
-- [ ] Build the multi-agent debate (Future Work item 2). The plan is approved and the questions are answered. HANDOFF.md, Task 1 has the decisions and the order of work. The next step is the role layer on `action_mask`, on a fresh `feat/multi-agent-debate` branch.
+- [ ] Multi-agent debate (Future Work item 2) is built and tested with mocks on `feat/multi-agent-debate`. It has not been run with real models. A tiny end-to-end run needs your approval, and the PR needs review.
 - [ ] Run the reruns from HANDOFF.md, Task 2, in a separate conversation. The update fixes are on `main`, so they can start.
 - [ ] Edit docs/SPEC.md and docs/DECISIONS.md into your own words. Entries marked inferred in SPEC are guesses from the code.
 
 ## Future Work status
 
-The README lists four Future Work items. Their state as of 2026-10-12:
+The README listed four Future Work items. Item 2 is removed from it on the debate branch. Their state as of 2026-10-12:
 
 1. Re-annotation pipeline: done. `evid-collect --mode rescore` replays recorded actions under the current environment and reward, and `--relabel` adds a strong LLM's action per step (D-017). Checked end to end on 3 trajectories against the real environment and the real Anthropic API.
-2. Multi-agent debate: plan approved on 2026-10-13, code not started. See HANDOFF.md, Task 1.
+2. Multi-agent debate: built and mock-tested on `feat/multi-agent-debate` (D-018), not yet run with real models. See HANDOFF.md, Task 1.
 3. Learned reward models: agreed scope is scaffolding only. A pluggable reward model judge type plus training code, tested on synthetic preference pairs. A trained model needs human preference data that this repo does not have.
 4. Domain expansion: agreed scope is scaffolding only. A domain registry, a retriever interface and a per-domain split contract. It needs labeled datasets for each domain, which this repo does not have.
 
@@ -73,6 +73,7 @@ Not done, to revisit if the smoke test or the reruns show the variation matters:
 - [x] Results tables report mean and spread across seeds (`summary_by_architecture.csv`).
 - [x] `evid-collect --mode rescore` and `--relabel` (D-017). `--relabel` exits without `ANTHROPIC_API_KEY`, and relabeling never changes the replayed rewards.
 - [x] `AnnotatorClient.select_action` raises `AnnotatorError` on an API or parse failure. It used to return a random action that `evid-collect` stored as the model's label.
+- [x] Multi-agent debate code (2026-10-13): role masks, `Arbiter`, `DebateEnv`, `DebateTrainer`, `ppo_multiagent_debate.yaml`, `DebateEvaluator` and `eval_debate`. Mock-tested only.
 - [x] `SUPPORT` and `CONTRADICT` write only the argument text to `debate_history` (2026-10-13). They used `str(payload)`, so the judge and the gold judge read a dict repr. Every earlier run, bandit included, was scored on that text.
 - [x] Fixed the PPO and PG updates (2026-10-13). `ClaimEnv` mutates one `State` in place, so every trajectory entry held the end-of-episode state and each step was updated with the wrong inputs (`7426705`). The updaters also used a plain softmax while `act` sampled from a masked one, so the PPO ratio and entropy were computed on the wrong distribution (`cce5354`). Features and the action mask are now stored at act time and shared through `masked_softmax`.
 

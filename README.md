@@ -226,6 +226,14 @@ Training artifacts are written to `artifacts/experiments/<run_name>/`:
 | `policy.npz` | Saved policy checkpoint |
 | `trajectories/episode_<N>.json` | Step-by-step trajectory for each episode |
 
+### Train a Debate Pair
+
+```bash
+evid-train --config configs/ppo_multiagent_debate.yaml --episodes 300 --seed 42 --exp-name debate_pair_s42
+```
+
+This trains two policies against each other on the same claim. One may only use `SUPPORT`, the other only `CONTRADICT`. They alternate for 5 turns each, share the evidence pool and the transcript, and then the environment finalizes. A separate arbiter model, set by `arbiter_model` in the config, scores the transcript, and both policies receive that final reward. The run folder holds `policy_support.npz` and `policy_contradict.npz` in place of `policy.npz`.
+
 ---
 
 ## Evaluation
@@ -282,6 +290,14 @@ The available baselines are:
 | `imitation` | Policy cloned from collected expert trajectories (requires `--trajectories`) |
 
 `evid-eval` prints a table of mean ± std reward for each baseline and the RL policy, and writes `eval_results.json` to the run folder. The exit code is 0 if the RL policy beats `greedy_llm` and 1 if it does not.
+
+### Evaluate a debate pair
+
+```bash
+python -m evid_rl_env.cli.eval_debate --run-dir artifacts/experiments/<run_name> --seed 42 --n-episodes 100
+```
+
+The pair plays the held-out split greedily, scored by the same single judge and on the same claims as `evid-eval`, so use the same `--seed`. The result goes to `eval_results.json` in the run folder under the policy name `rl`.
 
 ---
 
@@ -425,5 +441,4 @@ Score-to-reward conversion: `0.30 × LCS + 0.25 × ESS + 0.20 × COMP − 0.25 �
 ## Future Work
 
 - Learned reward models: replace the heuristic base reward with a trained reward model fine-tuned on human preference data over argument quality, making the reward signal less dependent on the `EvidenceLabeler`'s own LLM-based stance/reliability labels, which are still a heuristic proxy and not ground truth
-- Multi-agent debate: pit two independent agents against each other, one constrained to support, one to contradiction, with a separate arbiter issuing the final reward signal. This separates role from policy and eliminates the need for a single agent to self-regulate debate balance
 - Domain expansion: extend beyond scientific claims to regulatory filings, clinical trial reports, and policy documents, with domain-specific evidence retrievers and reward calibration for each domain's ground-truth structure
