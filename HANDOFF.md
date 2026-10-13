@@ -2,13 +2,13 @@
 
 This file is for a fresh conversation. It has two tasks. Task 1 builds the multi-agent debate. Task 2 reruns the evaluations and is independent of Task 1. Read CLAUDE.md, docs/SPEC.md and PROGRESS.md first. Do not push, merge, delete experiment folders, or change dependencies without asking the owner.
 
-# Task 1: multi-agent debate
+# Task 1: multi-agent debate (done)
 
-Status on 2026-10-13: built on `feat/multi-agent-debate` and covered by mock tests (D-018, SPEC section 8, README). The gold audit of the pair and a debate token budget are also built. A real-model smoke run passed on 2026-10-13 (training, both gold paths, `eval_debate`). What is left is the owner's review. The arbiter was switched to Qwen2.5-3B-Instruct after SmolLM2 often echoed the score template (D-020). The rest of this section is the original plan and decisions, kept for reference.
+Status on 2026-10-13: done and merged to `main` as PR #10 (D-018, D-020, SPEC section 8, README). It has the gold audit of the pair, a debate token budget and an `eval_debate` command, and it passed two real-model smoke runs, the second with the Qwen2.5-3B arbiter. Nothing is left to do for it. Do not start a new conversation on it unless the owner reopens it. The rest of this section is the original plan and decisions, kept for reference.
 
 README Future Work item 2. Two independent agents argue the claim, one limited to support and one to contradiction, and a separate arbiter issues the reward. This separates role from policy, so a single agent no longer has to balance the debate itself.
 
-The plan was approved on 2026-10-13 and the open questions are answered (see "Decisions" below). The full plan is in `~/.claude/plans/woolly-stargazing-metcalfe.md` on the owner's machine and is summarized here. Two things in it still need the owner's approval before code: the new `arbiter_model` config key, and the `DebateEvaluator`.
+The plan was approved on 2026-10-13 and the open questions are answered (see "Decisions" below). The full plan is in `~/.claude/plans/woolly-stargazing-metcalfe.md` on the owner's machine and is summarized here. The owner approved the `arbiter_model` key and the `DebateEvaluator`.
 
 ## Decisions
 
@@ -61,19 +61,20 @@ The PPO and PG updates were fixed on 2026-10-13, and this changes how the role m
 
 Use a branch named `feat/multi-agent-debate`, cut from the current `main`, and Conventional Commits. A tiny end-to-end run of a few episodes with real models needs the owner's approval first, the same as any training run.
 
-# Task 2: rerun the evaluations
+# Task 2: rerun the evaluations (ready to start)
 
-This task trains and evaluates the models. It does not depend on Task 1, because Task 1 adds new files and leaves the existing environment, reward and evaluators unchanged.
+This task trains and evaluates the models. Everything it needs is on `main` as of 2026-10-13: the three training fixes and the multi-agent debate (PR #10). Task 1 added new files and left the existing environment, reward and evaluators unchanged, so the four-architecture plan below is unaffected by it.
 
 ## Where things stand
 
 - All preparation is merged to `main`. Check `git status` and `git log -3` first. The rescore mode and the `AnnotatorError` change are also in, and neither touches training or evaluation.
 - Two bugs in the PPO and PG updates were fixed and merged on 2026-10-13. `ClaimEnv` mutates one `State` in place, so every step used to be updated with the end-of-episode state, and the updaters used an unmasked softmax while `act` sampled from a masked one. Every PPO and PG run made before that is invalid, so the old experiment folders cannot be compared with new runs for that reason too. Bandit runs were not affected by those two. A third fix (2026-10-13) changes judge-scored rewards for every algorithm, bandit included: `SUPPORT` and `CONTRADICT` used to put the whole payload dict, with evidence ids and the token count, into the transcript the judge reads, and now put in only the argument text. It is merged to `main`, so the reruns can start.
-- The code is ready to train. A real 10-episode PPO run plus an eval round ran end to end on 2026-10-06, and two identical runs gave identical rewards and weights, one with a cold judge cache and one with a warm one. That smoke test predates the 2026-10-13 fixes. Before the full runs, ask the owner whether to repeat a short two-run determinism check on the fixed code.
+- The code is ready to train. Check `git log -3` on `main` first, and confirm the debate PR (#10) is in it. A real 10-episode PPO run plus an eval round ran end to end on 2026-10-06, and two identical runs gave identical rewards and weights, one with a cold judge cache and one with a warm one. That smoke test predates the 2026-10-13 fixes. Before the full runs, ask the owner whether to repeat a short two-run determinism check on the fixed code.
 - Claim order, curriculum, policy init, baseline randomness and each LLM generation are seeded from `--seed`. Results from before this work cannot be compared with new ones.
 - `gold_eval_n_episodes` is 100 in `configs/base.yaml`. The judge caches were emptied and archived in `artifacts/cache_archive/judge_caches_20261006/`. The evidence caches were kept.
 - The debate config audits with `Qwen/Qwen2.5-3B-Instruct`, not Mistral-7B, because the debate arbiter is Mistral-7B (D-016). All other configs use Mistral-7B as the gold judge.
 - Tavily has auto-reload on.
+- The two debate smoke runs on 2026-10-13 added a few entries to `artifacts/cache/gold_judge_cache.sqlite3` and created arbiter caches for SmolLM2 and Qwen2.5-3B. The entries are keyed by content and harmless, but the judge caches are no longer completely empty, so a first-run timing is not strictly cold. The smoke run folders are in `artifacts/smoke_runs/` and are not read by `make results`.
 - All needed models are in the local Hugging Face cache: gemma-2-2b-it, Qwen2.5-1.5B-Instruct, Qwen2.5-3B-Instruct, SmolLM2-1.7B-Instruct, Mistral-7B-Instruct-v0.2.
 
 ## Plan
@@ -104,6 +105,16 @@ evid-eval --checkpoint artifacts/experiments/<run>/policy.npz --seed 42 \
 ```
 
 Each training run writes `config.json` (with the device and library versions), `metrics.csv`, `gold_eval.jsonl` and `policy.npz` to `artifacts/experiments/<exp-name>_<timestamp>/`. `evid-eval` writes `eval_results.json` to the same folder.
+
+Optional, only if the owner asks: the multi-agent debate pair, a fifth architecture. It trains two policies against a Qwen2.5-3B arbiter, and its gold judge is Mistral-7B. It needs the owner's approval, because it has not been run at scale and the arbiter's signal is untested beyond the smoke runs.
+
+```bash
+S=42
+evid-train --config configs/ppo_multiagent_debate.yaml --episodes 300 --seed $S --exp-name full_multiagent_s$S
+python -m evid_rl_env.cli.eval_debate --run-dir artifacts/experiments/<run> --seed 42 --n-episodes 100
+```
+
+It writes `policy_support.npz` and `policy_contradict.npz` instead of `policy.npz`, and `eval_debate` writes `eval_results.json` under the policy name `rl`. `make results` lists it under `ppo_multiagent` with `judge_architecture = single`, which is a known label gap (SPEC section 9). Its rewards are not directly comparable with the single-agent runs, so say so wherever it is reported.
 
 Optional: rescore a checkpoint with a second gold judge, for example to compare debate with the others on one judge:
 `evid-gold-eval --checkpoint <path> --gold-judge-model <model> ...` (match the judge flags to the training config).
