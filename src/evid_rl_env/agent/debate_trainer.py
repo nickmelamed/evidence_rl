@@ -50,7 +50,7 @@ class DebateTrainer(BaseTrainer):
             baseline_n_episodes=0,
             curriculum=curriculum,
             extra_wandb_config={
-                "algo": "ppo_debate",
+                "algo": "ppo_multiagent",
                 "roles": list(ROLES),
                 "turns_per_side": turns_per_side,
                 "arbiter_model": arbiter_model,

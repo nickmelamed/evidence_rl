@@ -278,7 +278,7 @@ Write a concise argument challenging the reliability or relevance of this eviden
         )
 
     @classmethod
-    def load(cls, path: str, seed: int = 42) -> "ActorCriticPolicy":
+    def load(cls, path: str, seed: int = 42, llm=None) -> "ActorCriticPolicy":
         """Reconstruct a policy from a .npz checkpoint produced by save().
 
         The LLM pipeline is re-initialised from the stored model_name, so the
@@ -288,7 +288,8 @@ Write a concise argument challenging the reliability or relevance of this eviden
         n_actions  = int(data["n_actions"][0])
         state_dim  = int(data["state_dim"][0])
         model_name = str(data["model_name"][0])
-        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name, seed=seed)
+        policy = cls(n_actions=n_actions, state_dim=state_dim, model_name=model_name, seed=seed,
+                     llm=llm)
         policy.actor_params = data["actor_params"]
         policy.value_params = data["value_params"]
         return policy
