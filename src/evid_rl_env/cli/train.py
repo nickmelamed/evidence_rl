@@ -11,6 +11,7 @@ import numpy as np
 
 from evid_rl_env.agent.bandit_trainer import BanditTrainer
 from evid_rl_env.agent.config_loader import load_base_config, load_config
+from evid_rl_env.agent.debate_trainer import DebateTrainer
 from evid_rl_env.agent.policy import ActorCriticPolicy
 from evid_rl_env.agent.trainer import Trainer
 from evid_rl_env.data.dataset import load_dataset, split_dataset
@@ -18,6 +19,7 @@ from evid_rl_env.data.evidence_fetcher import use_snapshot, warm_cache
 from evid_rl_env.environment.actions import ACTIONS
 from evid_rl_env.environment.curriculum import Curriculum
 from evid_rl_env.environment.environment import ClaimEnv
+from evid_rl_env.judge.arbiter import build_arbiter
 
 # configs/*_baseline.yaml is the single source of truth for RL hyperparameters
 # (see agent/config.py). The default path with no --config also goes through
@@ -27,6 +29,34 @@ _DEFAULT_CONFIG_PATHS = {
     "pg": "configs/pg_baseline.yaml",
     "bandit": "configs/bandit_baseline.yaml",
 }
+
+
+def train_multiagent(train_dataset, config, episodes, seed, exp_name, curriculum):
+    """Train the support and contradict policies against the configured arbiter."""
+    arbiter = build_arbiter(config.arbiter_model, seed)
+    env = ClaimEnv(train_dataset, judge_model=config.judge_model, seed=seed, llm_judge=arbiter)
+
+    np.random.seed(seed)
+    support_policy = ActorCriticPolicy(
+        len(list(ACTIONS)), model_name=config.actor_model, seed=seed
+    )
+    # Both roles write their text with one loaded actor model. Only the weights differ.
+    contradict_policy = ActorCriticPolicy(
+        len(list(ACTIONS)), model_name=config.actor_model, seed=seed, llm=support_policy.llm
+    )
+    trainer = DebateTrainer(
+        env=env,
+        support_policy=support_policy,
+        contradict_policy=contradict_policy,
+        config=config,
+        episodes=episodes,
+        exp_name=exp_name,
+        seed=seed,
+        curriculum=curriculum,
+        turns_per_side=config.turns_per_side,
+        arbiter_model=config.arbiter_model,
+    )
+    trainer.train()
 
 
 def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
@@ -47,6 +77,11 @@ def train(episodes, method="ppo", config_path=None, seed=42, eval_every=None,
     config.seed = seed  # align config.seed with the resolved seed
 
     curriculum = Curriculum(rng=random.Random(seed))
+    if method == "ppo_multiagent":
+        train_multiagent(train_dataset, config, episodes, seed,
+                         exp_name or f"{method}_run", curriculum)
+        return
+
     # Config loaded first so judge_model/actor_model actually drive which
     # models get instantiated instead of falling back to hardcoded defaults.
     env = ClaimEnv(
