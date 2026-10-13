@@ -50,7 +50,14 @@ class ActorCriticPolicy:
         if not hasattr(self, "_arg_cache"):
             self._arg_cache = {}
 
-        probs = self.get_probs(state)  # fresh array, safe to mutate in place
+        # Snapshot the inputs: the env mutates one State in place, so the updater
+        # cannot rebuild these from the stored state later.
+        features = encode_state(state)
+        self.last_features = features
+        logits = features @ self.actor_params
+        logits -= np.max(logits)
+        probs = np.exp(logits)
+        probs /= probs.sum()
 
         # Mask 1: QUERY / REQUEST_CLARIFICATION share the per-episode query budget
         if state.query_count >= state.max_queries:

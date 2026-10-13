@@ -2,8 +2,6 @@ from typing import Any
 
 import numpy as np
 
-from evid_rl_env.agent.policy import encode_state
-
 
 class PPO:
     def __init__(self, policy, config):
@@ -34,18 +32,14 @@ class PPO:
         return returns, advantages
 
     def update(self, trajectories):
-        states, actions, old_probs, rewards, values = zip(*trajectories)
+        all_features, actions, old_probs, rewards, values = zip(*trajectories)
 
         returns, advantages = self.compute_advantages(list(rewards), list(values))
 
         for _ in range(self.K):
-            for state, action_idx, old_prob, ret, adv in zip(
-                states, actions, old_probs, returns, advantages
+            for features, action_idx, old_prob, ret, adv in zip(
+                all_features, actions, old_probs, returns, advantages
             ):
-                # Encode state once and reuse for all computations in this step.
-                # (get_probs, get_value, grad_log_prob×2, explicit call).
-                features = encode_state(state)
-
                 logits = features @ self.policy.actor_params
                 logits -= np.max(logits)
                 exp = np.exp(logits)
@@ -65,7 +59,7 @@ class PPO:
                 value = float(features @ self.policy.value_params)
 
                 grad_actor = self.policy.grad_log_prob(
-                    state, action_idx, features=features, probs=probs
+                    None, action_idx, features=features, probs=probs
                 )
                 grad_value = features * (ret - value)
 

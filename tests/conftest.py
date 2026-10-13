@@ -188,6 +188,7 @@ class FakePolicy:
 
     def act(self, state, greedy: bool = False, force_action_idx: int = None):
         probs = self.get_probs(state)
+        self.last_features = self._features(state)
         self.last_probs = probs.copy()
         self.last_entropy = float(-np.sum(probs * np.log(probs + 1e-8)))
 
@@ -227,7 +228,9 @@ class FakePolicy:
         if features is None:
             features = self._features(state)
         if probs is None:
-            probs = self.get_probs(state)
+            logits = features @ self.actor_params
+            exp = np.exp(logits - np.max(logits))
+            probs = exp / np.sum(exp)
         grad = -probs.copy()
         grad[action_idx] += 1
         return np.outer(features, grad)

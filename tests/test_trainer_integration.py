@@ -31,9 +31,8 @@ def _metrics_df(trainer):
     return pd.read_csv(trainer.tracker.csv_path)
 
 
-def test_trainer_ppo_runs_end_to_end(fake_policy, make_env, monkeypatch):
+def test_trainer_ppo_runs_end_to_end(fake_policy, make_env):
     policy = fake_policy(state_dim=4)
-    monkeypatch.setattr("evid_rl_env.agent.ppo.encode_state", lambda state: policy._features(state))
 
     _, config = load_config(str(_CONFIGS_DIR / "ppo_baseline.yaml"))
     env = make_env(dataset=DATASET)
@@ -52,11 +51,8 @@ def test_trainer_ppo_runs_end_to_end(fake_policy, make_env, monkeypatch):
     assert df["reward_raw"].notna().all()  # previously dropped by FIXED_FIELDS
 
 
-def test_trainer_pg_runs_end_to_end_and_persists_pg_lr(fake_policy, make_env, monkeypatch):
+def test_trainer_pg_runs_end_to_end_and_persists_pg_lr(fake_policy, make_env):
     policy = fake_policy(state_dim=4)
-    monkeypatch.setattr(
-        "evid_rl_env.agent.policy_gradient.encode_state", lambda state: policy._features(state)
-    )
 
     _, config = load_config(str(_CONFIGS_DIR / "pg_baseline.yaml"))
     env = make_env(dataset=DATASET)
@@ -71,9 +67,8 @@ def test_trainer_pg_runs_end_to_end_and_persists_pg_lr(fake_policy, make_env, mo
     assert df["pg_lr"].notna().all()  # previously dropped by FIXED_FIELDS
 
 
-def test_trainer_with_curriculum_persists_curriculum_mean_score(fake_policy, make_env, monkeypatch):
+def test_trainer_with_curriculum_persists_curriculum_mean_score(fake_policy, make_env):
     policy = fake_policy(state_dim=4)
-    monkeypatch.setattr("evid_rl_env.agent.ppo.encode_state", lambda state: policy._features(state))
 
     _, config = load_config(str(_CONFIGS_DIR / "ppo_baseline.yaml"))
     env = make_env(dataset=DATASET)
