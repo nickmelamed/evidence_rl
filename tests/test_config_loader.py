@@ -45,6 +45,16 @@ def test_load_config_unknown_algo_raises(tmp_path):
         load_config(str(bogus))
 
 
+def _training_judges(cfg, debate_models):
+    training = {cfg.judge_model}
+    training.update(getattr(cfg, "judge_ensemble_models", None) or [])
+    if getattr(cfg, "judge_escalation", False) and cfg.judge_escalation_target == "debate":
+        training |= debate_models
+    if getattr(cfg, "arbiter_model", None):
+        training.add(cfg.arbiter_model)
+    return training
+
+
 def test_gold_judge_is_never_one_of_the_training_judges():
     import glob
 
@@ -59,8 +69,26 @@ def test_gold_judge_is_never_one_of_the_training_judges():
     assert paths
     for path in paths:
         _, cfg = load_config(path)
-        training = {cfg.judge_model}
-        training.update(getattr(cfg, "judge_ensemble_models", None) or [])
-        if getattr(cfg, "judge_escalation", False) and cfg.judge_escalation_target == "debate":
-            training |= debate_models
+        training = _training_judges(cfg, debate_models)
         assert cfg.gold_judge_model not in training, path
+
+
+def test_multiagent_config_sets_the_arbiter_and_the_turn_count():
+    algo, cfg = load_config("configs/ppo_multiagent_debate.yaml")
+    assert algo == "ppo_multiagent"
+    assert cfg.arbiter_model == "HuggingFaceTB/SmolLM2-1.7B-Instruct"
+    assert cfg.turns_per_side == 5
+    assert cfg.gold_judge_model != cfg.arbiter_model
+
+
+def test_guard_catches_a_gold_judge_that_is_also_the_arbiter(tmp_path):
+    (tmp_path / "base.yaml").write_text("seed: 1\n")
+    bad = tmp_path / "bad.yaml"
+    bad.write_text(
+        "algo: ppo_multiagent\n"
+        "rl:\n"
+        "  arbiter_model: org/shared-model\n"
+        "gold_judge_model: org/shared-model\n"
+    )
+    _, cfg = load_config(str(bad))
+    assert cfg.gold_judge_model in _training_judges(cfg, debate_models=set())
