@@ -148,3 +148,40 @@ def test_no_confidence_is_forced_when_no_evidence_was_selected(debate):
     for _ in range(9):
         debate.step(Actions.RERANK, None)
     assert debate.current_allowed_actions() == CONTRADICT_ROLE
+
+
+def test_a_spent_token_budget_ends_the_debate_with_a_scored_finalize(make_env):
+    debate = DebateEnv(make_env(dataset=DATASET), turns_per_side=5, max_tokens=10)
+    debate.reset()
+    results = []
+    for action, payload in _script(debate):
+        results.append(debate.step(action, payload))
+        if results[-1][2]:
+            break
+
+    # Three setup turns carry no tokens, then each argument adds 3, so the fourth
+    # argument (turn 7) reaches 12 and ends the debate.
+    assert len(results) == 7
+    _, _, done, info = results[-1]
+    assert done
+    assert info["truncated"] is True
+    assert "final_reward" in info
+    assert debate.env.state.steps_taken == 8
+
+
+def test_a_debate_inside_its_budget_is_not_truncated(make_env):
+    debate = DebateEnv(make_env(dataset=DATASET), turns_per_side=5, max_tokens=1000)
+    _, info, _ = _play(debate)
+    assert info["truncated"] is False
+
+
+def test_no_budget_means_no_truncation(debate):
+    _, info, _ = _play(debate)
+    assert info["truncated"] is False
+
+
+def test_the_budget_resets_between_episodes(make_env):
+    debate = DebateEnv(make_env(dataset=DATASET), turns_per_side=5, max_tokens=1000)
+    _play(debate)
+    debate.reset()
+    assert debate.tokens_used == 0

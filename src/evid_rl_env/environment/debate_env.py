@@ -15,16 +15,20 @@ class DebateEnv:
     ``step`` takes the action of whichever role is up and returns that step's
     reward. If no confidence has been assigned by the last turn, that turn must
     assign one, so the final score does not fall back to the evidence-count
-    guess. After the last turn the environment runs FINALIZE itself, so the
+    guess. If ``max_tokens`` is set and the roles' payloads have used that many
+    tokens, the debate ends early. It is still finalized, so the arbiter always
+    scores the transcript and ``info["truncated"]`` marks the early end. After the last turn the environment runs FINALIZE itself, so the
     arbiter that backs the ``ClaimEnv`` scores the full transcript. That reward
     comes back in ``info["final_reward"]`` and belongs to both roles.
     """
 
-    def __init__(self, env, turns_per_side: int = 5):
+    def __init__(self, env, turns_per_side: int = 5, max_tokens: int | None = None):
         if turns_per_side < 2:
             raise ValueError("turns_per_side must be at least 2")
         self.env = env
         self.turns_per_side = turns_per_side
+        self.max_tokens = max_tokens
+        self.tokens_used = 0
         self._turn = 0
 
     @property
@@ -59,6 +63,7 @@ class DebateEnv:
         # the step limit, which would replace the arbiter's reward with -0.2.
         state.max_steps = self.total_turns + 1
         self._turn = 0
+        self.tokens_used = 0
         return state
 
     def step(self, action, payload):
@@ -69,10 +74,14 @@ class DebateEnv:
 
         state, reward, done, info = self.env.step(action, payload)
         self._turn += 1
-        if self._turn < self.total_turns:
+        if isinstance(payload, dict):
+            self.tokens_used += payload.get("tokens", 0)
+        truncated = self.max_tokens is not None and self.tokens_used >= self.max_tokens
+        if self._turn < self.total_turns and not truncated:
             return state, reward, done, info
 
         state, final_reward, done, final_info = self.env.step(Actions.FINALIZE, None)
         if not done:
             raise RuntimeError("FINALIZE did not end the debate")
-        return state, reward, done, {**info, **final_info, "final_reward": final_reward}
+        info = {**info, **final_info, "final_reward": final_reward, "truncated": truncated}
+        return state, reward, done, info
