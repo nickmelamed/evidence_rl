@@ -115,3 +115,61 @@ def test_repeating_a_prompt_gives_a_new_sample(monkeypatch):
     client.generate_structured("same")
     client.generate_structured("same")
     assert values[0] != values[1]
+
+
+class _FakeMessages:
+    def __init__(self, text=None, exc=None):
+        self._text, self._exc, self.calls = text, exc, 0
+
+    def create(self, **kwargs):
+        self.calls += 1
+        if self._exc is not None:
+            raise self._exc
+        import types
+        return types.SimpleNamespace(content=[types.SimpleNamespace(text=self._text)])
+
+
+def _annotator(text=None, exc=None):
+    import types
+
+    from evid_rl_env.agent.llm_client import AnnotatorClient
+
+    client = AnnotatorClient.__new__(AnnotatorClient)
+    client.model = "fake-model"
+    client._cache = {}
+    messages = _FakeMessages(text, exc)
+    client._client = types.SimpleNamespace(messages=messages)
+    return client, messages
+
+
+def test_annotator_returns_the_parsed_index_and_caches_it():
+    client, messages = _annotator(text="Action 4")
+    assert client.select_action("obs", ["a"] * 13) == 4
+    assert client.select_action("obs", ["a"] * 13) == 4
+    assert messages.calls == 1
+
+
+def test_annotator_clips_an_out_of_range_index():
+    client, _ = _annotator(text="99")
+    assert client.select_action("obs", ["a"] * 13) == 12
+
+
+def test_annotator_raises_when_the_api_call_fails():
+    import pytest
+
+    from evid_rl_env.agent.llm_client import AnnotatorError
+
+    client, _ = _annotator(exc=ConnectionError("down"))
+    with pytest.raises(AnnotatorError, match="down"):
+        client.select_action("obs", ["a"] * 13)
+
+
+def test_annotator_raises_when_the_reply_has_no_index():
+    import pytest
+
+    from evid_rl_env.agent.llm_client import AnnotatorError
+
+    client, messages = _annotator(text="no idea")
+    with pytest.raises(AnnotatorError, match="could not parse"):
+        client.select_action("obs", ["a"] * 13)
+    assert client._cache == {}
